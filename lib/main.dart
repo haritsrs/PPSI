@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Import future pages (for modularity)
+// Example: import 'pages/overview_page.dart';
+// We'll add these later as the app grows
+
 void main() {
   runApp(const KiosDarmaApp());
 }
@@ -15,7 +19,14 @@ class KiosDarmaApp extends StatelessWidget {
         primarySwatch: Colors.indigo,
         fontFamily: 'Segoe UI',
       ),
-      home: const HomePage(),
+      // Routing setup: HomePage is still the default
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomePage(),
+        // '/catalog': (context) => const CatalogPage(),
+        // '/cart': (context) => const CartPage(),
+        // '/profile': (context) => const ProfilePage(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
@@ -52,10 +63,10 @@ class HomePage extends StatelessWidget {
                       height: 160,
                     ),
                   ),
-                  Text(
+                  const Text(
                     "Kelola Toko Lebih Mudah dengan KiosDarma",
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -72,7 +83,10 @@ class HomePage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          // Example navigation for next steps
+                          // Navigator.pushNamed(context, '/catalog');
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.indigo,
@@ -124,20 +138,23 @@ class HomePage extends StatelessWidget {
                     alignment: WrapAlignment.center,
                     children: const [
                       FeatureCard(
-                          icon: "📱",
-                          title: "100% Offline",
-                          desc:
-                              "Bekerja tanpa koneksi internet. Semua data tersimpan aman di perangkat."),
+                        icon: "📱",
+                        title: "100% Offline",
+                        desc:
+                            "Bekerja tanpa koneksi internet. Semua data tersimpan aman di perangkat.",
+                      ),
                       FeatureCard(
-                          icon: "🔍",
-                          title: "Barcode Scanner",
-                          desc:
-                              "Terhubung langsung dengan pemindai barcode Android."),
+                        icon: "🔍",
+                        title: "Barcode Scanner",
+                        desc:
+                            "Terhubung langsung dengan pemindai barcode Android.",
+                      ),
                       FeatureCard(
-                          icon: "💰",
-                          title: "Kasir Modern",
-                          desc:
-                              "Point of Sale lengkap dengan perhitungan otomatis."),
+                        icon: "💰",
+                        title: "Kasir Modern",
+                        desc:
+                            "Point of Sale lengkap dengan perhitungan otomatis.",
+                      ),
                     ],
                   )
                 ],
@@ -145,6 +162,33 @@ class HomePage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.indigo,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              // Home
+              break;
+            case 1:
+              // Navigator.pushNamed(context, '/catalog');
+              break;
+            case 2:
+              // Navigator.pushNamed(context, '/cart');
+              break;
+            case 3:
+              // Navigator.pushNamed(context, '/profile');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: "Produk"),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Keranjang"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
+        ],
       ),
     );
   }
@@ -155,8 +199,12 @@ class FeatureCard extends StatelessWidget {
   final String title;
   final String desc;
 
-  const FeatureCard(
-      {super.key, required this.icon, required this.title, required this.desc});
+  const FeatureCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.desc,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -166,8 +214,7 @@ class FeatureCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: const [
-          BoxShadow(
-              color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))
         ],
         borderRadius: BorderRadius.circular(16),
       ),
@@ -178,7 +225,10 @@ class FeatureCard extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
