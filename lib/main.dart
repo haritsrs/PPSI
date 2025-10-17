@@ -38,127 +38,175 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F6F6),
+      appBar: AppBar(
+        backgroundColor: Colors.indigo,
+        elevation: 0,
+        title: const Text(
+          "KiosDarma",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        actions: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+          ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // HERO SECTION
+            Row(
+  children: [
+    Image.asset(
+      'assets/images/logo.png',
+      height: 50,
+      width: 50,
+    ),
+    SizedBox(width: 10),
+    Text(
+      'KiosDarma',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.green[700],
+      ),
+    ),
+  ],
+),
+SizedBox(height: 20),
+            // Greeting
+            const Text(
+              "Selamat datang kembali, Harits 👋",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Summary card
             Container(
-              height: MediaQuery.of(context).size.height * 0.9,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
                   colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 6,
+                    offset: Offset(0, 4),
+                  )
+                ],
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      height: 160,
-                    ),
-                  ),
-                  const Text(
-                    "Kelola Toko Lebih Mudah dengan KiosDarma",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Sistem kasir offline lengkap untuk usaha kecil Anda.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          // Example navigation for next steps
-                          // Navigator.pushNamed(context, '/catalog');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.indigo,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: const Text("Download Sekarang"),
+                      Text(
+                        "Pendapatan Hari Ini",
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
-                      const SizedBox(width: 16),
-                      OutlinedButton(
-                        onPressed: () {},
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
+                      SizedBox(height: 6),
+                      Text(
+                        "Rp 1.250.000",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: const Text("Pelajari Lebih Lanjut"),
                       ),
                     ],
                   ),
+                  Icon(Icons.show_chart, color: Colors.white, size: 36),
                 ],
               ),
             ),
 
-            // FITUR SECTION
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 20),
-              child: Column(
-                children: [
-                  const Text(
-                    "Kenapa Memilih KiosDarma?",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    alignment: WrapAlignment.center,
-                    children: const [
-                      FeatureCard(
-                        icon: "📱",
-                        title: "100% Offline",
-                        desc:
-                            "Bekerja tanpa koneksi internet. Semua data tersimpan aman di perangkat.",
-                      ),
-                      FeatureCard(
-                        icon: "🔍",
-                        title: "Barcode Scanner",
-                        desc:
-                            "Terhubung langsung dengan pemindai barcode Android.",
-                      ),
-                      FeatureCard(
-                        icon: "💰",
-                        title: "Kasir Modern",
-                        desc:
-                            "Point of Sale lengkap dengan perhitungan otomatis.",
-                      ),
-                    ],
-                  )
-                ],
+            const SizedBox(height: 24),
+
+            // Feature grid
+            const Text(
+              "Fitur Utama",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
               ),
+            ),
+            const SizedBox(height: 12),
+
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              children: const [
+                HomeFeature(icon: Icons.point_of_sale, label: "Kasir"),
+                HomeFeature(icon: Icons.inventory, label: "Stok Barang"),
+                HomeFeature(icon: Icons.receipt_long, label: "Laporan"),
+                HomeFeature(icon: Icons.qr_code_scanner, label: "Scan Barcode"),
+                HomeFeature(icon: Icons.people, label: "Pelanggan"),
+                HomeFeature(icon: Icons.payment, label: "Pembayaran"),
+                HomeFeature(icon: Icons.cloud_off, label: "Mode Offline"),
+                HomeFeature(icon: Icons.settings, label: "Pengaturan"),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // Recent section
+            const Text(
+              "Ringkasan Hari Ini",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Column(
+              children: const [
+                SummaryCard(
+                  title: "Transaksi Selesai",
+                  value: "42",
+                  icon: Icons.shopping_bag_outlined,
+                  color: Colors.teal,
+                ),
+                SizedBox(height: 12),
+                SummaryCard(
+                  title: "Barang Hampir Habis",
+                  value: "5 Produk",
+                  icon: Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                ),
+                SizedBox(height: 12),
+                SummaryCard(
+                  title: "Total Pelanggan",
+                  value: "120",
+                  icon: Icons.people_alt_outlined,
+                  color: Colors.blue,
+                ),
+              ],
             ),
           ],
         ),
@@ -167,27 +215,118 @@ class HomePage extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.indigo,
         unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              // Home
-              break;
-            case 1:
-              // Navigator.pushNamed(context, '/catalog');
-              break;
-            case 2:
-              // Navigator.pushNamed(context, '/cart');
-              break;
-            case 3:
-              // Navigator.pushNamed(context, '/profile');
-              break;
-          }
-        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
           BottomNavigationBarItem(icon: Icon(Icons.store), label: "Produk"),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Keranjang"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Kasir"),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Laporan"),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeFeature extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const HomeFeature({super.key, required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {}, // TODO: add navigation later
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.indigo, size: 28),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SummaryCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const SummaryCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 42,
+                width: 42,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
         ],
       ),
     );
