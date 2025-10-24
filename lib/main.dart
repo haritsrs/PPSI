@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'pages/kasir_page.dart';
 
 // Import future pages (for modularity)
 // Example: import 'pages/overview_page.dart';
@@ -143,7 +144,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _showComingSoon(context, 'Produk');
         break;
       case 2:
-        _showComingSoon(context, 'Kasir');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const KasirPage()),
+        );
         break;
       case 3:
         _showComingSoon(context, 'Laporan');
@@ -431,7 +435,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       icon: Icons.point_of_sale_rounded,
                       label: "Kasir",
                       color: const Color(0xFF10B981),
-                      onTap: () => _showComingSoon(context, 'Kasir'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const KasirPage()),
+                        );
+                      },
                     ),
                     HomeFeature(
                       icon: Icons.inventory_2_rounded,
