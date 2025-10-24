@@ -18,7 +18,54 @@ class KiosDarmaApp extends StatelessWidget {
       title: 'KiosDarma',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
-        fontFamily: 'Segoe UI',
+        fontFamily: 'Inter',
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.25,
+          ),
+          headlineSmall: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+          titleLarge: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+          titleMedium: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.15,
+          ),
+          titleSmall: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.1,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0.15,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0.25,
+          ),
+          bodySmall: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0.4,
+          ),
+        ),
       ),
       // Routing setup: HomePage is still the default
       initialRoute: '/',
@@ -140,7 +187,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -163,7 +210,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return const Icon(
-                      Icons.store,
+                      Icons.store_rounded,
                       color: Colors.white,
                       size: 24,
                     );
@@ -172,13 +219,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               "KiosDarma",
-              style: TextStyle(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                letterSpacing: 0.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -195,7 +240,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 HapticFeedback.lightImpact();
                 _showComingSoon(context, 'Notifikasi');
               },
-              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              icon: const Icon(Icons.notifications_rounded, color: Colors.white),
             ),
           ),
           Container(
@@ -209,7 +254,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 HapticFeedback.lightImpact();
                 _showComingSoon(context, 'Pengaturan');
               },
-              icon: const Icon(Icons.settings_outlined, color: Colors.white),
+              icon: const Icon(Icons.settings_rounded, color: Colors.white),
             ),
           ),
         ],
@@ -229,14 +274,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF4F46E5).withOpacity(0.3),
+                        color: const Color(0xFF6366F1).withOpacity(0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -264,21 +309,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "Selamat datang kembali!",
-                                  style: TextStyle(
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: Colors.white70,
-                                    fontSize: 16,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
+                                Text(
                                   "Harits 👋",
-                                  style: TextStyle(
+                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                     color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -293,37 +336,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 "Pendapatan Hari Ini",
-                                style: TextStyle(
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: Colors.white70,
-                                  fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                 "Rp 1.250.000",
-                                style: TextStyle(
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                   color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Row(
                                 children: [
                                   Icon(
-                                    Icons.trending_up,
+                                    Icons.trending_up_rounded,
                                     color: Colors.green[300],
                                     size: 16,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     "+12.5% dari kemarin",
-                                    style: TextStyle(
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Colors.green[300],
-                                      fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -355,12 +395,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       "Fitur Utama",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     TextButton(
@@ -368,10 +407,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         HapticFeedback.lightImpact();
                         _showComingSoon(context, 'Semua Fitur');
                       },
-                      child: const Text(
+                      child: Text(
                         "Lihat Semua",
-                        style: TextStyle(
-                          color: Color(0xFF4F46E5),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: const Color(0xFF6366F1),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -442,12 +481,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 32),
 
                 // Summary section
-                const Text(
+                Text(
                   "Ringkasan Hari Ini",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: const Color(0xFF1F2937),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -505,7 +543,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           elevation: 0,
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
-          selectedItemColor: const Color(0xFF4F46E5),
+          selectedItemColor: const Color(0xFF6366F1),
           unselectedItemColor: const Color(0xFF9CA3AF),
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
@@ -631,9 +669,8 @@ class _HomeFeatureState extends State<HomeFeature>
               const SizedBox(height: 8),
               Text(
                 widget.label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF374151),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF374151),
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
@@ -755,17 +792,15 @@ class _SummaryCardState extends State<SummaryCard>
                   children: [
                     Text(
                       widget.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF374151),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF374151),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey[600],
                         fontWeight: FontWeight.w500,
                       ),
@@ -778,10 +813,9 @@ class _SummaryCardState extends State<SummaryCard>
                 children: [
                   Text(
                     widget.value,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1F2937),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -789,15 +823,14 @@ class _SummaryCardState extends State<SummaryCard>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        widget.trend ? Icons.trending_up : Icons.trending_down,
+                        widget.trend ? Icons.trending_up_rounded : Icons.trending_down_rounded,
                         color: widget.trend ? Colors.green[600] : Colors.red[600],
                         size: 16,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         widget.trend ? "Naik" : "Turun",
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: widget.trend ? Colors.green[600] : Colors.red[600],
                           fontWeight: FontWeight.w600,
                         ),
