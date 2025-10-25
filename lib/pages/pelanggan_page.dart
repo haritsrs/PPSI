@@ -1,105 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/product_model.dart';
+import '../models/customer_model.dart';
 
-class ProdukPage extends StatefulWidget {
-  const ProdukPage({super.key});
+class PelangganPage extends StatefulWidget {
+  const PelangganPage({super.key});
 
   @override
-  State<ProdukPage> createState() => _ProdukPageState();
+  State<PelangganPage> createState() => _PelangganPageState();
 }
 
-class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
+class _PelangganPageState extends State<PelangganPage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
-  String _selectedCategory = 'Semua';
-  String _selectedFilter = 'Semua';
   String _searchQuery = '';
   
-  final List<String> _categories = ['Semua', 'Makanan', 'Minuman', 'Snack', 'Lainnya'];
-  final List<String> _filters = ['Semua', 'Stok Rendah', 'Habis', 'Tersedia'];
-  
-  // Sample product data
-  final List<Product> _products = [
-    Product(
-      id: 'PRD001',
-      name: 'Indomie Goreng',
-      description: 'Mie instan rasa goreng',
-      price: 2500,
-      stock: 45,
-      minStock: 10,
-      supplier: 'PT Indofood',
-      category: 'Makanan',
-      barcode: '8991002101234',
+  // Sample customer data
+  final List<Customer> _customers = [
+    Customer(
+      id: 'CUST001',
+      name: 'Ahmad Wijaya',
+      phone: '081234567890',
+      email: 'ahmad.wijaya@email.com',
+      address: 'Jl. Merdeka No. 123, Jakarta',
+      transactionCount: 15,
+      totalSpent: 1250000,
+      createdAt: DateTime.now().subtract(const Duration(days: 90)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 2)),
+      notes: 'Pelanggan setia, sering beli snack',
+    ),
+    Customer(
+      id: 'CUST002',
+      name: 'Siti Nurhaliza',
+      phone: '081234567891',
+      email: 'siti.nurhaliza@email.com',
+      address: 'Jl. Sudirman No. 456, Bandung',
+      transactionCount: 8,
+      totalSpent: 450000,
+      createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 5)),
+      notes: 'Suka minuman dingin',
+    ),
+    Customer(
+      id: 'CUST003',
+      name: 'Budi Santoso',
+      phone: '081234567892',
+      email: 'budi.santoso@email.com',
+      address: 'Jl. Gatot Subroto No. 789, Surabaya',
+      transactionCount: 3,
+      totalSpent: 75000,
       createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 10)),
     ),
-    Product(
-      id: 'PRD002',
-      name: 'Aqua 600ml',
-      description: 'Air mineral kemasan',
-      price: 3000,
-      stock: 5,
-      minStock: 15,
-      supplier: 'PT Tirta Investama',
-      category: 'Minuman',
-      barcode: '8991002101235',
-      createdAt: DateTime.now().subtract(const Duration(days: 25)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    Customer(
+      id: 'CUST004',
+      name: 'Dewi Sartika',
+      phone: '081234567893',
+      email: 'dewi.sartika@email.com',
+      address: 'Jl. Thamrin No. 321, Medan',
+      transactionCount: 22,
+      totalSpent: 2100000,
+      createdAt: DateTime.now().subtract(const Duration(days: 120)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 1)),
+      notes: 'Pelanggan VIP, sering beli dalam jumlah besar',
     ),
-    Product(
-      id: 'PRD003',
-      name: 'Chitato Original',
-      description: 'Keripik kentang rasa original',
-      price: 5000,
-      stock: 0,
-      minStock: 8,
-      supplier: 'PT Indofood',
-      category: 'Snack',
-      barcode: '8991002101236',
-      createdAt: DateTime.now().subtract(const Duration(days: 20)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+    Customer(
+      id: 'CUST005',
+      name: 'Rudi Hartono',
+      phone: '081234567894',
+      email: 'rudi.hartono@email.com',
+      address: 'Jl. Diponegoro No. 654, Yogyakarta',
+      transactionCount: 12,
+      totalSpent: 680000,
+      createdAt: DateTime.now().subtract(const Duration(days: 75)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 3)),
     ),
-    Product(
-      id: 'PRD004',
-      name: 'Teh Botol Sosro',
-      description: 'Teh manis kemasan botol',
-      price: 4000,
-      stock: 25,
-      minStock: 12,
-      supplier: 'PT Sinar Sosro',
-      category: 'Minuman',
-      barcode: '8991002101237',
-      createdAt: DateTime.now().subtract(const Duration(days: 15)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    Product(
-      id: 'PRD005',
-      name: 'Roti Tawar',
-      description: 'Roti tawar kemasan',
-      price: 12000,
-      stock: 8,
-      minStock: 10,
-      supplier: 'PT Sari Roti',
-      category: 'Makanan',
-      barcode: '8991002101238',
-      createdAt: DateTime.now().subtract(const Duration(days: 10)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    Product(
-      id: 'PRD006',
-      name: 'Kopi Kapal Api',
-      description: 'Kopi instan kemasan sachet',
-      price: 1500,
-      stock: 30,
-      minStock: 20,
-      supplier: 'PT Santos Jaya Abadi',
-      category: 'Minuman',
-      barcode: '8991002101239',
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      updatedAt: DateTime.now(),
+    Customer(
+      id: 'CUST006',
+      name: 'Maya Sari',
+      phone: '081234567895',
+      email: 'maya.sari@email.com',
+      address: 'Jl. Pahlawan No. 987, Semarang',
+      transactionCount: 5,
+      totalSpent: 180000,
+      createdAt: DateTime.now().subtract(const Duration(days: 45)),
+      lastTransaction: DateTime.now().subtract(const Duration(days: 7)),
     ),
   ];
 
@@ -136,42 +122,21 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  List<Product> get _filteredProducts {
-    return _products.where((product) {
-      // Category filter
-      if (_selectedCategory != 'Semua' && product.category != _selectedCategory) {
-        return false;
-      }
-      
-      // Stock filter
-      switch (_selectedFilter) {
-        case 'Stok Rendah':
-          return product.isLowStock && !product.isOutOfStock;
-        case 'Habis':
-          return product.isOutOfStock;
-        case 'Tersedia':
-          return !product.isLowStock && !product.isOutOfStock;
-        default:
-          break;
-      }
-      
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        return product.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-               product.supplier.toLowerCase().contains(_searchQuery.toLowerCase());
-      }
-      
-      return true;
+  List<Customer> get _filteredCustomers {
+    if (_searchQuery.isEmpty) {
+      return _customers;
+    }
+    
+    return _customers.where((customer) {
+      return customer.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             customer.phone.contains(_searchQuery) ||
+             customer.email.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
-  int get _lowStockCount {
-    return _products.where((product) => product.isLowStock && !product.isOutOfStock).length;
-  }
-
-  int get _outOfStockCount {
-    return _products.where((product) => product.isOutOfStock).length;
-  }
+  int get _totalCustomers => _customers.length;
+  int get _vipCustomers => _customers.where((c) => c.customerTier == 'VIP').length;
+  double get _totalRevenue => _customers.fold(0.0, (sum, customer) => sum + customer.totalSpent);
 
   @override
   Widget build(BuildContext context) {
@@ -199,14 +164,14 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
-                Icons.inventory_2_rounded,
+                Icons.people_rounded,
                 color: Colors.white,
                 size: 24,
               ),
             ),
             const SizedBox(width: 12),
             Text(
-              "Produk & Stok",
+              "Pelanggan",
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -216,20 +181,6 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         ),
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showScanDialog();
-              },
-              icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
-            ),
-          ),
-          Container(
             margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
@@ -238,7 +189,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
             child: IconButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
-                _showAddProductDialog();
+                _showAddCustomerDialog();
               },
               icon: const Icon(Icons.add_rounded, color: Colors.white),
             ),
@@ -254,7 +205,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Search and Filter Section
+                // Search Section
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -272,14 +223,13 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Cari & Filter Produk",
+                        "Cari Pelanggan",
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1F2937),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Search Bar
                       TextField(
                         onChanged: (value) {
                           setState(() {
@@ -287,7 +237,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'Cari produk atau supplier...',
+                          hintText: 'Cari nama, nomor telepon, atau email...',
                           prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1)),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -301,82 +251,6 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                           fillColor: const Color(0xFFF8FAFC),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Category Filter
-                      Text(
-                        "Kategori",
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF374151),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _categories.map((category) {
-                            final isSelected = _selectedCategory == category;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedCategory = category;
-                                });
-                                HapticFeedback.lightImpact();
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFF6366F1) : Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  category,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: isSelected ? Colors.white : Colors.grey[600],
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Stock Filter
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Filter Stok",
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF374151),
-                            ),
-                          ),
-                          DropdownButton<String>(
-                            value: _selectedFilter,
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                _selectedFilter = newValue!;
-                              });
-                            },
-                            underline: Container(),
-                            items: _filters.map<DropdownMenuItem<String>>((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(
-                                  value,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF1F2937),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            icon: const Icon(Icons.filter_list_rounded, color: Color(0xFF6366F1)),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -388,9 +262,9 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                   children: [
                     Expanded(
                       child: _buildSummaryCard(
-                        title: "Total Produk",
-                        value: _products.length.toDouble(),
-                        icon: Icons.inventory_2_rounded,
+                        title: "Total Pelanggan",
+                        value: _totalCustomers.toDouble(),
+                        icon: Icons.people_rounded,
                         color: const Color(0xFF3B82F6),
                         isCurrency: false,
                       ),
@@ -398,10 +272,10 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildSummaryCard(
-                        title: "Stok Rendah",
-                        value: _lowStockCount.toDouble(),
-                        icon: Icons.warning_amber_rounded,
-                        color: const Color(0xFFF59E0B),
+                        title: "Pelanggan VIP",
+                        value: _vipCustomers.toDouble(),
+                        icon: Icons.star_rounded,
+                        color: const Color(0xFF8B5CF6),
                         isCurrency: false,
                       ),
                     ),
@@ -410,33 +284,73 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
 
                 const SizedBox(height: 16),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildSummaryCard(
-                        title: "Habis",
-                        value: _outOfStockCount.toDouble(),
-                        icon: Icons.error_rounded,
-                        color: const Color(0xFFEF4444),
-                        isCurrency: false,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
+                    ],
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withOpacity(0.1),
+                      width: 1,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSummaryCard(
-                        title: "Nilai Stok",
-                        value: _calculateTotalStockValue(),
-                        icon: Icons.attach_money_rounded,
-                        color: const Color(0xFF10B981),
-                        isCurrency: true,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.attach_money_rounded,
+                              color: Color(0xFF10B981),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Total Revenue",
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Rp ${_totalRevenue.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1F2937),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // Product List
+                // Customer List
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -457,7 +371,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Daftar Produk (${_filteredProducts.length})",
+                            "Daftar Pelanggan (${_filteredCustomers.length})",
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF1F2937),
@@ -466,10 +380,10 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                           TextButton.icon(
                             onPressed: () {
                               HapticFeedback.lightImpact();
-                              _showAddProductDialog();
+                              _showAddCustomerDialog();
                             },
                             icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Tambah Produk'),
+                            label: const Text('Tambah Pelanggan'),
                             style: TextButton.styleFrom(
                               foregroundColor: const Color(0xFF6366F1),
                               backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
@@ -481,13 +395,13 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredProducts.length,
+                        itemCount: _filteredCustomers.length,
                         itemBuilder: (context, index) {
-                          final product = _filteredProducts[index];
-                          return ProductCard(
-                            product: product,
-                            onTap: () => _showProductDetail(product),
-                            onEdit: () => _showEditProductDialog(product),
+                          final customer = _filteredCustomers[index];
+                          return CustomerCard(
+                            customer: customer,
+                            onTap: () => _showCustomerDetail(customer),
+                            onEdit: () => _showEditCustomerDialog(customer),
                           );
                         },
                       ),
@@ -545,12 +459,11 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                   size: 24,
                 ),
               ),
-              if (color == const Color(0xFFF59E0B) || color == const Color(0xFFEF4444))
-                Icon(
-                  Icons.warning_rounded,
-                  color: color,
-                  size: 20,
-                ),
+              Icon(
+                Icons.trending_up_rounded,
+                color: Colors.green[600],
+                size: 20,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -576,19 +489,15 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     );
   }
 
-  double _calculateTotalStockValue() {
-    return _products.fold(0.0, (sum, product) => sum + (product.price * product.stock));
-  }
-
-  void _showProductDetail(Product product) {
+  void _showCustomerDetail(Customer customer) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductDetailModal(product: product),
+      builder: (context) => CustomerDetailModal(customer: customer),
     );
   }
 
-  void _showAddProductDialog() {
+  void _showAddCustomerDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -598,10 +507,10 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
             children: [
               Icon(Icons.add_rounded, color: Colors.blue[600]),
               const SizedBox(width: 8),
-              const Text('Tambah Produk'),
+              const Text('Tambah Pelanggan'),
             ],
           ),
-          content: const Text('Fitur tambah produk akan segera hadir!'),
+          content: const Text('Fitur tambah pelanggan akan segera hadir!'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -613,7 +522,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     );
   }
 
-  void _showEditProductDialog(Product product) {
+  void _showEditCustomerDialog(Customer customer) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -623,35 +532,10 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
             children: [
               Icon(Icons.edit_rounded, color: Colors.orange[600]),
               const SizedBox(width: 8),
-              const Text('Edit Stok'),
+              const Text('Edit Pelanggan'),
             ],
           ),
-          content: Text('Edit stok untuk ${product.name} akan segera hadir!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showScanDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.qr_code_scanner_rounded, color: Colors.purple[600]),
-              const SizedBox(width: 8),
-              const Text('Scan Barcode'),
-            ],
-          ),
-          content: const Text('Fitur scan barcode akan segera hadir!'),
+          content: Text('Edit data ${customer.name} akan segera hadir!'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -664,34 +548,20 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
   }
 }
 
-class ProductCard extends StatelessWidget {
-  final Product product;
+class CustomerCard extends StatelessWidget {
+  final Customer customer;
   final VoidCallback onTap;
   final VoidCallback onEdit;
 
-  const ProductCard({
+  const CustomerCard({
     super.key,
-    required this.product,
+    required this.customer,
     required this.onTap,
     required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
-    Color statusColor;
-    IconData statusIcon;
-    
-    if (product.isOutOfStock) {
-      statusColor = const Color(0xFFEF4444);
-      statusIcon = Icons.error_rounded;
-    } else if (product.isLowStock) {
-      statusColor = const Color(0xFFF59E0B);
-      statusIcon = Icons.warning_rounded;
-    } else {
-      statusColor = const Color(0xFF10B981);
-      statusIcon = Icons.check_circle_rounded;
-    }
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -701,23 +571,29 @@ class ProductCard extends StatelessWidget {
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: statusColor.withOpacity(0.2),
+            color: customer.tierColor.withOpacity(0.2),
             width: 1,
           ),
         ),
         child: Row(
           children: [
+            // Avatar
             Container(
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: customer.tierColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                statusIcon,
-                color: statusColor,
-                size: 24,
+              child: Center(
+                child: Text(
+                  customer.initials,
+                  style: TextStyle(
+                    color: customer.tierColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -726,7 +602,7 @@ class ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product.name,
+                    customer.name,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFF1F2937),
@@ -734,14 +610,14 @@ class ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${product.supplier} • ${product.category}',
+                    customer.phone,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[600],
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Stok: ${product.stock} • Min: ${product.minStock}',
+                    '${customer.transactionCount} transaksi • ${customer.customerTier}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[500],
                     ),
@@ -753,7 +629,7 @@ class ProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'Rp ${product.price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                  'Rp ${customer.totalSpent.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF6366F1),
@@ -763,13 +639,13 @@ class ProductCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: customer.tierColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    product.stockStatus,
+                    customer.customerTier,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: statusColor,
+                      color: customer.tierColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -799,26 +675,16 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-class ProductDetailModal extends StatelessWidget {
-  final Product product;
+class CustomerDetailModal extends StatelessWidget {
+  final Customer customer;
 
-  const ProductDetailModal({
+  const CustomerDetailModal({
     super.key,
-    required this.product,
+    required this.customer,
   });
 
   @override
   Widget build(BuildContext context) {
-    Color statusColor;
-    
-    if (product.isOutOfStock) {
-      statusColor = const Color(0xFFEF4444);
-    } else if (product.isLowStock) {
-      statusColor = const Color(0xFFF59E0B);
-    } else {
-      statusColor = const Color(0xFF10B981);
-    }
-
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
@@ -848,7 +714,7 @@ class ProductDetailModal extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "Detail Produk",
+                  "Detail Pelanggan",
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF1F2937),
@@ -873,65 +739,114 @@ class ProductDetailModal extends StatelessWidget {
             ),
           ),
           
-          // Product Details
+          // Customer Details
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow("ID Produk", product.id),
-                  _buildDetailRow("Nama", product.name),
-                  _buildDetailRow("Deskripsi", product.description),
-                  _buildDetailRow("Kategori", product.category),
-                  _buildDetailRow("Supplier", product.supplier),
-                  _buildDetailRow("Barcode", product.barcode),
-                  _buildDetailRow("Stok Saat Ini", "${product.stock} unit"),
-                  _buildDetailRow("Stok Minimum", "${product.minStock} unit"),
-                  _buildDetailRow("Status", product.stockStatus),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [statusColor, statusColor.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  // Customer Avatar and Basic Info
+                  Center(
                     child: Column(
                       children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: customer.tierColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Center(
+                            child: Text(
+                              customer.initials,
+                              style: TextStyle(
+                                color: customer.tierColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          "Harga Satuan",
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
+                          customer.name,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F2937),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Rp ${product.price.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: customer.tierColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            customer.customerTier,
+                            style: TextStyle(
+                              color: customer.tierColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Customer Details
+                  _buildDetailRow("ID Pelanggan", customer.id),
+                  _buildDetailRow("Nomor Telepon", customer.phone),
+                  _buildDetailRow("Email", customer.email),
+                  _buildDetailRow("Alamat", customer.address),
+                  _buildDetailRow("Total Transaksi", "${customer.transactionCount} kali"),
+                  _buildDetailRow("Total Belanja", 'Rp ${customer.totalSpent.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'),
+                  _buildDetailRow("Terakhir Transaksi", _formatDate(customer.lastTransaction)),
+                  
+                  if (customer.notes.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      "Catatan",
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF374151),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        customer.notes,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Action Buttons
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            // TODO: Implement edit stock
+                            // TODO: Implement edit customer
                           },
                           icon: const Icon(Icons.edit_rounded),
-                          label: const Text('Edit Stok'),
+                          label: const Text('Edit Data'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF6366F1),
                             foregroundColor: Colors.white,
@@ -947,10 +862,10 @@ class ProductDetailModal extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            // TODO: Implement scan barcode
+                            // TODO: Implement view transactions
                           },
-                          icon: const Icon(Icons.qr_code_scanner_rounded),
-                          label: const Text('Scan'),
+                          icon: const Icon(Icons.receipt_long_rounded),
+                          label: const Text('Riwayat'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF6366F1),
                             side: const BorderSide(color: Color(0xFF6366F1)),
@@ -998,5 +913,9 @@ class ProductDetailModal extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
   }
 }

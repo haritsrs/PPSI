@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'pages/kasir_page.dart';
+import 'pages/laporan_page.dart';
+import 'pages/produk_page.dart';
+import 'pages/pelanggan_page.dart';
+import 'pages/pengaturan_page.dart';
 
 // Import future pages (for modularity)
 // Example: import 'pages/overview_page.dart';
@@ -141,7 +145,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         // Already on home
         break;
       case 1:
-        _showComingSoon(context, 'Produk');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ProdukPage()),
+        );
         break;
       case 2:
         Navigator.push(
@@ -150,7 +157,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         );
         break;
       case 3:
-        _showComingSoon(context, 'Laporan');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LaporanPage()),
+        );
         break;
     }
   }
@@ -256,7 +266,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: IconButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
-                _showComingSoon(context, 'Pengaturan');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const PengaturanPage()),
+                );
               },
               icon: const Icon(Icons.settings_rounded, color: Colors.white),
             ),
@@ -446,13 +459,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       icon: Icons.inventory_2_rounded,
                       label: "Stok",
                       color: const Color(0xFF3B82F6),
-                      onTap: () => _showComingSoon(context, 'Stok Barang'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ProdukPage()),
+                        );
+                      },
                     ),
                     HomeFeature(
                       icon: Icons.analytics_rounded,
                       label: "Laporan",
                       color: const Color(0xFF8B5CF6),
-                      onTap: () => _showComingSoon(context, 'Laporan'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LaporanPage()),
+                        );
+                      },
                     ),
                     HomeFeature(
                       icon: Icons.qr_code_scanner_rounded,
@@ -464,7 +487,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       icon: Icons.people_rounded,
                       label: "Pelanggan",
                       color: const Color(0xFFEF4444),
-                      onTap: () => _showComingSoon(context, 'Pelanggan'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PelangganPage()),
+                        );
+                      },
                     ),
                     HomeFeature(
                       icon: Icons.payment_rounded,
@@ -482,7 +510,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       icon: Icons.settings_rounded,
                       label: "Setting",
                       color: const Color(0xFFEC4899),
-                      onTap: () => _showComingSoon(context, 'Pengaturan'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PengaturanPage()),
+                        );
+                      },
                     ),
                   ],
                 ),
