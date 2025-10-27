@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'pages/kasir_page.dart';
 import 'pages/laporan_page.dart';
 import 'pages/produk_page.dart';
 import 'pages/pelanggan_page.dart';
 import 'pages/pengaturan_page.dart';
+import 'pages/auth_wrapper.dart';
+import 'firebase_options.dart';
 
 // Import future pages (for modularity)
 // Example: import 'pages/overview_page.dart';
 // We'll add these later as the app grows
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const KiosDarmaApp());
 }
 
