@@ -101,10 +101,9 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
           ),
         );
         
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
+        // Pop back to AuthWrapper, which will automatically show HomePage
+        // since the user is now logged in
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {

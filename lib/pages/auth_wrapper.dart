@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
-import '../main.dart'; // import main.dart to access MyApp or main screen
+import '../main.dart'; // Import to access HomePage
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -12,7 +12,6 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: AuthService.authStateChanges,
       builder: (context, snapshot) {
-        // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAFC),
@@ -21,7 +20,8 @@ class AuthWrapper extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
                   ),
                   SizedBox(height: 16),
                   Text(
@@ -38,13 +38,11 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // If user is logged in, go to main.dart (MyApp or your main screen)
         if (snapshot.hasData && snapshot.data != null) {
-          return const KiosDarmaApp(); // or replace with whatever root widget you use in main.dart
+          return const HomePage();
         }
 
-        // If user is not logged in, show login page
-        return LoginPage();
+        return const LoginPage();
       },
     );
   }

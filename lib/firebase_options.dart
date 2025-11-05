@@ -41,20 +41,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'your-web-api-key',
-    appId: 'your-web-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: "AIzaSyBoLRkZzpFRlmGo0rYxZmQtyBPA9aNQjYM",
+    authDomain: "gunadarma-pos-marketplace.firebaseapp.com",
+    projectId: "gunadarma-pos-marketplace",
+    storageBucket: "gunadarma-pos-marketplace.firebasestorage.app",
+    messagingSenderId: "410635663253",
+    appId: "1:410635663253:web:24d960f24f6acf1899a89c",
+  measurementId: "G-ZB3RZ8ZDTG"
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'your-android-api-key',
-    appId: 'your-android-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyD7QUD_E5bgcBCukHmEhaCd-VpSCMca9Kg',
+    appId: 'gunadarma-pos-marketplace',
+    messagingSenderId: '410635663253',
+    projectId: '1:410635663253:android:384eb100bef8f64c99a89c',
+    storageBucket: 'gunadarma-pos-marketplace.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -76,11 +77,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'your-windows-api-key',
-    appId: 'your-windows-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: "AIzaSyBoLRkZzpFRlmGo0rYxZmQtyBPA9aNQjYM",
+    authDomain: "gunadarma-pos-marketplace.firebaseapp.com",
+    projectId: "gunadarma-pos-marketplace",
+    storageBucket: "gunadarma-pos-marketplace.firebasestorage.app",
+    messagingSenderId: "410635663253",
+    appId: "1:410635663253:web:ff2d419db6af737999a89c",
+    measurementId: "G-QJXMMF6S9Q"
   );
 }

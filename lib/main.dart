@@ -7,6 +7,8 @@ import 'pages/produk_page.dart';
 import 'pages/pelanggan_page.dart';
 import 'pages/pengaturan_page.dart';
 import 'pages/auth_wrapper.dart';
+import 'pages/account_page.dart';
+import 'pages/logout_page.dart';
 import 'firebase_options.dart';
 
 // Import future pages (for modularity)
@@ -79,10 +81,10 @@ class KiosDarmaApp extends StatelessWidget {
           ),
         ),
       ),
-      // Routing setup: HomePage is still the default
-      initialRoute: '/',
+      // Routing setup: AuthWrapper handles authentication state
+      home: const AuthWrapper(),
       routes: {
-        '/': (context) => const HomePage(),
+        '/home': (context) => const HomePage(),
         // '/catalog': (context) => const CatalogPage(),
         // '/cart': (context) => const CartPage(),
         // '/profile': (context) => const ProfilePage(),
@@ -259,9 +261,46 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: IconButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AccountPage()),
+                );
+              },
+              icon: const Icon(Icons.person_rounded, color: Colors.white),
+              tooltip: 'Akun',
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
                 _showComingSoon(context, 'Notifikasi');
               },
               icon: const Icon(Icons.notifications_rounded, color: Colors.white),
+              tooltip: 'Notifikasi',
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LogoutPage()),
+                );
+              },
+              icon: const Icon(Icons.logout_rounded, color: Colors.white),
+              tooltip: 'Keluar',
             ),
           ),
           Container(
@@ -279,6 +318,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 );
               },
               icon: const Icon(Icons.settings_rounded, color: Colors.white),
+              tooltip: 'Pengaturan',
             ),
           ),
         ],
@@ -292,74 +332,87 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Welcome Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6366F1).withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                // Welcome Section (Clickable to Account Page)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AccountPage()),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.waving_hand,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.waving_hand,
-                              color: Colors.white,
-                              size: 28,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Selamat datang kembali!",
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Harits 👋",
+                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white.withOpacity(0.7),
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  "Selamat datang kembali!",
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Harits 👋",
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
                               Text(
                                 "Pendapatan Hari Ini",
                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -395,21 +448,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.show_chart_rounded,
+                                color: Colors.white,
+                                size: 40,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.show_chart_rounded,
-                              color: Colors.white,
-                              size: 40,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 

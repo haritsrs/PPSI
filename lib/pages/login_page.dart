@@ -71,9 +71,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         password: _passwordController.text,
       );
       
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      // AuthWrapper will automatically navigate to HomePage when auth state changes
+      // No manual navigation needed here
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
