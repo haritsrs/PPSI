@@ -9,6 +9,7 @@ import 'pages/pengaturan_page.dart';
 import 'pages/auth_wrapper.dart';
 import 'pages/account_page.dart';
 import 'pages/logout_page.dart';
+import 'utils/responsive_helper.dart';
 import 'firebase_options.dart';
 
 // Import future pages (for modularity)
@@ -201,308 +202,351 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final appBarHeight = ResponsiveHelper.getAppBarHeight(context);
+    final iconScale = ResponsiveHelper.getIconScale(context);
+    final bottomNavHeight = ResponsiveHelper.getBottomNavBarHeight(context);
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(appBarHeight),
+        child: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          toolbarHeight: appBarHeight,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
           ),
-        ),
-        title: Row(
-          children: [
+          title: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8 * iconScale),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 24 * iconScale,
+                    height: 24 * iconScale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.store_rounded,
+                        color: Colors.white,
+                        size: 24 * iconScale,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(width: 12 * iconScale),
+              Text(
+                "KiosDarma",
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * ResponsiveHelper.getFontScale(context),
+                ),
+              ),
+            ],
+          ),
+          actions: [
             Container(
-              padding: const EdgeInsets.all(8),
+              margin: EdgeInsets.only(right: 8 * iconScale),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  width: 24,
-                  height: 24,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.store_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    );
-                  },
-                ),
+              child: IconButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AccountPage()),
+                  );
+                },
+                icon: Icon(Icons.person_rounded, color: Colors.white, size: 24 * iconScale),
+                iconSize: 24 * iconScale,
+                padding: EdgeInsets.all(8 * iconScale),
+                tooltip: 'Akun',
               ),
             ),
-            const SizedBox(width: 12),
-            Text(
-              "KiosDarma",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+            Container(
+              margin: EdgeInsets.only(right: 8 * iconScale),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _showComingSoon(context, 'Notifikasi');
+                },
+                icon: Icon(Icons.notifications_rounded, color: Colors.white, size: 24 * iconScale),
+                iconSize: 24 * iconScale,
+                padding: EdgeInsets.all(8 * iconScale),
+                tooltip: 'Notifikasi',
+              ),
+            ),
+            Container(
+              margin: EdgeInsets.only(right: 8 * iconScale),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LogoutPage()),
+                  );
+                },
+                icon: Icon(Icons.logout_rounded, color: Colors.white, size: 24 * iconScale),
+                iconSize: 24 * iconScale,
+                padding: EdgeInsets.all(8 * iconScale),
+                tooltip: 'Keluar',
+              ),
+            ),
+            Container(
+              margin: EdgeInsets.only(right: 16 * iconScale),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const PengaturanPage()),
+                  );
+                },
+                icon: Icon(Icons.settings_rounded, color: Colors.white, size: 24 * iconScale),
+                iconSize: 24 * iconScale,
+                padding: EdgeInsets.all(8 * iconScale),
+                tooltip: 'Pengaturan',
               ),
             ),
           ],
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AccountPage()),
-                );
-              },
-              icon: const Icon(Icons.person_rounded, color: Colors.white),
-              tooltip: 'Akun',
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showComingSoon(context, 'Notifikasi');
-              },
-              icon: const Icon(Icons.notifications_rounded, color: Colors.white),
-              tooltip: 'Notifikasi',
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LogoutPage()),
-                );
-              },
-              icon: const Icon(Icons.logout_rounded, color: Colors.white),
-              tooltip: 'Keluar',
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const PengaturanPage()),
-                );
-              },
-              icon: const Icon(Icons.settings_rounded, color: Colors.white),
-              tooltip: 'Pengaturan',
-            ),
-          ),
-        ],
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(20 * ResponsiveHelper.getPaddingScale(context)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Welcome Section (Clickable to Account Page)
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AccountPage()),
-                    );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366F1).withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(
-                                Icons.waving_hand,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Selamat datang kembali!",
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "Harits 👋",
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.white.withOpacity(0.7),
-                              size: 24,
+                Builder(
+                  builder: (context) {
+                    final iconScale = ResponsiveHelper.getIconScale(context);
+                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    final fontScale = ResponsiveHelper.getFontScale(context);
+                    
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AccountPage()),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(24 * paddingScale),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6366F1).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(12 * iconScale),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(
+                                    Icons.waving_hand,
+                                    color: Colors.white,
+                                    size: 28 * iconScale,
+                                  ),
+                                ),
+                                SizedBox(width: 16 * paddingScale),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Selamat datang kembali!",
+                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: (Theme.of(context).textTheme.bodyLarge?.fontSize ?? 16) * fontScale,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4 * paddingScale),
+                                      Text(
+                                        "Harits 👋",
+                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * fontScale,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: 24 * iconScale,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 20 * paddingScale),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Pendapatan Hari Ini",
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white70,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8 * paddingScale),
+                                    Text(
+                                      "Rp 1.250.000",
+                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4 * paddingScale),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.trending_up_rounded,
+                                          color: Colors.green[300],
+                                          size: 16 * iconScale,
+                                        ),
+                                        SizedBox(width: 4 * paddingScale),
+                                        Text(
+                                          "+12.5% dari kemarin",
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Colors.green[300],
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: EdgeInsets.all(16 * iconScale),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(
+                                    Icons.show_chart_rounded,
+                                    color: Colors.white,
+                                    size: 40 * iconScale,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                
+                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+
+                // Feature grid
+                Builder(
+                  builder: (context) {
+                    final fontScale = ResponsiveHelper.getFontScale(context);
+                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    
+                    return Column(
+                      children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                              Text(
-                                "Pendapatan Hari Ini",
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w500,
+                            Text(
+                              "Fitur Utama",
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: const Color(0xFF1F2937),
+                                fontWeight: FontWeight.w600,
+                                fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _showComingSoon(context, 'Semua Fitur');
+                              },
+                              child: Text(
+                                "Lihat Semua",
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: const Color(0xFF6366F1),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Rp 1.250.000",
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.trending_up_rounded,
-                                    color: Colors.green[300],
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    "+12.5% dari kemarin",
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.green[300],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(
-                                Icons.show_chart_rounded,
-                                color: Colors.white,
-                                size: 40,
                               ),
                             ),
                           ],
                         ),
+                        SizedBox(height: 16 * paddingScale),
                       ],
-                    ),
-                  ),
+                    );
+                  },
                 ),
-
-                const SizedBox(height: 32),
-
-                // Feature grid
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Fitur Utama",
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF1F2937),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        _showComingSoon(context, 'Semua Fitur');
-                      },
-                      child: Text(
-                        "Lihat Semua",
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: const Color(0xFF6366F1),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
 
                 GridView.count(
                   crossAxisCount: 4,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16 * ResponsiveHelper.getPaddingScale(context),
+                  mainAxisSpacing: 16 * ResponsiveHelper.getPaddingScale(context),
                   childAspectRatio: 0.9,
                   children: [
                     HomeFeature(
@@ -581,17 +625,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ],
                 ),
 
-                const SizedBox(height: 32),
+                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
                 // Summary section
-                Text(
-                  "Ringkasan Hari Ini",
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: const Color(0xFF1F2937),
-                    fontWeight: FontWeight.w600,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final fontScale = ResponsiveHelper.getFontScale(context);
+                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Ringkasan Hari Ini",
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: const Color(0xFF1F2937),
+                            fontWeight: FontWeight.w600,
+                            fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                          ),
+                        ),
+                        SizedBox(height: 16 * paddingScale),
+                      ],
+                    );
+                  },
                 ),
-                const SizedBox(height: 16),
 
                 Column(
                   children: [
@@ -603,7 +660,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       color: const Color(0xFF10B981),
                       trend: true,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16 * ResponsiveHelper.getPaddingScale(context)),
                     SummaryCard(
                       title: "Barang Hampir Habis",
                       value: "5 Produk",
@@ -612,7 +669,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       color: const Color(0xFFF59E0B),
                       trend: false,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16 * ResponsiveHelper.getPaddingScale(context)),
                     SummaryCard(
                       title: "Total Pelanggan",
                       value: "120",
@@ -623,13 +680,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20 * ResponsiveHelper.getPaddingScale(context)),
               ],
             ),
           ),
         ),
       ),
       bottomNavigationBar: Container(
+        height: bottomNavHeight,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -648,33 +706,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           onTap: _onItemTapped,
           selectedItemColor: const Color(0xFF6366F1),
           unselectedItemColor: const Color(0xFF9CA3AF),
-          selectedLabelStyle: const TextStyle(
+          selectedLabelStyle: TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 12,
+            fontSize: 12 * ResponsiveHelper.getFontScale(context),
           ),
-          unselectedLabelStyle: const TextStyle(
+          unselectedLabelStyle: TextStyle(
             fontWeight: FontWeight.w500,
-            fontSize: 12,
+            fontSize: 12 * ResponsiveHelper.getFontScale(context),
           ),
-          items: const [
+          iconSize: 24 * iconScale,
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              activeIcon: Icon(Icons.home_rounded),
+              icon: Icon(Icons.home_rounded, size: 24 * iconScale),
+              activeIcon: Icon(Icons.home_rounded, size: 24 * iconScale),
               label: "Beranda",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.store_rounded),
-              activeIcon: Icon(Icons.store_rounded),
+              icon: Icon(Icons.store_rounded, size: 24 * iconScale),
+              activeIcon: Icon(Icons.store_rounded, size: 24 * iconScale),
               label: "Produk",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.point_of_sale_rounded),
-              activeIcon: Icon(Icons.point_of_sale_rounded),
+              icon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
+              activeIcon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
               label: "Kasir",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_rounded),
-              activeIcon: Icon(Icons.analytics_rounded),
+              icon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
+              activeIcon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
               label: "Laporan",
             ),
           ],
@@ -731,59 +790,70 @@ class _HomeFeatureState extends State<HomeFeature>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      onTap: widget.onTap,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: widget.color.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+    final iconScale = ResponsiveHelper.getIconScale(context);
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate icon size based on actual container constraints
+        final actualIconSize = (constraints.maxWidth * 0.35 * iconScale).clamp(20.0, 36.0);
+        final actualPadding = (actualIconSize * 0.5).clamp(10.0, 16.0);
+        
+        return GestureDetector(
+          onTapDown: (_) => _controller.forward(),
+          onTapUp: (_) => _controller.reverse(),
+          onTapCancel: () => _controller.reverse(),
+          onTap: widget.onTap,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: widget.color.withOpacity(0.1),
+                  width: 1,
+                ),
               ),
-            ],
-            border: Border.all(
-              color: widget.color.withOpacity(0.1),
-              width: 1,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(actualPadding),
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      widget.icon,
+                      color: widget.color,
+                      size: actualIconSize,
+                    ),
+                  ),
+                  SizedBox(height: 8 * ResponsiveHelper.getPaddingScale(context)),
+                  Text(
+                    widget.label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF374151),
+                      fontWeight: FontWeight.w600,
+                      fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * ResponsiveHelper.getFontScale(context),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  widget.icon,
-                  color: widget.color,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF374151),
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
