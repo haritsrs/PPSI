@@ -42,6 +42,7 @@ dependencies:
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   firebase_storage: ^12.3.5
+  firebase_database: ^11.1.2
   
   # QR/Barcode Scanner
   mobile_scanner: ^5.2.3
@@ -78,6 +79,7 @@ flutter:
   assets:
     - assets/images/
     - assets/banners/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
