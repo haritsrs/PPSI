@@ -9,21 +9,31 @@ import 'pages/pengaturan_page.dart';
 import 'pages/auth_wrapper.dart';
 import 'pages/account_page.dart';
 import 'pages/logout_page.dart';
+import 'pages/scanner_page.dart';
 import 'utils/responsive_helper.dart';
 import 'firebase_options.dart';
+import 'services/auth_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'firebase_options.dart'; // your generated file
 
 // Import future pages (for modularity)
 // Example: import 'pages/overview_page.dart';
 // We'll add these later as the app grows
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Run your main app
   runApp(const KiosDarmaApp());
 }
-
 class KiosDarmaApp extends StatelessWidget {
   const KiosDarmaApp({super.key});
 
@@ -161,18 +171,128 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         );
         break;
       case 2:
+        // Scan button - handled separately
+        _showComingSoon(context, 'Scan Barcode');
+        break;
+      case 3:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const KasirPage()),
         );
         break;
-      case 3:
+      case 4:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const LaporanPage()),
         );
         break;
     }
+  }
+
+  void _onScanTapped() {
+    HapticFeedback.mediumImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ScannerPage()),
+    );
+  }
+
+  // Helper method to format currency
+  String _formatCurrency(int amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+  }
+
+  // Helper method to build popular product card
+  Widget _buildPopularProductCard(
+    BuildContext context,
+    String name,
+    String price,
+    String sold,
+    IconData icon,
+    Color color,
+  ) {
+    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+    final fontScale = ResponsiveHelper.getFontScale(context);
+    final iconScale = ResponsiveHelper.getIconScale(context);
+    
+    return Container(
+      width: 200 * paddingScale,
+      padding: EdgeInsets.all(20 * paddingScale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(12 * paddingScale),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 32 * iconScale,
+            ),
+          ),
+          SizedBox(height: 16 * paddingScale),
+          Text(
+            name,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: const Color(0xFF1F2937),
+              fontWeight: FontWeight.w700,
+              fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontScale,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 8 * paddingScale),
+          Text(
+            price,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
+            ),
+          ),
+          SizedBox(height: 4 * paddingScale),
+          Row(
+            children: [
+              Icon(
+                Icons.shopping_bag_rounded,
+                size: 14 * iconScale,
+                color: const Color(0xFF6B7280),
+              ),
+              SizedBox(width: 4 * paddingScale),
+              Text(
+                sold,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
+                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   void _showComingSoon(BuildContext context, String feature) {
@@ -350,138 +470,178 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Welcome Section (Clickable to Account Page)
+                // Enhanced Header: Personalized Greeting + Motivational Revenue Summary + Growth Indicator
                 Builder(
                   builder: (context) {
                     final iconScale = ResponsiveHelper.getIconScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AccountPage()),
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(24 * paddingScale),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6366F1).withOpacity(0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
+                    // Get user name from auth service
+                    final userName = AuthService.currentUser?.displayName ?? 
+                                    AuthService.currentUser?.email?.split('@')[0] ?? 
+                                    'Pengguna';
+                    
+                    // Get time-based greeting
+                    final hour = DateTime.now().hour;
+                    String greeting;
+                    if (hour < 12) {
+                      greeting = 'Selamat Pagi';
+                    } else if (hour < 17) {
+                      greeting = 'Selamat Siang';
+                    } else {
+                      greeting = 'Selamat Sore';
+                    }
+                    
+                    // Mock revenue data (replace with real data later)
+                    final todayRevenue = 1250000;
+                    final yesterdayRevenue = 1110000;
+                    final growthPercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toStringAsFixed(1);
+                    final isPositiveGrowth = todayRevenue >= yesterdayRevenue;
+                    
+                    return Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(24 * paddingScale),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(12 * iconScale),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Icon(
-                                    Icons.waving_hand,
-                                    color: Colors.white,
-                                    size: 28 * iconScale,
-                                  ),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6366F1).withOpacity(0.4),
+                            blurRadius: 24,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Personalized Greeting
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(12 * iconScale),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                SizedBox(width: 16 * paddingScale),
+                                child: Icon(
+                                  Icons.waving_hand_rounded,
+                                  color: Colors.white,
+                                  size: 28 * iconScale,
+                                ),
+                              ),
+                              SizedBox(width: 16 * paddingScale),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "$greeting, $userName! 👋",
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * fontScale,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4 * paddingScale),
+                                    Text(
+                                      "Semangat untuk hari yang produktif!",
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 24 * paddingScale),
+                          
+                          // Motivational Revenue Summary
+                          Container(
+                            padding: EdgeInsets.all(20 * paddingScale),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "Selamat datang kembali!",
-                                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                          color: Colors.white70,
+                                        "Pendapatan Hari Ini",
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: Colors.white.withOpacity(0.9),
                                           fontWeight: FontWeight.w500,
-                                          fontSize: (Theme.of(context).textTheme.bodyLarge?.fontSize ?? 16) * fontScale,
+                                          fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
                                         ),
                                       ),
-                                      SizedBox(height: 4 * paddingScale),
+                                      SizedBox(height: 8 * paddingScale),
                                       Text(
-                                        "Harits 👋",
-                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                        "Rp ${_formatCurrency(todayRevenue)}",
+                                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                           color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * fontScale,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
+                                        ),
+                                      ),
+                                      SizedBox(height: 8 * paddingScale),
+                                      // Mini Growth Indicator
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 12 * paddingScale,
+                                          vertical: 6 * paddingScale,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isPositiveGrowth 
+                                              ? Colors.green.withOpacity(0.25)
+                                              : Colors.red.withOpacity(0.25),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isPositiveGrowth 
+                                                  ? Icons.trending_up_rounded
+                                                  : Icons.trending_down_rounded,
+                                              color: Colors.white,
+                                              size: 16 * iconScale,
+                                            ),
+                                            SizedBox(width: 6 * paddingScale),
+                                            Text(
+                                              "${isPositiveGrowth ? '+' : ''}$growthPercent% dari kemarin",
+                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: Colors.white.withOpacity(0.7),
-                                  size: 24 * iconScale,
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 20 * paddingScale),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Pendapatan Hari Ini",
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white70,
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8 * paddingScale),
-                                    Text(
-                                      "Rp 1.250.000",
-                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4 * paddingScale),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.trending_up_rounded,
-                                          color: Colors.green[300],
-                                          size: 16 * iconScale,
-                                        ),
-                                        SizedBox(width: 4 * paddingScale),
-                                        Text(
-                                          "+12.5% dari kemarin",
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: Colors.green[300],
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
                                 Container(
                                   padding: EdgeInsets.all(16 * iconScale),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(16),
+                                    color: Colors.white.withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Icon(
                                     Icons.show_chart_rounded,
@@ -491,8 +651,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -500,29 +660,102 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 
                 SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                // Feature grid
+                // Menu Bisnis / Kelola Usaha Kamu - 2x2 Grid
                 Builder(
                   builder: (context) {
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
                     
                     return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Menu Bisnis / Kelola Usaha Kamu",
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: const Color(0xFF1F2937),
+                            fontWeight: FontWeight.w700,
+                            fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                          ),
+                        ),
+                        SizedBox(height: 20 * paddingScale),
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 16 * paddingScale,
+                          mainAxisSpacing: 16 * paddingScale,
+                          childAspectRatio: 1.1,
+                          children: [
+                            HomeFeature(
+                              icon: Icons.inventory_2_rounded,
+                              label: "Stok",
+                              color: const Color(0xFF3B82F6),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ProdukPage()),
+                                );
+                              },
+                            ),
+                            HomeFeature(
+                              icon: Icons.people_rounded,
+                              label: "Pelanggan",
+                              color: const Color(0xFFEF4444),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const PelangganPage()),
+                                );
+                              },
+                            ),
+                            HomeFeature(
+                              icon: Icons.payment_rounded,
+                              label: "Pembayaran",
+                              color: const Color(0xFF10B981),
+                              onTap: () => _showComingSoon(context, 'Pembayaran'),
+                            ),
+                            HomeFeature(
+                              icon: Icons.local_offer_rounded,
+                              label: "Promo",
+                              color: const Color(0xFFF59E0B),
+                              onTap: () => _showComingSoon(context, 'Promo'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+
+                // Dynamic Content Section - Produk Populer
+                Builder(
+                  builder: (context) {
+                    final fontScale = ResponsiveHelper.getFontScale(context);
+                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "Fitur Utama",
+                              "Produk Populer",
                               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 color: const Color(0xFF1F2937),
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
                               ),
                             ),
                             TextButton(
                               onPressed: () {
                                 HapticFeedback.lightImpact();
-                                _showComingSoon(context, 'Semua Fitur');
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ProdukPage()),
+                                );
                               },
                               child: Text(
                                 "Lihat Semua",
@@ -536,149 +769,160 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ],
                         ),
                         SizedBox(height: 16 * paddingScale),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildPopularProductCard(
+                                context,
+                                "Nasi Goreng Spesial",
+                                "Rp 15.000",
+                                "42 terjual",
+                                Icons.restaurant_rounded,
+                                const Color(0xFF10B981),
+                              ),
+                              SizedBox(width: 16 * paddingScale),
+                              _buildPopularProductCard(
+                                context,
+                                "Es Teh Manis",
+                                "Rp 5.000",
+                                "38 terjual",
+                                Icons.local_drink_rounded,
+                                const Color(0xFF3B82F6),
+                              ),
+                              SizedBox(width: 16 * paddingScale),
+                              _buildPopularProductCard(
+                                context,
+                                "Mie Ayam",
+                                "Rp 12.000",
+                                "35 terjual",
+                                Icons.ramen_dining_rounded,
+                                const Color(0xFFF59E0B),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     );
                   },
                 ),
 
-                GridView.count(
-                  crossAxisCount: 4,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 16 * ResponsiveHelper.getPaddingScale(context),
-                  mainAxisSpacing: 16 * ResponsiveHelper.getPaddingScale(context),
-                  childAspectRatio: 0.9,
-                  children: [
-                    HomeFeature(
-                      icon: Icons.point_of_sale_rounded,
-                      label: "Kasir",
-                      color: const Color(0xFF10B981),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const KasirPage()),
-                        );
-                      },
-                    ),
-                    HomeFeature(
-                      icon: Icons.inventory_2_rounded,
-                      label: "Stok",
-                      color: const Color(0xFF3B82F6),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ProdukPage()),
-                        );
-                      },
-                    ),
-                    HomeFeature(
-                      icon: Icons.analytics_rounded,
-                      label: "Laporan",
-                      color: const Color(0xFF8B5CF6),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const LaporanPage()),
-                        );
-                      },
-                    ),
-                    HomeFeature(
-                      icon: Icons.qr_code_scanner_rounded,
-                      label: "Scan",
-                      color: const Color(0xFFF59E0B),
-                      onTap: () => _showComingSoon(context, 'Scan Barcode'),
-                    ),
-                    HomeFeature(
-                      icon: Icons.people_rounded,
-                      label: "Pelanggan",
-                      color: const Color(0xFFEF4444),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PelangganPage()),
-                        );
-                      },
-                    ),
-                    HomeFeature(
-                      icon: Icons.payment_rounded,
-                      label: "Bayar",
-                      color: const Color(0xFF06B6D4),
-                      onTap: () => _showComingSoon(context, 'Pembayaran'),
-                    ),
-                    HomeFeature(
-                      icon: Icons.cloud_off_rounded,
-                      label: "Offline",
-                      color: const Color(0xFF6B7280),
-                      onTap: () => _showComingSoon(context, 'Mode Offline'),
-                    ),
-                    HomeFeature(
-                      icon: Icons.settings_rounded,
-                      label: "Setting",
-                      color: const Color(0xFFEC4899),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PengaturanPage()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-
                 SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                // Summary section
+                // Weekly Target Tracker (Optional Add-on)
                 Builder(
                   builder: (context) {
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
                     
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Ringkasan Hari Ini",
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: const Color(0xFF1F2937),
-                            fontWeight: FontWeight.w600,
-                            fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
-                          ),
+                    final weeklyTarget = 10000000; // 10M target
+                    final currentProgress = 6250000; // 6.25M current
+                    final progressPercent = (currentProgress / weeklyTarget * 100).clamp(0.0, 100.0);
+                    
+                    return Container(
+                      padding: EdgeInsets.all(24 * paddingScale),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF8B5CF6).withOpacity(0.1),
+                            const Color(0xFFEC4899).withOpacity(0.1),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        SizedBox(height: 16 * paddingScale),
-                      ],
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(10 * paddingScale),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.track_changes_rounded,
+                                  color: const Color(0xFF8B5CF6),
+                                  size: 24 * ResponsiveHelper.getIconScale(context),
+                                ),
+                              ),
+                              SizedBox(width: 12 * paddingScale),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Target Mingguan",
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: const Color(0xFF1F2937),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontScale,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4 * paddingScale),
+                                    Text(
+                                      "${progressPercent.toStringAsFixed(0)}% tercapai",
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: const Color(0xFF6B7280),
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 20 * paddingScale),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: LinearProgressIndicator(
+                              value: progressPercent / 100,
+                              minHeight: 12,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                            ),
+                          ),
+                          SizedBox(height: 12 * paddingScale),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Rp ${_formatCurrency(currentProgress)}",
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: const Color(0xFF8B5CF6),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
+                                ),
+                              ),
+                              Text(
+                                "Rp ${_formatCurrency(weeklyTarget)}",
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFF6B7280),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     );
                   },
-                ),
-
-                Column(
-                  children: [
-                    SummaryCard(
-                      title: "Transaksi Selesai",
-                      value: "42",
-                      subtitle: "Naik 8% dari kemarin",
-                      icon: Icons.shopping_bag_rounded,
-                      color: const Color(0xFF10B981),
-                      trend: true,
-                    ),
-                    SizedBox(height: 16 * ResponsiveHelper.getPaddingScale(context)),
-                    SummaryCard(
-                      title: "Barang Hampir Habis",
-                      value: "5 Produk",
-                      subtitle: "Perlu restock segera",
-                      icon: Icons.warning_amber_rounded,
-                      color: const Color(0xFFF59E0B),
-                      trend: false,
-                    ),
-                    SizedBox(height: 16 * ResponsiveHelper.getPaddingScale(context)),
-                    SummaryCard(
-                      title: "Total Pelanggan",
-                      value: "120",
-                      subtitle: "3 pelanggan baru hari ini",
-                      icon: Icons.people_alt_rounded,
-                      color: const Color(0xFF3B82F6),
-                      trend: true,
-                    ),
-                  ],
                 ),
                 SizedBox(height: 20 * ResponsiveHelper.getPaddingScale(context)),
               ],
@@ -687,7 +931,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       ),
       bottomNavigationBar: Container(
-        height: bottomNavHeight,
+        height: bottomNavHeight + 20,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -698,43 +942,84 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          selectedItemColor: const Color(0xFF6366F1),
-          unselectedItemColor: const Color(0xFF9CA3AF),
-          selectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12 * ResponsiveHelper.getFontScale(context),
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 12 * ResponsiveHelper.getFontScale(context),
-          ),
-          iconSize: 24 * iconScale,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.home_rounded, size: 24 * iconScale),
-              label: "Beranda",
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              currentIndex: _selectedIndex,
+              onTap: _onItemTapped,
+              selectedItemColor: const Color(0xFF6366F1),
+              unselectedItemColor: const Color(0xFF9CA3AF),
+              selectedLabelStyle: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12 * ResponsiveHelper.getFontScale(context),
+              ),
+              unselectedLabelStyle: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 12 * ResponsiveHelper.getFontScale(context),
+              ),
+              iconSize: 24 * iconScale,
+              items: [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded, size: 24 * iconScale),
+                  activeIcon: Icon(Icons.home_rounded, size: 24 * iconScale),
+                  label: "Beranda",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.store_rounded, size: 24 * iconScale),
+                  activeIcon: Icon(Icons.store_rounded, size: 24 * iconScale),
+                  label: "Produk",
+                ),
+                const BottomNavigationBarItem(
+                  icon: SizedBox.shrink(),
+                  label: "",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
+                  activeIcon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
+                  label: "Kasir",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
+                  activeIcon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
+                  label: "Laporan",
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.store_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.store_rounded, size: 24 * iconScale),
-              label: "Produk",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
-              label: "Kasir",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
-              label: "Laporan",
+            // Center Floating Scan Button
+            Positioned(
+              left: MediaQuery.of(context).size.width / 2 - 32 * iconScale,
+              top: -32 * iconScale,
+              child: GestureDetector(
+                onTap: _onScanTapped,
+                child: Container(
+                  width: 64 * iconScale,
+                  height: 64 * iconScale,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: Colors.white,
+                    size: 32 * iconScale,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -1067,3 +1352,4 @@ class FeatureCard extends StatelessWidget {
     );
   }
 }
+

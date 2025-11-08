@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
   
   // Get current user
   static User? get currentUser => _auth.currentUser;
@@ -69,18 +72,95 @@ class AuthService {
   static Future<void> updateUserProfile({
     String? displayName,
     String? photoURL,
+    bool deletePhoto = false,
   }) async {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        await user.updateDisplayName(displayName);
-        if (photoURL != null) {
+        if (displayName != null) {
+          await user.updateDisplayName(displayName);
+        }
+        if (deletePhoto) {
+          await user.updatePhotoURL(null);
+        } else if (photoURL != null) {
           await user.updatePhotoURL(photoURL);
         }
         await user.reload();
       }
     } catch (e) {
       throw Exception('Gagal memperbarui profil: $e');
+    }
+  }
+  
+  // Upload profile picture to Firebase Storage
+  static Future<String> uploadProfilePicture(File imageFile) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+      
+      // Create a reference to the location you want to upload to in Firebase Storage
+      final ref = _storage.ref().child('profile_pictures/${user.uid}.jpg');
+      
+      // Upload the file to Firebase Storage
+      await ref.putFile(imageFile);
+      
+      // Get the download URL
+      final downloadURL = await ref.getDownloadURL();
+      
+      return downloadURL;
+    } catch (e) {
+      throw Exception('Gagal mengupload foto profil: $e');
+    }
+  }
+  
+  // Change password
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+      
+      // Re-authenticate user with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      
+      // Update password
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw Exception('Gagal mengubah password: $e');
+    }
+  }
+  
+  // Send email verification
+  static Future<void> sendEmailVerification() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+      await user.sendEmailVerification();
+    } catch (e) {
+      throw Exception('Gagal mengirim email verifikasi: $e');
+    }
+  }
+  
+  // Reload user to get latest data
+  static Future<void> reloadUser() async {
+    try {
+      await _auth.currentUser?.reload();
+    } catch (e) {
+      throw Exception('Gagal memuat ulang data user: $e');
     }
   }
   

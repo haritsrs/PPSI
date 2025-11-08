@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Kami memerlukan akses kamera untuk memindai barcode dan QR code produk, serta mengambil foto profil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kami memerlukan akses galeri foto untuk memilih foto profil Anda.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Kami memerlukan akses untuk menyimpan foto profil ke galeri.</string>
 </dict>
 </plist>
