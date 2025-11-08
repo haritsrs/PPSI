@@ -49,6 +49,9 @@ dependencies:
   
   # Image picking
   image_picker: ^1.1.2
+  
+  # Carousel slider for banners
+  carousel_slider: ^5.0.0
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +77,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/banners/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

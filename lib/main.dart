@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import 'pages/kasir_page.dart';
 import 'pages/laporan_page.dart';
 import 'pages/produk_page.dart';
@@ -14,7 +16,6 @@ import 'utils/responsive_helper.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'firebase_options.dart'; // your generated file
 
 // Import future pages (for modularity)
 // Example: import 'pages/overview_page.dart';
@@ -117,10 +118,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   int _selectedIndex = 0;
+  int _currentBannerIndex = 0;
+  User? _currentUser;
+  List<String> _bannerImages = [];
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+    _loadBanners();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -143,6 +149,38 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ));
     
     _animationController.forward();
+    
+    // Listen to auth state changes
+    AuthService.authStateChanges.listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+        });
+      }
+    });
+  }
+
+  Future<void> _loadUserData() async {
+    await AuthService.reloadUser();
+    if (mounted) {
+      setState(() {
+        _currentUser = AuthService.currentUser;
+      });
+    }
+  }
+
+  Future<void> _loadBanners() async {
+    // Load banner images from assets/banners folder
+    // For now, we'll use a placeholder approach
+    // In a real app, you might load from Firebase Storage or a server
+    setState(() {
+      _bannerImages = [
+        // Placeholder banners - you can add actual banner images to assets/banners/
+        // 'assets/banners/banner1.png',
+        // 'assets/banners/banner2.png',
+        // 'assets/banners/banner3.png',
+      ];
+    });
   }
 
   @override
@@ -205,95 +243,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  // Helper method to build popular product card
-  Widget _buildPopularProductCard(
-    BuildContext context,
-    String name,
-    String price,
-    String sold,
-    IconData icon,
-    Color color,
-  ) {
-    final paddingScale = ResponsiveHelper.getPaddingScale(context);
-    final fontScale = ResponsiveHelper.getFontScale(context);
-    final iconScale = ResponsiveHelper.getIconScale(context);
-    
-    return Container(
-      width: 200 * paddingScale,
-      padding: EdgeInsets.all(20 * paddingScale),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(12 * paddingScale),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 32 * iconScale,
-            ),
-          ),
-          SizedBox(height: 16 * paddingScale),
-          Text(
-            name,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF1F2937),
-              fontWeight: FontWeight.w700,
-              fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontScale,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          SizedBox(height: 8 * paddingScale),
-          Text(
-            price,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
-            ),
-          ),
-          SizedBox(height: 4 * paddingScale),
-          Row(
-            children: [
-              Icon(
-                Icons.shopping_bag_rounded,
-                size: 14 * iconScale,
-                color: const Color(0xFF6B7280),
-              ),
-              SizedBox(width: 4 * paddingScale),
-              Text(
-                sold,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF6B7280),
-                  fontWeight: FontWeight.w500,
-                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showComingSoon(BuildContext context, String feature) {
     showDialog(
@@ -470,16 +419,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Enhanced Header: Personalized Greeting + Motivational Revenue Summary + Growth Indicator
+                // Profile Header: Real User Profile with Photo
                 Builder(
                   builder: (context) {
                     final iconScale = ResponsiveHelper.getIconScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     
-                    // Get user name from auth service
-                    final userName = AuthService.currentUser?.displayName ?? 
-                                    AuthService.currentUser?.email?.split('@')[0] ?? 
+                    // Get user name from current user
+                    final userName = _currentUser?.displayName ?? 
+                                    _currentUser?.email?.split('@')[0] ?? 
                                     'Pengguna';
                     
                     // Get time-based greeting
@@ -499,160 +448,210 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     final growthPercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toStringAsFixed(1);
                     final isPositiveGrowth = todayRevenue >= yesterdayRevenue;
                     
-                    return Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(24 * paddingScale),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6366F1).withOpacity(0.4),
-                            blurRadius: 24,
-                            offset: const Offset(0, 12),
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AccountPage()),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(24 * paddingScale),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Personalized Greeting
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(12 * iconScale),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Icon(
-                                  Icons.waving_hand_rounded,
-                                  color: Colors.white,
-                                  size: 28 * iconScale,
-                                ),
-                              ),
-                              SizedBox(width: 16 * paddingScale),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "$greeting, $userName! 👋",
-                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * fontScale,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4 * paddingScale),
-                                    Text(
-                                      "Semangat untuk hari yang produktif!",
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 24 * paddingScale),
-                          
-                          // Motivational Revenue Summary
-                          Container(
-                            padding: EdgeInsets.all(20 * paddingScale),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
-                                width: 1,
-                              ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6366F1).withOpacity(0.4),
+                              blurRadius: 24,
+                              offset: const Offset(0, 12),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Profile Section with Photo
+                            Row(
                               children: [
+                                // Profile Photo
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const AccountPage()),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 60 * iconScale,
+                                    height: 60 * iconScale,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.25),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.5),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: _currentUser?.photoURL != null
+                                        ? ClipOval(
+                                            child: Image.network(
+                                              _currentUser!.photoURL!,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Icon(
+                                                  Icons.person_rounded,
+                                                  color: Colors.white,
+                                                  size: 30 * iconScale,
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.person_rounded,
+                                            color: Colors.white,
+                                            size: 30 * iconScale,
+                                          ),
+                                  ),
+                                ),
+                                SizedBox(width: 16 * paddingScale),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "Pendapatan Hari Ini",
+                                        "$greeting, $userName! 👋",
+                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * fontScale,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4 * paddingScale),
+                                      Text(
+                                        _currentUser?.email ?? 'Pengguna',
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                           color: Colors.white.withOpacity(0.9),
                                           fontWeight: FontWeight.w500,
                                           fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
                                         ),
                                       ),
-                                      SizedBox(height: 8 * paddingScale),
-                                      Text(
-                                        "Rp ${_formatCurrency(todayRevenue)}",
-                                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
-                                        ),
-                                      ),
-                                      SizedBox(height: 8 * paddingScale),
-                                      // Mini Growth Indicator
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 12 * paddingScale,
-                                          vertical: 6 * paddingScale,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isPositiveGrowth 
-                                              ? Colors.green.withOpacity(0.25)
-                                              : Colors.red.withOpacity(0.25),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              isPositiveGrowth 
-                                                  ? Icons.trending_up_rounded
-                                                  : Icons.trending_down_rounded,
-                                              color: Colors.white,
-                                              size: 16 * iconScale,
-                                            ),
-                                            SizedBox(width: 6 * paddingScale),
-                                            Text(
-                                              "${isPositiveGrowth ? '+' : ''}$growthPercent% dari kemarin",
-                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
                                     ],
                                   ),
                                 ),
                                 Container(
-                                  padding: EdgeInsets.all(16 * iconScale),
+                                  padding: EdgeInsets.all(8 * iconScale),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.25),
-                                    borderRadius: BorderRadius.circular(18),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
-                                    Icons.show_chart_rounded,
+                                    Icons.arrow_forward_ios_rounded,
                                     color: Colors.white,
-                                    size: 40 * iconScale,
+                                    size: 16 * iconScale,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 24 * paddingScale),
+                            
+                            // Motivational Revenue Summary
+                            Container(
+                              padding: EdgeInsets.all(20 * paddingScale),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Pendapatan Hari Ini",
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: Colors.white.withOpacity(0.9),
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8 * paddingScale),
+                                        Text(
+                                          "Rp ${_formatCurrency(todayRevenue)}",
+                                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8 * paddingScale),
+                                        // Mini Growth Indicator
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 12 * paddingScale,
+                                            vertical: 6 * paddingScale,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isPositiveGrowth 
+                                                ? Colors.green.withOpacity(0.25)
+                                                : Colors.red.withOpacity(0.25),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isPositiveGrowth 
+                                                    ? Icons.trending_up_rounded
+                                                    : Icons.trending_down_rounded,
+                                                color: Colors.white,
+                                                size: 16 * iconScale,
+                                              ),
+                                              SizedBox(width: 6 * paddingScale),
+                                              Text(
+                                                "${isPositiveGrowth ? '+' : ''}$growthPercent% dari kemarin",
+                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.all(16 * iconScale),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.25),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Icon(
+                                      Icons.show_chart_rounded,
+                                      color: Colors.white,
+                                      size: 40 * iconScale,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -660,11 +659,186 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 
                 SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                // Menu Bisnis / Kelola Usaha Kamu - 2x2 Grid
+                // Banner Carousel
+                Builder(
+                  builder: (context) {
+                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    
+                    if (_bannerImages.isEmpty) {
+                      // Show placeholder if no banners
+                      return Container(
+                        height: 180 * paddingScale,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF6366F1).withOpacity(0.1),
+                              const Color(0xFF8B5CF6).withOpacity(0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF6366F1).withOpacity(0.2),
+                            width: 2,
+                            style: BorderStyle.solid,
+                          ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_rounded,
+                                size: 48,
+                                color: const Color(0xFF6366F1).withOpacity(0.5),
+                              ),
+                              SizedBox(height: 8 * paddingScale),
+                              Text(
+                                'Tambahkan banner promosi di assets/banners/',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFF6B7280),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    return Column(
+                      children: [
+                        CarouselSlider.builder(
+                          itemCount: _bannerImages.length,
+                          itemBuilder: (context, index, realIndex) {
+                            return Container(
+                              margin: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Image.asset(
+                                  _bannerImages[index],
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(Icons.error_outline, color: Colors.grey),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          options: CarouselOptions(
+                            height: 180 * paddingScale,
+                            autoPlay: true,
+                            autoPlayInterval: const Duration(seconds: 3),
+                            autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                            autoPlayCurve: Curves.fastOutSlowIn,
+                            enlargeCenterPage: true,
+                            enlargeFactor: 0.2,
+                            viewportFraction: 0.9,
+                            onPageChanged: (index, reason) {
+                              setState(() {
+                                _currentBannerIndex = index;
+                              });
+                            },
+                          ),
+                        ),
+                        if (_bannerImages.length > 1) ...[
+                          SizedBox(height: 12 * paddingScale),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              _bannerImages.length,
+                              (index) => Container(
+                                width: 8,
+                                height: 8,
+                                margin: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _currentBannerIndex == index
+                                      ? const Color(0xFF6366F1)
+                                      : const Color(0xFF6366F1).withOpacity(0.3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+                
+                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+
+                // Menu Bisnis / Kelola Usaha Kamu - Horizontal Scrolling
                 Builder(
                   builder: (context) {
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    
+                    final menuItems = [
+                      {
+                        'icon': Icons.inventory_2_rounded,
+                        'label': 'Stok',
+                        'color': const Color(0xFF3B82F6),
+                        'onTap': () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ProdukPage()),
+                          );
+                        },
+                      },
+                      {
+                        'icon': Icons.language_rounded,
+                        'label': 'Website',
+                        'color': const Color(0xFF8B5CF6),
+                        'onTap': () => _showComingSoon(context, 'Website'),
+                      },
+                      {
+                        'icon': Icons.people_rounded,
+                        'label': 'Pelanggan',
+                        'color': const Color(0xFFEF4444),
+                        'onTap': () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const PelangganPage()),
+                          );
+                        },
+                      },
+                      {
+                        'icon': Icons.local_offer_rounded,
+                        'label': 'Promo',
+                        'color': const Color(0xFFF59E0B),
+                        'onTap': () => _showComingSoon(context, 'Promo'),
+                      },
+                      {
+                        'icon': Icons.payment_rounded,
+                        'label': 'Pembayaran',
+                        'color': const Color(0xFF10B981),
+                        'onTap': () => _showComingSoon(context, 'Pembayaran'),
+                      },
+                      {
+                        'icon': Icons.more_horiz_rounded,
+                        'label': 'More',
+                        'color': const Color(0xFF6B7280),
+                        'onTap': () => _showComingSoon(context, 'More'),
+                      },
+                    ];
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,49 +852,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ),
                         ),
                         SizedBox(height: 20 * paddingScale),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisSpacing: 16 * paddingScale,
-                          mainAxisSpacing: 16 * paddingScale,
-                          childAspectRatio: 1.1,
-                          children: [
-                            HomeFeature(
-                              icon: Icons.inventory_2_rounded,
-                              label: "Stok",
-                              color: const Color(0xFF3B82F6),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const ProdukPage()),
-                                );
-                              },
-                            ),
-                            HomeFeature(
-                              icon: Icons.people_rounded,
-                              label: "Pelanggan",
-                              color: const Color(0xFFEF4444),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const PelangganPage()),
-                                );
-                              },
-                            ),
-                            HomeFeature(
-                              icon: Icons.payment_rounded,
-                              label: "Pembayaran",
-                              color: const Color(0xFF10B981),
-                              onTap: () => _showComingSoon(context, 'Pembayaran'),
-                            ),
-                            HomeFeature(
-                              icon: Icons.local_offer_rounded,
-                              label: "Promo",
-                              color: const Color(0xFFF59E0B),
-                              onTap: () => _showComingSoon(context, 'Promo'),
-                            ),
-                          ],
+                        SizedBox(
+                          height: 120 * paddingScale,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: menuItems.length,
+                            itemBuilder: (context, index) {
+                              final item = menuItems[index];
+                              return Container(
+                                width: 100 * paddingScale,
+                                margin: EdgeInsets.only(
+                                  right: index < menuItems.length - 1 ? 16 * paddingScale : 0,
+                                ),
+                                child: HomeFeature(
+                                  icon: item['icon'] as IconData,
+                                  label: item['label'] as String,
+                                  color: item['color'] as Color,
+                                  onTap: item['onTap'] as VoidCallback,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ],
                     );
@@ -729,11 +881,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
                 SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                // Dynamic Content Section - Produk Populer
+                // News Section for Updates
                 Builder(
                   builder: (context) {
                     final fontScale = ResponsiveHelper.getFontScale(context);
                     final paddingScale = ResponsiveHelper.getPaddingScale(context);
+                    final iconScale = ResponsiveHelper.getIconScale(context);
+                    
+                    // Mock news data - replace with real data from API/database
+                    final newsItems = [
+                      {
+                        'title': 'Update Fitur Baru',
+                        'description': 'Sekarang Anda dapat mengelola stok dengan lebih mudah dan efisien.',
+                        'date': '2 jam yang lalu',
+                        'icon': Icons.new_releases_rounded,
+                        'color': const Color(0xFF6366F1),
+                      },
+                      {
+                        'title': 'Promo Bulan Ini',
+                        'description': 'Dapatkan diskon spesial untuk pembelian pertama di aplikasi kami.',
+                        'date': '1 hari yang lalu',
+                        'icon': Icons.local_offer_rounded,
+                        'color': const Color(0xFFF59E0B),
+                      },
+                      {
+                        'title': 'Tips Mengelola Bisnis',
+                        'description': 'Pelajari cara mengoptimalkan pendapatan Anda dengan fitur laporan yang lengkap.',
+                        'date': '3 hari yang lalu',
+                        'icon': Icons.tips_and_updates_rounded,
+                        'color': const Color(0xFF10B981),
+                      },
+                    ];
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,186 +919,116 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              "Produk Populer",
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: const Color(0xFF1F2937),
-                                fontWeight: FontWeight.w700,
-                                fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const ProdukPage()),
-                                );
-                              },
-                              child: Text(
-                                "Lihat Semua",
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.newspaper_rounded,
                                   color: const Color(0xFF6366F1),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
+                                  size: 24 * iconScale,
                                 ),
-                              ),
+                                SizedBox(width: 8 * paddingScale),
+                                Text(
+                                  "Berita & Update",
+                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: const Color(0xFF1F2937),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                         SizedBox(height: 16 * paddingScale),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildPopularProductCard(
-                                context,
-                                "Nasi Goreng Spesial",
-                                "Rp 15.000",
-                                "42 terjual",
-                                Icons.restaurant_rounded,
-                                const Color(0xFF10B981),
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: newsItems.length,
+                          separatorBuilder: (context, index) => SizedBox(height: 12 * paddingScale),
+                          itemBuilder: (context, index) {
+                            final news = newsItems[index];
+                            return Container(
+                              padding: EdgeInsets.all(16 * paddingScale),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: (news['color'] as Color).withOpacity(0.1),
+                                  width: 1,
+                                ),
                               ),
-                              SizedBox(width: 16 * paddingScale),
-                              _buildPopularProductCard(
-                                context,
-                                "Es Teh Manis",
-                                "Rp 5.000",
-                                "38 terjual",
-                                Icons.local_drink_rounded,
-                                const Color(0xFF3B82F6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(12 * paddingScale),
+                                    decoration: BoxDecoration(
+                                      color: (news['color'] as Color).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      news['icon'] as IconData,
+                                      color: news['color'] as Color,
+                                      size: 24 * iconScale,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12 * paddingScale),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          news['title'] as String,
+                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            color: const Color(0xFF1F2937),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontScale,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4 * paddingScale),
+                                        Text(
+                                          news['description'] as String,
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: const Color(0xFF6B7280),
+                                            fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        SizedBox(height: 8 * paddingScale),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time_rounded,
+                                              size: 12 * iconScale,
+                                              color: const Color(0xFF9CA3AF),
+                                            ),
+                                            SizedBox(width: 4 * paddingScale),
+                                            Text(
+                                              news['date'] as String,
+                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                color: const Color(0xFF9CA3AF),
+                                                fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 16 * paddingScale),
-                              _buildPopularProductCard(
-                                context,
-                                "Mie Ayam",
-                                "Rp 12.000",
-                                "35 terjual",
-                                Icons.ramen_dining_rounded,
-                                const Color(0xFFF59E0B),
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
                       ],
-                    );
-                  },
-                ),
-
-                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
-
-                // Weekly Target Tracker (Optional Add-on)
-                Builder(
-                  builder: (context) {
-                    final fontScale = ResponsiveHelper.getFontScale(context);
-                    final paddingScale = ResponsiveHelper.getPaddingScale(context);
-                    
-                    final weeklyTarget = 10000000; // 10M target
-                    final currentProgress = 6250000; // 6.25M current
-                    final progressPercent = (currentProgress / weeklyTarget * 100).clamp(0.0, 100.0);
-                    
-                    return Container(
-                      padding: EdgeInsets.all(24 * paddingScale),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF8B5CF6).withOpacity(0.1),
-                            const Color(0xFFEC4899).withOpacity(0.1),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: const Color(0xFF8B5CF6).withOpacity(0.2),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF8B5CF6).withOpacity(0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(10 * paddingScale),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8B5CF6).withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.track_changes_rounded,
-                                  color: const Color(0xFF8B5CF6),
-                                  size: 24 * ResponsiveHelper.getIconScale(context),
-                                ),
-                              ),
-                              SizedBox(width: 12 * paddingScale),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "Target Mingguan",
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: const Color(0xFF1F2937),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontScale,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4 * paddingScale),
-                                    Text(
-                                      "${progressPercent.toStringAsFixed(0)}% tercapai",
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: const Color(0xFF6B7280),
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 20 * paddingScale),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: LinearProgressIndicator(
-                              value: progressPercent / 100,
-                              minHeight: 12,
-                              backgroundColor: Colors.grey[200],
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
-                            ),
-                          ),
-                          SizedBox(height: 12 * paddingScale),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Rp ${_formatCurrency(currentProgress)}",
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: const Color(0xFF8B5CF6),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontScale,
-                                ),
-                              ),
-                              Text(
-                                "Rp ${_formatCurrency(weeklyTarget)}",
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: const Color(0xFF6B7280),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
                     );
                   },
                 ),
