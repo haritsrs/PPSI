@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../services/database_service.dart';
+import '../services/xendit_service.dart';
 
 class KasirPage extends StatefulWidget {
   const KasirPage({super.key});
@@ -1128,9 +1130,11 @@ class _PaymentModalState extends State<PaymentModal> {
   final List<PaymentMethod> _paymentMethods = [
     PaymentMethod(id: 'Cash', name: 'Tunai', icon: Icons.money_rounded),
     PaymentMethod(id: 'QRIS', name: 'QRIS', icon: Icons.qr_code_rounded),
-    PaymentMethod(id: 'Debit', name: 'Kartu Debit', icon: Icons.credit_card_rounded),
-    PaymentMethod(id: 'Credit', name: 'Kartu Kredit', icon: Icons.credit_card_rounded),
+    PaymentMethod(id: 'VirtualAccount', name: 'Virtual Account', icon: Icons.account_balance_rounded),
   ];
+
+  final XenditService _xenditService = XenditService();
+  bool _isProcessingPayment = false;
 
   @override
   void dispose() {
@@ -1145,36 +1149,180 @@ class _PaymentModalState extends State<PaymentModal> {
     });
   }
 
-  void _processPayment() {
-    if (_selectedPaymentMethod == 'Cash' && _cashAmount < widget.total) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Jumlah uang tidak mencukupi!'),
-          backgroundColor: Colors.red,
-        ),
+  Future<void> _processPayment() async {
+    if (_selectedPaymentMethod == 'Cash') {
+      if (_cashAmount < widget.total) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Jumlah uang tidak mencukupi!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      // Process cash payment immediately
+      widget.onPaymentSuccess(
+        paymentMethod: _selectedPaymentMethod,
+        cashAmount: _cashAmount,
+        change: _change > 0 ? _change : null,
       );
       return;
     }
 
-    // Simulate payment processing
+    setState(() {
+      _isProcessingPayment = true;
+    });
+
+    try {
+      if (_selectedPaymentMethod == 'QRIS') {
+        await _processQRISPayment();
+      } else if (_selectedPaymentMethod == 'VirtualAccount') {
+        await _processVirtualAccountPayment();
+      }
+    } catch (e) {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _processQRISPayment() async {
+    try {
+      final referenceId = 'TXN-${DateTime.now().millisecondsSinceEpoch}';
+      final expiredAt = DateTime.now().add(const Duration(hours: 24)).toIso8601String();
+
+      final qrisResponse = await _xenditService.createQRIS(
+        amount: widget.total,
+        referenceId: referenceId,
+        callbackUrl: 'https://api.xendit.co/qr_codes/callback',
+        expiredAt: expiredAt,
+      );
+
+      setState(() {
+        _isProcessingPayment = false;
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Close payment modal
+        _showQRISPaymentDialog(qrisResponse, referenceId);
+      }
+    } catch (e) {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+      rethrow;
+    }
+  }
+
+  Future<void> _processVirtualAccountPayment() async {
+    if (mounted) {
+      Navigator.pop(context); // Close payment modal
+      _showVirtualAccountBankSelection();
+    }
+  }
+
+  void _showQRISPaymentDialog(Map<String, dynamic> qrisData, String referenceId) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-        ),
+      builder: (context) => QRISPaymentDialog(
+        qrisData: qrisData,
+        referenceId: referenceId,
+        total: widget.total,
+        onPaymentVerified: () {
+          widget.onPaymentSuccess(
+            paymentMethod: 'QRIS',
+            cashAmount: null,
+            change: null,
+          );
+        },
+        onCancel: () {
+          // Handle cancel
+        },
       ),
     );
+  }
 
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.pop(context); // Close loading dialog
-      widget.onPaymentSuccess(
-        paymentMethod: _selectedPaymentMethod,
-        cashAmount: _selectedPaymentMethod == 'Cash' ? _cashAmount : null,
-        change: _selectedPaymentMethod == 'Cash' && _change > 0 ? _change : null,
+  void _showVirtualAccountBankSelection() {
+    showDialog(
+      context: context,
+      builder: (context) => VirtualAccountBankSelectionDialog(
+        total: widget.total,
+        onBankSelected: (bankCode, bankName) async {
+          Navigator.pop(context);
+          await _createVirtualAccount(bankCode, bankName);
+        },
+      ),
+    );
+  }
+
+  Future<void> _createVirtualAccount(String bankCode, String bankName) async {
+    try {
+      setState(() {
+        _isProcessingPayment = true;
+      });
+
+      final externalId = 'VA-${DateTime.now().millisecondsSinceEpoch}';
+      final expiredAt = DateTime.now().add(const Duration(days: 1));
+
+      final vaResponse = await _xenditService.createVirtualAccount(
+        externalId: externalId,
+        bankCode: bankCode,
+        name: 'KiosDarma Payment',
+        amount: widget.total,
+        expiredAt: expiredAt,
       );
-    });
+
+      setState(() {
+        _isProcessingPayment = false;
+      });
+
+      if (mounted) {
+        _showVirtualAccountPaymentDialog(vaResponse, bankName);
+      }
+    } catch (e) {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating Virtual Account: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showVirtualAccountPaymentDialog(Map<String, dynamic> vaData, String bankName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => VirtualAccountPaymentDialog(
+        vaData: vaData,
+        bankName: bankName,
+        total: widget.total,
+        onPaymentVerified: () {
+          widget.onPaymentSuccess(
+            paymentMethod: 'VirtualAccount',
+            cashAmount: null,
+            change: null,
+          );
+        },
+        onCancel: () {
+          // Handle cancel
+        },
+      ),
+    );
   }
 
   @override
@@ -1338,8 +1486,25 @@ class _PaymentModalState extends State<PaymentModal> {
             ),
           ),
           
+          // Payment Processing Indicator
+          if (_isProcessingPayment) ...[
+            const SizedBox(height: 24),
+            const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Memproses pembayaran...',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+
           // Cash Input (if Cash selected)
-          if (_selectedPaymentMethod == 'Cash') ...[
+          if (_selectedPaymentMethod == 'Cash' && !_isProcessingPayment) ...[
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1421,38 +1586,50 @@ class _PaymentModalState extends State<PaymentModal> {
           const Spacer(),
           
           // Pay Button
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _processPayment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.payment_rounded, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Proses Pembayaran",
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+          if (!_isProcessingPayment)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _processPayment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _selectedPaymentMethod == 'QRIS'
+                            ? Icons.qr_code_rounded
+                            : _selectedPaymentMethod == 'VirtualAccount'
+                                ? Icons.account_balance_rounded
+                                : Icons.payment_rounded,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _selectedPaymentMethod == 'Cash'
+                            ? "Proses Pembayaran"
+                            : _selectedPaymentMethod == 'QRIS'
+                                ? "Buat QRIS"
+                                : "Buat Virtual Account",
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -2035,4 +2212,566 @@ class PaymentMethod {
     required this.name,
     required this.icon,
   });
+}
+
+// QRIS Payment Dialog
+class QRISPaymentDialog extends StatefulWidget {
+  final Map<String, dynamic> qrisData;
+  final String referenceId;
+  final double total;
+  final VoidCallback onPaymentVerified;
+  final VoidCallback onCancel;
+
+  const QRISPaymentDialog({
+    super.key,
+    required this.qrisData,
+    required this.referenceId,
+    required this.total,
+    required this.onPaymentVerified,
+    required this.onCancel,
+  });
+
+  @override
+  State<QRISPaymentDialog> createState() => _QRISPaymentDialogState();
+}
+
+class _QRISPaymentDialogState extends State<QRISPaymentDialog> {
+  final XenditService _xenditService = XenditService();
+  bool _isChecking = false;
+  String _status = 'PENDING';
+
+  @override
+  void initState() {
+    super.initState();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _checkPaymentStatus();
+      }
+    });
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    try {
+      setState(() {
+        _isChecking = true;
+      });
+
+      final qrId = widget.qrisData['id'] as String?;
+      if (qrId != null) {
+        final status = await _xenditService.getQRISStatus(qrId);
+        final paymentStatus = status['status'] as String? ?? 'PENDING';
+
+        setState(() {
+          _status = paymentStatus;
+          _isChecking = false;
+        });
+
+        if (paymentStatus == 'SUCCEEDED' || paymentStatus == 'COMPLETED') {
+          widget.onPaymentVerified();
+        } else if (paymentStatus == 'PENDING') {
+          _startPolling();
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isChecking = false;
+      });
+      // Continue polling even if check fails
+      _startPolling();
+    }
+  }
+
+  String get _qrString {
+    return widget.qrisData['qr_string'] as String? ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Scan QRIS untuk Pembayaran",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1F2937),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Rp ${widget.total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF6366F1),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: QrImageView(
+                data: _qrString,
+                version: QrVersions.auto,
+                size: 250,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_isChecking)
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Memeriksa status pembayaran...'),
+                ],
+              )
+            else if (_status == 'PENDING')
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.access_time_rounded, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Menunggu pembayaran...',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.onCancel,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _checkPaymentStatus,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Cek Status'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Virtual Account Bank Selection Dialog
+class VirtualAccountBankSelectionDialog extends StatelessWidget {
+  final double total;
+  final Function(String bankCode, String bankName) onBankSelected;
+
+  const VirtualAccountBankSelectionDialog({
+    super.key,
+    required this.total,
+    required this.onBankSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final xenditService = XenditService();
+    final banks = xenditService.getAvailableBanks();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Pilih Bank",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1F2937),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Rp ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF6366F1),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListView.builder(
+              shrinkWrap: true,
+              itemCount: banks.length,
+              itemBuilder: (context, index) {
+                final bank = banks[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      onBankSelected(bank['code']!, bank['name']!);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF1F2937),
+                      elevation: 0,
+                      side: BorderSide(
+                        color: Colors.grey.withOpacity(0.3),
+                        width: 1,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_rounded,
+                            color: Color(0xFF6366F1),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            bank['name']!,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Virtual Account Payment Dialog
+class VirtualAccountPaymentDialog extends StatefulWidget {
+  final Map<String, dynamic> vaData;
+  final String bankName;
+  final double total;
+  final VoidCallback onPaymentVerified;
+  final VoidCallback onCancel;
+
+  const VirtualAccountPaymentDialog({
+    super.key,
+    required this.vaData,
+    required this.bankName,
+    required this.total,
+    required this.onPaymentVerified,
+    required this.onCancel,
+  });
+
+  @override
+  State<VirtualAccountPaymentDialog> createState() => _VirtualAccountPaymentDialogState();
+}
+
+class _VirtualAccountPaymentDialogState extends State<VirtualAccountPaymentDialog> {
+  final XenditService _xenditService = XenditService();
+  bool _isChecking = false;
+  String _status = 'PENDING';
+
+  @override
+  void initState() {
+    super.initState();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        _checkPaymentStatus();
+      }
+    });
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    try {
+      setState(() {
+        _isChecking = true;
+      });
+
+      final vaId = widget.vaData['id'] as String?;
+      if (vaId != null) {
+        final status = await _xenditService.getVirtualAccountStatus(vaId);
+        final paymentStatus = status['status'] as String? ?? 'PENDING';
+
+        setState(() {
+          _status = paymentStatus;
+          _isChecking = false;
+        });
+
+        if (paymentStatus == 'PAID' || paymentStatus == 'COMPLETED') {
+          widget.onPaymentVerified();
+        } else if (paymentStatus == 'PENDING' || paymentStatus == 'ACTIVE') {
+          _startPolling();
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isChecking = false;
+      });
+      _startPolling();
+    }
+  }
+
+  String get _accountNumber {
+    return widget.vaData['account_number'] as String? ?? '';
+  }
+
+  String? get _expirationDate {
+    final exp = widget.vaData['expiration_date'];
+    if (exp != null) {
+      try {
+        final date = DateTime.parse(exp as String);
+        return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Virtual Account",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1F2937),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.bankName,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Nomor Virtual Account',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _accountNumber,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Rp ${widget.total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_expirationDate != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time_rounded, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Berlaku sampai: $_expirationDate',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (_isChecking)
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Memeriksa status pembayaran...'),
+                ],
+              )
+            else if (_status == 'PENDING' || _status == 'ACTIVE')
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.access_time_rounded, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Menunggu pembayaran...',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.onCancel,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _checkPaymentStatus,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Cek Status'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

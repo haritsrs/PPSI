@@ -24,17 +24,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Firebase
+  await dotenv.load(fileName: ".env"); // must come before using XenditService
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Run your main app
   runApp(const KiosDarmaApp());
 }
+
 class KiosDarmaApp extends StatelessWidget {
   const KiosDarmaApp({super.key});
 

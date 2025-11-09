@@ -53,6 +53,12 @@ dependencies:
   
   # Carousel slider for banners
   carousel_slider: ^5.0.0
+  
+  # HTTP client for API calls
+  http: ^1.2.0
+  
+  # QR Code generator
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
