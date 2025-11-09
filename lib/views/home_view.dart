@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../pages/kasir_page.dart';
 import '../pages/laporan_page.dart';
 import '../pages/produk_page.dart';
-import '../pages/scanner_page.dart';
 import '../utils/responsive_helper.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -108,7 +107,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     
     switch (index) {
       case 0:
-        // Already on home
+        // Already on home - scroll to top if needed
         break;
       case 1:
         Navigator.push(
@@ -117,30 +116,18 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
         );
         break;
       case 2:
-        // Scan button - handled separately
-        showComingSoonDialog(context, 'Scan Barcode');
-        break;
-      case 3:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const KasirPage()),
         );
         break;
-      case 4:
+      case 3:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const LaporanPage()),
         );
         break;
     }
-  }
-
-  void _onScanTapped() {
-    HapticFeedback.mediumImpact();
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ScannerPage()),
-    );
   }
 
   @override
@@ -185,7 +172,6 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
       bottomNavigationBar: CustomBottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
-        onScanTapped: _onScanTapped,
       ),
     );
   }
