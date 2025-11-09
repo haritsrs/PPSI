@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
@@ -12,6 +13,20 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env"); // must come before using XenditService
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Set system UI overlay style to make navigation bar opaque and visible
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.white, // Opaque white navbar
+      systemNavigationBarIconBrightness: Brightness.dark, // Dark icons on white
+      systemNavigationBarDividerColor: Colors.transparent,
+    ),
+  );
+
+  // Set system UI mode to ensure navigation bar is always visible and opaque
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.edgeToEdge, // Allows content to go edge-to-edge
   );
 
   runApp(const KiosDarmaApp());

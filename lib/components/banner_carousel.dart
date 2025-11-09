@@ -20,11 +20,21 @@ class _BannerCarouselState extends State<BannerCarousel> {
   @override
   Widget build(BuildContext context) {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final homePadding = 20 * paddingScale; // Match home view padding
+    final itemMargin = 4 * paddingScale; // Carousel item margin
+    final availableWidth = screenWidth - (homePadding * 2);
+    // Calculate height based on 2.7:1 aspect ratio (width:height)
+    // viewportFraction = 0.9, so visible banner width = availableWidth * 0.9
+    // Each item has margin, so image width = (availableWidth * 0.9) - (itemMargin * 2)
+    // height = image width / 2.7
+    final bannerImageWidth = (availableWidth * 0.9) - (itemMargin * 2);
+    final bannerHeight = bannerImageWidth / 2.7;
     
     if (widget.bannerImages.isEmpty) {
       // Show placeholder if no banners
       return Container(
-        height: 180 * paddingScale,
+        height: bannerHeight,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -83,24 +93,27 @@ class _BannerCarouselState extends State<BannerCarousel> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  widget.bannerImages[index],
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: Icon(Icons.error_outline, color: Colors.grey),
-                      ),
-                    );
-                  },
+                child: AspectRatio(
+                  aspectRatio: 2.7,
+                  child: Image.asset(
+                    widget.bannerImages[index],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: Icon(Icons.error_outline, color: Colors.grey),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             );
           },
           options: CarouselOptions(
-            height: 180 * paddingScale,
+            height: bannerHeight,
             autoPlay: true,
             autoPlayInterval: const Duration(seconds: 3),
             autoPlayAnimationDuration: const Duration(milliseconds: 800),

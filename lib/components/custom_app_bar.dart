@@ -25,6 +25,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final appBarHeight = ResponsiveHelper.getAppBarHeight(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
+    final isVertical = ResponsiveHelper.isVertical(context);
     
     return PreferredSize(
       preferredSize: Size.fromHeight(appBarHeight),
@@ -43,6 +44,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: EdgeInsets.all(8 * iconScale),
@@ -67,15 +69,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
-            SizedBox(width: 12 * iconScale),
-            Text(
-              "KiosDarma",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * ResponsiveHelper.getFontScale(context),
+            // Only show text when not in vertical/portrait mode
+            if (!isVertical) ...[
+              SizedBox(width: 12 * iconScale),
+              Text(
+                "KiosDarma",
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * ResponsiveHelper.getFontScale(context),
+                ),
               ),
-            ),
+            ],
           ],
         ),
         actions: [

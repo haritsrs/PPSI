@@ -25,6 +25,20 @@ class ResponsiveHelper {
     return aspectRatio >= 1.7;
   }
 
+  // Check if screen is vertical (portrait mode)
+  static bool isVertical(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    // Portrait mode: aspect ratio < 1 (width < height)
+    return aspectRatio < 1.0;
+  }
+
+  // Check if screen is tall/narrow (like Samsung S22 Ultra in portrait: 19.3:9 = ~0.466)
+  static bool isTallScreen(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    // Very tall screens have aspect ratio < 0.5
+    return aspectRatio < 0.5;
+  }
+
   // Get responsive AppBar height based on aspect ratio
   static double getAppBarHeight(BuildContext context) {
     final aspectRatio = getAspectRatio(context);
