@@ -101,7 +101,7 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
           ),
         );
         
-        // Pop back to AuthWrapper, which will automatically show HomePage
+        // Pop back to AuthWrapper, which will automatically show HomeView
         // since the user is now logged in
         Navigator.of(context).popUntil((route) => route.isFirst);
       }

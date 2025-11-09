@@ -1,0 +1,122 @@
+import 'package:flutter/material.dart';
+import '../utils/responsive_helper.dart';
+import '../pages/produk_page.dart';
+import '../pages/pelanggan_page.dart';
+import 'home_feature.dart';
+
+class BusinessMenu extends StatelessWidget {
+  final Function(BuildContext, String) onShowComingSoon;
+
+  const BusinessMenu({
+    super.key,
+    required this.onShowComingSoon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fontScale = ResponsiveHelper.getFontScale(context);
+    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+    
+    final menuItems = [
+      {
+        'icon': Icons.inventory_2_rounded,
+        'label': 'Stok',
+        'color': const Color(0xFF3B82F6),
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProdukPage()),
+          );
+        },
+      },
+      {
+        'icon': Icons.language_rounded,
+        'label': 'Website',
+        'color': const Color(0xFF8B5CF6),
+        'onTap': () => onShowComingSoon(context, 'Website'),
+      },
+      {
+        'icon': Icons.people_rounded,
+        'label': 'Pelanggan',
+        'color': const Color(0xFFEF4444),
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PelangganPage()),
+          );
+        },
+      },
+      {
+        'icon': Icons.local_offer_rounded,
+        'label': 'Promo',
+        'color': const Color(0xFFF59E0B),
+        'onTap': () => onShowComingSoon(context, 'Promo'),
+      },
+      {
+        'icon': Icons.payment_rounded,
+        'label': 'Pembayaran',
+        'color': const Color(0xFF10B981),
+        'onTap': () => onShowComingSoon(context, 'Pembayaran'),
+      },
+      {
+        'icon': Icons.more_horiz_rounded,
+        'label': 'More',
+        'color': const Color(0xFF6B7280),
+        'onTap': () => onShowComingSoon(context, 'More'),
+      },
+    ];
+    
+    return Container(
+      padding: EdgeInsets.all(20 * paddingScale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Menu Bisnis / Kelola Usaha Kamu",
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: const Color(0xFF1F2937),
+              fontWeight: FontWeight.w700,
+              fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+            ),
+          ),
+          SizedBox(height: 20 * paddingScale),
+          SizedBox(
+            height: 120 * paddingScale,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
+              itemCount: menuItems.length,
+              itemBuilder: (context, index) {
+                final item = menuItems[index];
+                return Container(
+                  width: 100 * paddingScale,
+                  margin: EdgeInsets.only(
+                    right: 16 * paddingScale,
+                  ),
+                  child: HomeFeature(
+                    icon: item['icon'] as IconData,
+                    label: item['label'] as String,
+                    color: item['color'] as Color,
+                    onTap: item['onTap'] as VoidCallback,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
