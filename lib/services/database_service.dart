@@ -179,6 +179,105 @@ class DatabaseService {
     });
   }
 
+  // Get total store balance from all transactions
+  Stream<double> getStoreBalanceStream() {
+    return transactionsRef.onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return 0.0;
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      double totalBalance = 0.0;
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          final total = value['total'];
+          if (total != null) {
+            totalBalance += (total as num).toDouble();
+          }
+        }
+      });
+      
+      return totalBalance;
+    });
+  }
+
+  // Get today's revenue
+  Stream<double> getTodayRevenueStream() {
+    return transactionsRef.onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return 0.0;
+      }
+      
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final tomorrowStart = todayStart.add(const Duration(days: 1));
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      double todayRevenue = 0.0;
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          final createdAt = value['createdAt'];
+          if (createdAt != null) {
+            try {
+              final transactionDate = DateTime.parse(createdAt as String);
+              if (transactionDate.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+                  transactionDate.isBefore(tomorrowStart)) {
+                final total = value['total'];
+                if (total != null) {
+                  todayRevenue += (total as num).toDouble();
+                }
+              }
+            } catch (e) {
+              // Skip invalid dates
+            }
+          }
+        }
+      });
+      
+      return todayRevenue;
+    });
+  }
+
+  // Get yesterday's revenue
+  Stream<double> getYesterdayRevenueStream() {
+    return transactionsRef.onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return 0.0;
+      }
+      
+      final now = DateTime.now();
+      final yesterdayStart = DateTime(now.year, now.month, now.day - 1);
+      final todayStart = DateTime(now.year, now.month, now.day);
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      double yesterdayRevenue = 0.0;
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          final createdAt = value['createdAt'];
+          if (createdAt != null) {
+            try {
+              final transactionDate = DateTime.parse(createdAt as String);
+              if (transactionDate.isAfter(yesterdayStart.subtract(const Duration(milliseconds: 1))) &&
+                  transactionDate.isBefore(todayStart)) {
+                final total = value['total'];
+                if (total != null) {
+                  yesterdayRevenue += (total as num).toDouble();
+                }
+              }
+            } catch (e) {
+              // Skip invalid dates
+            }
+          }
+        }
+      });
+      
+      return yesterdayRevenue;
+    });
+  }
+
   // Get categories from products
   Future<List<String>> getCategories() async {
     final products = await getProducts();

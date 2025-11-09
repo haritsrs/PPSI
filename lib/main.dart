@@ -482,11 +482,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       greeting = 'Selamat Sore';
                     }
                     
-                    // Mock store balance data (replace with real data later)
-                    final storeBalance = 1250000;
-                    final previousBalance = 1110000;
-                    final growthPercent = ((storeBalance - previousBalance) / previousBalance * 100).toStringAsFixed(1);
-                    final isPositiveGrowth = storeBalance >= previousBalance;
+                    // Store balance will be loaded from StreamBuilder
                     
                     return GestureDetector(
                       onTap: () {
@@ -603,92 +599,124 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             SizedBox(height: 24 * paddingScale),
                             
                             // Store Balance Summary
-                            Container(
-                              padding: EdgeInsets.all(20 * paddingScale),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Saldo Toko",
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: Colors.white.withOpacity(0.9),
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
-                                          ),
-                                        ),
-                                        SizedBox(height: 8 * paddingScale),
-                                        Text(
-                                          "Rp ${_formatCurrency(storeBalance)}",
-                                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
-                                          ),
-                                        ),
-                                        SizedBox(height: 8 * paddingScale),
-                                        // Mini Growth Indicator
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 12 * paddingScale,
-                                            vertical: 6 * paddingScale,
-                                          ),
+                            StreamBuilder<double>(
+                              stream: _databaseService.getStoreBalanceStream(),
+                              builder: (context, balanceSnapshot) {
+                                return StreamBuilder<double>(
+                                  stream: _databaseService.getTodayRevenueStream(),
+                                  builder: (context, todaySnapshot) {
+                                    return StreamBuilder<double>(
+                                      stream: _databaseService.getYesterdayRevenueStream(),
+                                      builder: (context, yesterdaySnapshot) {
+                                        final storeBalance = balanceSnapshot.data ?? 0.0;
+                                        final todayRevenue = todaySnapshot.data ?? 0.0;
+                                        final yesterdayRevenue = yesterdaySnapshot.data ?? 0.0;
+                                        
+                                        String growthPercent = '0.0';
+                                        bool isPositiveGrowth = true;
+                                        
+                                        if (yesterdayRevenue > 0) {
+                                          final growth = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+                                          growthPercent = growth.toStringAsFixed(1);
+                                          isPositiveGrowth = growth >= 0;
+                                        } else if (todayRevenue > 0) {
+                                          growthPercent = '100.0';
+                                          isPositiveGrowth = true;
+                                        }
+                                        
+                                        return Container(
+                                          padding: EdgeInsets.all(20 * paddingScale),
                                           decoration: BoxDecoration(
-                                            color: isPositiveGrowth 
-                                                ? Colors.green.withOpacity(0.25)
-                                                : Colors.red.withOpacity(0.25),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: Colors.white.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.3),
+                                              width: 1,
+                                            ),
                                           ),
                                           child: Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Icon(
-                                                isPositiveGrowth 
-                                                    ? Icons.trending_up_rounded
-                                                    : Icons.trending_down_rounded,
-                                                color: Colors.white,
-                                                size: 16 * iconScale,
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      "Saldo Toko",
+                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                        color: Colors.white.withOpacity(0.9),
+                                                        fontWeight: FontWeight.w500,
+                                                        fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 8 * paddingScale),
+                                                    Text(
+                                                      "Rp ${_formatCurrency(storeBalance.toInt())}",
+                                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.w800,
+                                                        fontSize: (Theme.of(context).textTheme.headlineMedium?.fontSize ?? 28) * fontScale,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 8 * paddingScale),
+                                                    // Mini Growth Indicator
+                                                    if (yesterdayRevenue > 0 || todayRevenue > 0)
+                                                      Container(
+                                                        padding: EdgeInsets.symmetric(
+                                                          horizontal: 12 * paddingScale,
+                                                          vertical: 6 * paddingScale,
+                                                        ),
+                                                        decoration: BoxDecoration(
+                                                          color: isPositiveGrowth 
+                                                              ? Colors.green.withOpacity(0.25)
+                                                              : Colors.red.withOpacity(0.25),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              isPositiveGrowth 
+                                                                  ? Icons.trending_up_rounded
+                                                                  : Icons.trending_down_rounded,
+                                                              color: Colors.white,
+                                                              size: 16 * iconScale,
+                                                            ),
+                                                            SizedBox(width: 6 * paddingScale),
+                                                            Text(
+                                                              "${isPositiveGrowth ? '+' : ''}$growthPercent% dari kemarin",
+                                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                                color: Colors.white,
+                                                                fontWeight: FontWeight.w700,
+                                                                fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
                                               ),
-                                              SizedBox(width: 6 * paddingScale),
-                                              Text(
-                                                "${isPositiveGrowth ? '+' : ''}$growthPercent% dari kemarin",
-                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              Container(
+                                                padding: EdgeInsets.all(16 * iconScale),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.25),
+                                                  borderRadius: BorderRadius.circular(18),
+                                                ),
+                                                child: Icon(
+                                                  Icons.show_chart_rounded,
                                                   color: Colors.white,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontScale,
+                                                  size: 40 * iconScale,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.all(16 * iconScale),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.25),
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: Icon(
-                                      Icons.show_chart_rounded,
-                                      color: Colors.white,
-                                      size: 40 * iconScale,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -825,7 +853,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 
                 SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                // Menu Bisnis / Kelola Usaha Kamu - Horizontal Scrolling
+                // Menu Bisnis / Kelola Usaha Kamu - Horizontal Scrolling Container
                 Builder(
                   builder: (context) {
                     final fontScale = ResponsiveHelper.getFontScale(context);
@@ -880,41 +908,56 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       },
                     ];
                     
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Menu Bisnis / Kelola Usaha Kamu",
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: const Color(0xFF1F2937),
-                            fontWeight: FontWeight.w700,
-                            fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                    return Container(
+                      padding: EdgeInsets.all(20 * paddingScale),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        SizedBox(height: 20 * paddingScale),
-                        SizedBox(
-                          height: 120 * paddingScale,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: menuItems.length,
-                            itemBuilder: (context, index) {
-                              final item = menuItems[index];
-                              return Container(
-                                width: 100 * paddingScale,
-                                margin: EdgeInsets.only(
-                                  right: index < menuItems.length - 1 ? 16 * paddingScale : 0,
-                                ),
-                                child: HomeFeature(
-                                  icon: item['icon'] as IconData,
-                                  label: item['label'] as String,
-                                  color: item['color'] as Color,
-                                  onTap: item['onTap'] as VoidCallback,
-                                ),
-                              );
-                            },
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Menu Bisnis / Kelola Usaha Kamu",
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: const Color(0xFF1F2937),
+                              fontWeight: FontWeight.w700,
+                              fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) * fontScale,
+                            ),
                           ),
-                        ),
-                      ],
+                          SizedBox(height: 20 * paddingScale),
+                          SizedBox(
+                            height: 120 * paddingScale,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
+                              itemCount: menuItems.length,
+                              itemBuilder: (context, index) {
+                                final item = menuItems[index];
+                                return Container(
+                                  width: 100 * paddingScale,
+                                  margin: EdgeInsets.only(
+                                    right: 16 * paddingScale,
+                                  ),
+                                  child: HomeFeature(
+                                    icon: item['icon'] as IconData,
+                                    label: item['label'] as String,
+                                    color: item['color'] as Color,
+                                    onTap: item['onTap'] as VoidCallback,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
