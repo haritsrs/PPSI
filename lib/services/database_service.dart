@@ -193,5 +193,153 @@ class DatabaseService {
     
     return categories.toList()..sort();
   }
+
+  // Notifications operations
+  DatabaseReference get notificationsRef {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User must be logged in to access notifications');
+    }
+    return _database.child('notifications').child(userId);
+  }
+
+  // Get notifications stream for current user
+  Stream<List<Map<String, dynamic>>> getNotificationsStream() {
+    return notificationsRef.orderByChild('createdAt').onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return <Map<String, dynamic>>[];
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> notifications = [];
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          notifications.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+        }
+      });
+      
+      return notifications.reversed.toList(); // Most recent first
+    });
+  }
+
+  // Get unread notifications count
+  Stream<int> getUnreadNotificationsCount() {
+    return notificationsRef.orderByChild('isRead').equalTo(false).onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return 0;
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      int count = 0;
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          final isRead = value['isRead'] as bool? ?? false;
+          if (!isRead) {
+            count++;
+          }
+        }
+      });
+      
+      return count;
+    });
+  }
+
+  // Add a new notification
+  Future<String> addNotification({
+    required String title,
+    required String message,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User must be logged in to create notifications');
+    }
+
+    final newNotificationRef = notificationsRef.push();
+    final notificationId = newNotificationRef.key!;
+    
+    await newNotificationRef.set({
+      'id': notificationId,
+      'title': title,
+      'message': message,
+      'type': type,
+      'isRead': false,
+      'createdAt': DateTime.now().toIso8601String(),
+      if (data != null) 'data': data,
+    });
+    
+    return notificationId;
+  }
+
+  // Mark notification as read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    await notificationsRef.child(notificationId).update({
+      'isRead': true,
+    });
+  }
+
+  // Mark all notifications as read
+  Future<void> markAllNotificationsAsRead() async {
+    final snapshot = await notificationsRef.get();
+    if (snapshot.value == null) {
+      return;
+    }
+    
+    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+    final updates = <String, dynamic>{};
+    
+    data.forEach((key, value) {
+      if (value is Map) {
+        final isRead = value['isRead'] as bool? ?? false;
+        if (!isRead) {
+          updates['$key/isRead'] = true;
+        }
+      }
+    });
+    
+    if (updates.isNotEmpty) {
+      await notificationsRef.update(updates);
+    }
+  }
+
+  // Delete a notification
+  Future<void> deleteNotification(String notificationId) async {
+    await notificationsRef.child(notificationId).remove();
+  }
+
+  // Delete all notifications
+  Future<void> deleteAllNotifications() async {
+    await notificationsRef.remove();
+  }
+
+  // Delete read notifications
+  Future<void> deleteReadNotifications() async {
+    final snapshot = await notificationsRef.get();
+    if (snapshot.value == null) {
+      return;
+    }
+    
+    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+    final updates = <String, dynamic>{};
+    
+    data.forEach((key, value) {
+      if (value is Map) {
+        final isRead = value['isRead'] as bool? ?? false;
+        if (isRead) {
+          updates[key.toString()] = null; // Mark for deletion
+        }
+      }
+    });
+    
+    if (updates.isNotEmpty) {
+      await notificationsRef.update(updates);
+    }
+  }
 }
 

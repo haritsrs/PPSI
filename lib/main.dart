@@ -12,9 +12,11 @@ import 'pages/auth_wrapper.dart';
 import 'pages/account_page.dart';
 import 'pages/logout_page.dart';
 import 'pages/scanner_page.dart';
+import 'pages/notification_page.dart';
 import 'utils/responsive_helper.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
+import 'services/database_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import future pages (for modularity)
@@ -118,6 +120,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _currentBannerIndex = 0;
   User? _currentUser;
   List<String> _bannerImages = [];
+  final DatabaseService _databaseService = DatabaseService();
 
   @override
   void initState() {
@@ -173,7 +176,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     setState(() {
       _bannerImages = [
         // Placeholder banners - you can add actual banner images to assets/banners/
-        // 'assets/banners/banner1.png',
+        'assets/banners/banner1.png',
         // 'assets/banners/banner2.png',
         // 'assets/banners/banner3.png',
       ];
@@ -353,15 +356,55 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: IconButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _showComingSoon(context, 'Notifikasi');
+              child: StreamBuilder<int>(
+                stream: _databaseService.getUnreadNotificationsCount(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  return Stack(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationPage(),
+                            ),
+                          );
+                        },
+                        icon: Icon(Icons.notifications_rounded, color: Colors.white, size: 24 * iconScale),
+                        iconSize: 24 * iconScale,
+                        padding: EdgeInsets.all(8 * iconScale),
+                        tooltip: 'Notifikasi',
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 8 * iconScale,
+                          top: 8 * iconScale,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              unreadCount > 9 ? '9+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
                 },
-                icon: Icon(Icons.notifications_rounded, color: Colors.white, size: 24 * iconScale),
-                iconSize: 24 * iconScale,
-                padding: EdgeInsets.all(8 * iconScale),
-                tooltip: 'Notifikasi',
               ),
             ),
             Container(

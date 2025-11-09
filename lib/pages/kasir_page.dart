@@ -251,7 +251,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       }).toList();
 
       // Save transaction to Firebase
-      await _databaseService.addTransaction(
+      final transactionId = await _databaseService.addTransaction(
         items: transactionItems,
         subtotal: _subtotal,
         tax: _tax,
@@ -260,6 +260,24 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         cashAmount: cashAmount,
         change: change,
       );
+
+      // Create notification for successful transaction
+      try {
+        await _databaseService.addNotification(
+          title: 'Transaksi Berhasil',
+          message: 'Transaksi sebesar Rp ${_total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} berhasil diproses dengan metode $paymentMethod',
+          type: 'transaction',
+          data: {
+            'transactionId': transactionId,
+            'total': _total,
+            'paymentMethod': paymentMethod,
+          },
+        );
+      } catch (e) {
+        // Notification creation failed, but transaction was successful
+        // Log error but don't show to user
+        print('Error creating notification: $e');
+      }
 
       setState(() {
         _cartItems.clear();
