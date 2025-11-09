@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import '../services/database_service.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -20,54 +21,9 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
   final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini'];
   
-  // Sample transaction data
-  final List<Transaction> _transactions = [
-    Transaction(
-      id: 'TXN001',
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      customerName: 'Pelanggan 1',
-      items: 3,
-      total: 75000,
-      paymentMethod: 'Cash',
-      status: 'Selesai',
-    ),
-    Transaction(
-      id: 'TXN002',
-      date: DateTime.now().subtract(const Duration(hours: 4)),
-      customerName: 'Pelanggan 2',
-      items: 2,
-      total: 48000,
-      paymentMethod: 'QRIS',
-      status: 'Selesai',
-    ),
-    Transaction(
-      id: 'TXN003',
-      date: DateTime.now().subtract(const Duration(hours: 6)),
-      customerName: 'Pelanggan 3',
-      items: 5,
-      total: 125000,
-      paymentMethod: 'Debit',
-      status: 'Selesai',
-    ),
-    Transaction(
-      id: 'TXN004',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      customerName: 'Pelanggan 4',
-      items: 1,
-      total: 25000,
-      paymentMethod: 'Cash',
-      status: 'Selesai',
-    ),
-    Transaction(
-      id: 'TXN005',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      customerName: 'Pelanggan 5',
-      items: 4,
-      total: 98000,
-      paymentMethod: 'QRIS',
-      status: 'Selesai',
-    ),
-  ];
+  final DatabaseService _databaseService = DatabaseService();
+  List<Transaction> _transactions = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -94,6 +50,38 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     ));
     
     _animationController.forward();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      _databaseService.getTransactionsStream().listen((transactionsData) {
+        if (mounted) {
+          setState(() {
+            _transactions = transactionsData.map((data) {
+              return Transaction.fromFirebase(data);
+            }).toList();
+            _isLoading = false;
+          });
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading transactions: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -187,11 +175,17 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 // Period Toggle
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -367,18 +361,43 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                         ],
                       ),
                       const SizedBox(height: 16),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredTransactions.length,
-                        itemBuilder: (context, index) {
-                          final transaction = _filteredTransactions[index];
-                          return TransactionCard(
-                            transaction: transaction,
-                            onTap: () => _showTransactionDetail(transaction),
-                          );
-                        },
-                      ),
+                      _filteredTransactions.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long_outlined,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _transactions.isEmpty
+                                          ? "Belum ada transaksi"
+                                          : "Tidak ada transaksi yang cocok",
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _filteredTransactions.length,
+                              itemBuilder: (context, index) {
+                                final transaction = _filteredTransactions[index];
+                                return TransactionCard(
+                                  transaction: transaction,
+                                  onTap: () => _showTransactionDetail(transaction),
+                                );
+                              },
+                            ),
                     ],
                   ),
                 ),
@@ -866,4 +885,41 @@ class Transaction {
     required this.paymentMethod,
     required this.status,
   });
+
+  factory Transaction.fromFirebase(Map<String, dynamic> data) {
+    // Parse date from ISO string or timestamp
+    DateTime date;
+    if (data['createdAt'] != null) {
+      try {
+        date = DateTime.parse(data['createdAt'] as String);
+      } catch (e) {
+        date = DateTime.now();
+      }
+    } else {
+      date = DateTime.now();
+    }
+
+    // Get items count
+    final itemsList = data['items'] as List<dynamic>? ?? [];
+    final itemsCount = itemsList.length;
+
+    // Get customer name (if available, otherwise use default)
+    final customerName = data['customerName'] as String? ?? 'Pelanggan';
+
+    // Get payment method
+    final paymentMethod = data['paymentMethod'] as String? ?? 'Cash';
+
+    // Get total
+    final total = (data['total'] as num?)?.toDouble() ?? 0.0;
+
+    return Transaction(
+      id: data['id'] as String? ?? data['key'] as String? ?? '',
+      date: date,
+      customerName: customerName,
+      items: itemsCount,
+      total: total,
+      paymentMethod: paymentMethod,
+      status: 'Selesai', // Default status
+    );
+  }
 }

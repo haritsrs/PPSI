@@ -1,9 +1,19 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class DatabaseService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
+  
+  late final DatabaseReference _database;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  DatabaseService() {
+    _database = FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL: databaseURL,
+    ).ref();
+  }
 
   // Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;

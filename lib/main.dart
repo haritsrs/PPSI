@@ -442,11 +442,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       greeting = 'Selamat Sore';
                     }
                     
-                    // Mock revenue data (replace with real data later)
-                    final todayRevenue = 1250000;
-                    final yesterdayRevenue = 1110000;
-                    final growthPercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toStringAsFixed(1);
-                    final isPositiveGrowth = todayRevenue >= yesterdayRevenue;
+                    // Mock store balance data (replace with real data later)
+                    final storeBalance = 1250000;
+                    final previousBalance = 1110000;
+                    final growthPercent = ((storeBalance - previousBalance) / previousBalance * 100).toStringAsFixed(1);
+                    final isPositiveGrowth = storeBalance >= previousBalance;
                     
                     return GestureDetector(
                       onTap: () {
@@ -562,7 +562,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             ),
                             SizedBox(height: 24 * paddingScale),
                             
-                            // Motivational Revenue Summary
+                            // Store Balance Summary
                             Container(
                               padding: EdgeInsets.all(20 * paddingScale),
                               decoration: BoxDecoration(
@@ -581,7 +581,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "Pendapatan Hari Ini",
+                                          "Saldo Toko",
                                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                             color: Colors.white.withOpacity(0.9),
                                             fontWeight: FontWeight.w500,
@@ -590,7 +590,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                         ),
                                         SizedBox(height: 8 * paddingScale),
                                         Text(
-                                          "Rp ${_formatCurrency(todayRevenue)}",
+                                          "Rp ${_formatCurrency(storeBalance)}",
                                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w800,
