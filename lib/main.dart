@@ -24,9 +24,14 @@ Future<void> main() async {
     ),
   );
 
-  // Set system UI mode to ensure navigation bar is always visible and opaque
+  // Set system UI mode - use manual mode to ensure navigation bar area is always reserved
+  // This ensures the navigation bar area is always visible, even if buttons are hidden by gesture navigation
   SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.edgeToEdge, // Allows content to go edge-to-edge
+    SystemUiMode.manual,
+    overlays: [
+      SystemUiOverlay.top, // Show status bar
+      SystemUiOverlay.bottom, // Show navigation bar area (buttons may be hidden by gesture navigation)
+    ],
   );
 
   runApp(const KiosDarmaApp());

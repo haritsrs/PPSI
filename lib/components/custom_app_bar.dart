@@ -9,10 +9,12 @@ import '../pages/notification_page.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final DatabaseService databaseService;
+  final VoidCallback? onMenuPressed;
 
   const CustomAppBar({
     super.key,
     required this.databaseService,
+    this.onMenuPressed,
   });
 
   @override
@@ -26,6 +28,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final appBarHeight = ResponsiveHelper.getAppBarHeight(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
     final isVertical = ResponsiveHelper.isVertical(context);
+    final isTallPhoneLandscape = ResponsiveHelper.isTallPhoneInLandscape(context);
     
     return PreferredSize(
       preferredSize: Size.fromHeight(appBarHeight),
@@ -43,6 +46,29 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
         ),
+        leading: isTallPhoneLandscape
+            ? Container(
+                margin: EdgeInsets.all(8 * iconScale),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: onMenuPressed ?? () {
+                    try {
+                      final scaffoldState = Scaffold.maybeOf(context);
+                      scaffoldState?.openDrawer();
+                    } catch (e) {
+                      // Silently fail if drawer is not available
+                    }
+                  },
+                  icon: Icon(Icons.menu_rounded, color: Colors.white, size: 24 * iconScale),
+                  iconSize: 24 * iconScale,
+                  padding: EdgeInsets.all(8 * iconScale),
+                  tooltip: 'Menu',
+                ),
+              )
+            : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -69,8 +95,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
-            // Only show text when not in vertical/portrait mode
-            if (!isVertical) ...[
+            // Only show text when not in vertical/portrait mode and not tall phone in landscape
+            if (!isVertical && !isTallPhoneLandscape) ...[
               SizedBox(width: 12 * iconScale),
               Text(
                 "KiosDarma",
@@ -83,7 +109,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ],
         ),
-        actions: [
+        actions: isTallPhoneLandscape
+            ? [] // Hide all actions when hamburger menu is shown
+            : [
           Container(
             margin: EdgeInsets.only(right: 8 * iconScale),
             decoration: BoxDecoration(

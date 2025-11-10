@@ -3,13 +3,30 @@ import 'package:flutter/material.dart';
 class ResponsiveHelper {
   // Get screen dimensions
   static Size getScreenSize(BuildContext context) {
-    return MediaQuery.of(context).size;
+    try {
+      final mediaQuery = MediaQuery.maybeOf(context);
+      if (mediaQuery != null) {
+        return mediaQuery.size;
+      }
+      // Fallback to a default size if MediaQuery is not available
+      return const Size(360, 640);
+    } catch (e) {
+      // Fallback to a default size if there's an error
+      return const Size(360, 640);
+    }
   }
 
   // Get aspect ratio
   static double getAspectRatio(BuildContext context) {
-    final size = getScreenSize(context);
-    return size.width / size.height;
+    try {
+      final size = getScreenSize(context);
+      if (size.height > 0) {
+        return size.width / size.height;
+      }
+      return 1.0; // Default aspect ratio
+    } catch (e) {
+      return 1.0; // Default aspect ratio
+    }
   }
 
   // Check if screen is wide (16:9 or 16:10)
@@ -37,6 +54,41 @@ class ResponsiveHelper {
     final aspectRatio = getAspectRatio(context);
     // Very tall screens have aspect ratio < 0.5
     return aspectRatio < 0.5;
+  }
+
+  // Check if screen is horizontal/landscape
+  static bool isHorizontal(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    // Landscape mode: aspect ratio > 1 (width > height)
+    return aspectRatio > 1.0;
+  }
+
+  // Check if screen is a tablet (typical tablet aspect ratios: 4:3, 16:10, etc.)
+  static bool isTablet(BuildContext context) {
+    try {
+      final aspectRatio = getAspectRatio(context);
+      final size = getScreenSize(context);
+      final mediaQuery = MediaQuery.maybeOf(context);
+      
+      if (mediaQuery != null) {
+        final shortestSide = size.width < size.height ? size.width : size.height;
+        // Tablets typically have:
+        // - Shortest side >= 600dp (physical size check)
+        // - Aspect ratio between 0.7 and 1.7 (covers 4:3, 16:10, 3:4, 10:16)
+        return shortestSide >= 600 && aspectRatio >= 0.7 && aspectRatio <= 1.7;
+      }
+      return false; // Default to not a tablet if MediaQuery is not available
+    } catch (e) {
+      return false; // Default to not a tablet on error
+    }
+  }
+
+  // Check if it's a tall phone in landscape mode (like 19.3:9 rotated = aspect ratio > 2.0)
+  static bool isTallPhoneInLandscape(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    // Tall phones in landscape have aspect ratio > 2.0 (like 19.3:9 = 2.14)
+    // But exclude tablets
+    return isHorizontal(context) && aspectRatio > 2.0 && !isTablet(context);
   }
 
   // Get responsive AppBar height based on aspect ratio
