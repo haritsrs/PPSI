@@ -127,6 +127,8 @@ class DatabaseService {
     required String paymentMethod,
     double? cashAmount,
     double? change,
+    String? customerId,
+    String? customerName,
   }) async {
     final newTransactionRef = transactionsRef.push();
     final transactionId = newTransactionRef.key!;
@@ -142,6 +144,8 @@ class DatabaseService {
       'change': change,
       'createdAt': DateTime.now().toIso8601String(),
       'createdBy': currentUserId ?? 'unknown',
+      if (customerId != null) 'customerId': customerId,
+      if (customerName != null) 'customerName': customerName,
     };
     
     await newTransactionRef.set(transactionData);
@@ -151,6 +155,11 @@ class DatabaseService {
       final productId = item['productId'] as String;
       final quantity = item['quantity'] as int;
       await decrementProductStock(productId, quantity);
+    }
+    
+    // Update customer transaction stats if customerId is provided
+    if (customerId != null) {
+      await updateCustomerTransactionStats(customerId, total);
     }
     
     return transactionId;
@@ -439,6 +448,170 @@ class DatabaseService {
     if (updates.isNotEmpty) {
       await notificationsRef.update(updates);
     }
+  }
+
+  // Customers operations
+  DatabaseReference get customersRef => _database.child('customers');
+  
+  // Stream of all customers
+  Stream<List<Map<String, dynamic>>> getCustomersStream() {
+    return customersRef.onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return <Map<String, dynamic>>[];
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> customers = [];
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          customers.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+        }
+      });
+      
+      return customers;
+    });
+  }
+
+  // Get all customers once
+  Future<List<Map<String, dynamic>>> getCustomers() async {
+    final snapshot = await customersRef.get();
+    if (snapshot.value == null) {
+      return [];
+    }
+    
+    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+    final List<Map<String, dynamic>> customers = [];
+    
+    data.forEach((key, value) {
+      if (value is Map) {
+        customers.add({
+          'id': key,
+          ...Map<String, dynamic>.from(value),
+        });
+      }
+    });
+    
+    return customers;
+  }
+
+  // Get a single customer by ID
+  Future<Map<String, dynamic>?> getCustomer(String customerId) async {
+    final snapshot = await customersRef.child(customerId).get();
+    if (!snapshot.exists) {
+      return null;
+    }
+    
+    return {
+      'id': customerId,
+      ...Map<String, dynamic>.from(snapshot.value as Map),
+    };
+  }
+
+  // Add a new customer
+  Future<String> addCustomer(Map<String, dynamic> customerData) async {
+    final newCustomerRef = customersRef.push();
+    final customerId = newCustomerRef.key!;
+    
+    await newCustomerRef.set({
+      ...customerData,
+      'id': customerId,
+      'transactionCount': 0,
+      'totalSpent': 0.0,
+      'createdAt': DateTime.now().toIso8601String(),
+      'lastTransaction': DateTime.now().toIso8601String(),
+      'createdBy': currentUserId ?? 'unknown',
+    });
+    
+    return customerId;
+  }
+
+  // Update a customer
+  Future<void> updateCustomer(String customerId, Map<String, dynamic> customerData) async {
+    await customersRef.child(customerId).update({
+      ...customerData,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // Delete a customer
+  Future<void> deleteCustomer(String customerId) async {
+    await customersRef.child(customerId).remove();
+  }
+
+  // Update customer transaction stats
+  Future<void> updateCustomerTransactionStats(String customerId, double transactionTotal) async {
+    final customerRef = customersRef.child(customerId);
+    final snapshot = await customerRef.get();
+    
+    if (snapshot.exists) {
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      final currentCount = (data['transactionCount'] as num?)?.toInt() ?? 0;
+      final currentTotal = (data['totalSpent'] as num?)?.toDouble() ?? 0.0;
+      
+      await customerRef.update({
+        'transactionCount': currentCount + 1,
+        'totalSpent': currentTotal + transactionTotal,
+        'lastTransaction': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    }
+  }
+
+  // Get transactions for a specific customer
+  Stream<List<Map<String, dynamic>>> getCustomerTransactionsStream(String customerId) {
+    return transactionsRef
+        .orderByChild('customerId')
+        .equalTo(customerId)
+        .onValue
+        .map((event) {
+      if (event.snapshot.value == null) {
+        return <Map<String, dynamic>>[];
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> transactions = [];
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          transactions.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+        }
+      });
+      
+      return transactions.reversed.toList(); // Most recent first
+    });
+  }
+
+  // Get customer transactions once
+  Future<List<Map<String, dynamic>>> getCustomerTransactions(String customerId) async {
+    final snapshot = await transactionsRef
+        .orderByChild('customerId')
+        .equalTo(customerId)
+        .get();
+    
+    if (snapshot.value == null) {
+      return [];
+    }
+    
+    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+    final List<Map<String, dynamic>> transactions = [];
+    
+    data.forEach((key, value) {
+      if (value is Map) {
+        transactions.add({
+          'id': key,
+          ...Map<String, dynamic>.from(value),
+        });
+      }
+    });
+    
+    return transactions.reversed.toList(); // Most recent first
   }
 }
 

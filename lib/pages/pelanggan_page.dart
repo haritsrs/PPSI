@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/customer_model.dart';
+import '../services/database_service.dart';
 
 class PelangganPage extends StatefulWidget {
   const PelangganPage({super.key});
@@ -15,79 +16,12 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
   late Animation<Offset> _slideAnimation;
   
   String _searchQuery = '';
+  String _selectedFilter = 'Semua'; // Semua, VIP, Gold, Silver, Bronze
+  final List<String> _filterOptions = ['Semua', 'VIP', 'Gold', 'Silver', 'Bronze'];
   
-  // Sample customer data
-  final List<Customer> _customers = [
-    Customer(
-      id: 'CUST001',
-      name: 'Ahmad Wijaya',
-      phone: '081234567890',
-      email: 'ahmad.wijaya@email.com',
-      address: 'Jl. Merdeka No. 123, Jakarta',
-      transactionCount: 15,
-      totalSpent: 1250000,
-      createdAt: DateTime.now().subtract(const Duration(days: 90)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 2)),
-      notes: 'Pelanggan setia, sering beli snack',
-    ),
-    Customer(
-      id: 'CUST002',
-      name: 'Siti Nurhaliza',
-      phone: '081234567891',
-      email: 'siti.nurhaliza@email.com',
-      address: 'Jl. Sudirman No. 456, Bandung',
-      transactionCount: 8,
-      totalSpent: 450000,
-      createdAt: DateTime.now().subtract(const Duration(days: 60)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 5)),
-      notes: 'Suka minuman dingin',
-    ),
-    Customer(
-      id: 'CUST003',
-      name: 'Budi Santoso',
-      phone: '081234567892',
-      email: 'budi.santoso@email.com',
-      address: 'Jl. Gatot Subroto No. 789, Surabaya',
-      transactionCount: 3,
-      totalSpent: 75000,
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 10)),
-    ),
-    Customer(
-      id: 'CUST004',
-      name: 'Dewi Sartika',
-      phone: '081234567893',
-      email: 'dewi.sartika@email.com',
-      address: 'Jl. Thamrin No. 321, Medan',
-      transactionCount: 22,
-      totalSpent: 2100000,
-      createdAt: DateTime.now().subtract(const Duration(days: 120)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 1)),
-      notes: 'Pelanggan VIP, sering beli dalam jumlah besar',
-    ),
-    Customer(
-      id: 'CUST005',
-      name: 'Rudi Hartono',
-      phone: '081234567894',
-      email: 'rudi.hartono@email.com',
-      address: 'Jl. Diponegoro No. 654, Yogyakarta',
-      transactionCount: 12,
-      totalSpent: 680000,
-      createdAt: DateTime.now().subtract(const Duration(days: 75)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 3)),
-    ),
-    Customer(
-      id: 'CUST006',
-      name: 'Maya Sari',
-      phone: '081234567895',
-      email: 'maya.sari@email.com',
-      address: 'Jl. Pahlawan No. 987, Semarang',
-      transactionCount: 5,
-      totalSpent: 180000,
-      createdAt: DateTime.now().subtract(const Duration(days: 45)),
-      lastTransaction: DateTime.now().subtract(const Duration(days: 7)),
-    ),
-  ];
+  final DatabaseService _databaseService = DatabaseService();
+  List<Customer> _customers = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -114,6 +48,34 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
     ));
     
     _animationController.forward();
+    _loadCustomers();
+  }
+
+  void _loadCustomers() {
+    setState(() {
+      _isLoading = true;
+    });
+
+    _databaseService.getCustomersStream().listen((customersData) {
+      if (mounted) {
+        setState(() {
+          _customers = customersData.map((data) => Customer.fromFirebase(data)).toList();
+          _isLoading = false;
+        });
+      }
+    }, onError: (error) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading customers: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -123,15 +85,24 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
   }
 
   List<Customer> get _filteredCustomers {
-    if (_searchQuery.isEmpty) {
-      return _customers;
+    List<Customer> filtered = _customers;
+
+    // Apply tier filter
+    if (_selectedFilter != 'Semua') {
+      filtered = filtered.where((customer) => customer.customerTier == _selectedFilter).toList();
     }
-    
-    return _customers.where((customer) {
-      return customer.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             customer.phone.contains(_searchQuery) ||
-             customer.email.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+
+    // Apply search query
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((customer) {
+        return customer.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               customer.phone.contains(_searchQuery) ||
+               customer.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               customer.address.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    return filtered;
   }
 
   int get _totalCustomers => _customers.length;
@@ -223,7 +194,7 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Cari Pelanggan",
+                        "Cari & Filter Pelanggan",
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1F2937),
@@ -237,7 +208,7 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'Cari nama, nomor telepon, atau email...',
+                          hintText: 'Cari nama, nomor telepon, email, atau alamat...',
                           prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1)),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -250,6 +221,29 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Filter chips
+                      Wrap(
+                        spacing: 8,
+                        children: _filterOptions.map((filter) {
+                          final isSelected = _selectedFilter == filter;
+                          return FilterChip(
+                            label: Text(filter),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedFilter = filter;
+                              });
+                            },
+                            selectedColor: const Color(0xFF6366F1).withOpacity(0.2),
+                            checkmarkColor: const Color(0xFF6366F1),
+                            labelStyle: TextStyle(
+                              color: isSelected ? const Color(0xFF6366F1) : Colors.grey[700],
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ],
                   ),
@@ -392,19 +386,52 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
                         ],
                       ),
                       const SizedBox(height: 16),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredCustomers.length,
-                        itemBuilder: (context, index) {
-                          final customer = _filteredCustomers[index];
-                          return CustomerCard(
-                            customer: customer,
-                            onTap: () => _showCustomerDetail(customer),
-                            onEdit: () => _showEditCustomerDialog(customer),
-                          );
-                        },
-                      ),
+                      _isLoading
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : _filteredCustomers.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(32.0),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.people_outline_rounded,
+                                          size: 64,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          _searchQuery.isNotEmpty || _selectedFilter != 'Semua'
+                                              ? 'Tidak ada pelanggan yang sesuai'
+                                              : 'Belum ada pelanggan',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: _filteredCustomers.length,
+                                  itemBuilder: (context, index) {
+                                    final customer = _filteredCustomers[index];
+                                    return CustomerCard(
+                                      customer: customer,
+                                      onTap: () => _showCustomerDetail(customer),
+                                      onEdit: () => _showEditCustomerDialog(customer),
+                                      onDelete: () => _showDeleteConfirmation(customer),
+                                    );
+                                  },
+                                ),
                     ],
                   ),
                 ),
@@ -493,36 +520,325 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => CustomerDetailModal(customer: customer),
+      isScrollControlled: true,
+      builder: (context) => CustomerDetailModal(
+        customer: customer,
+        databaseService: _databaseService,
+        onEdit: () {
+          Navigator.pop(context);
+          _showEditCustomerDialog(customer);
+        },
+      ),
     );
   }
 
   void _showAddCustomerDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final emailController = TextEditingController();
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.add_rounded, color: Colors.blue[600]),
-              const SizedBox(width: 8),
-              const Text('Tambah Pelanggan'),
-            ],
-          ),
-          content: const Text('Fitur tambah pelanggan akan segera hadir!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.add_rounded, color: Colors.blue[600]),
+                  const SizedBox(width: 8),
+                  const Text('Tambah Pelanggan'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama *',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Nama harus diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nomor Telepon *',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Nomor telepon harus diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Alamat',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Catatan',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            setDialogState(() {
+                              isSubmitting = true;
+                            });
+
+                            try {
+                              await _databaseService.addCustomer({
+                                'name': nameController.text.trim(),
+                                'phone': phoneController.text.trim(),
+                                'email': emailController.text.trim(),
+                                'address': addressController.text.trim(),
+                                'notes': notesController.text.trim(),
+                              });
+
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Pelanggan berhasil ditambahkan'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                isSubmitting = false;
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Simpan'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 
   void _showEditCustomerDialog(Customer customer) {
+    final nameController = TextEditingController(text: customer.name);
+    final phoneController = TextEditingController(text: customer.phone);
+    final emailController = TextEditingController(text: customer.email);
+    final addressController = TextEditingController(text: customer.address);
+    final notesController = TextEditingController(text: customer.notes);
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.edit_rounded, color: Colors.orange[600]),
+                  const SizedBox(width: 8),
+                  const Text('Edit Pelanggan'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama *',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Nama harus diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nomor Telepon *',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Nomor telepon harus diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Alamat',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Catatan',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            setDialogState(() {
+                              isSubmitting = true;
+                            });
+
+                            try {
+                              await _databaseService.updateCustomer(customer.id, {
+                                'name': nameController.text.trim(),
+                                'phone': phoneController.text.trim(),
+                                'email': emailController.text.trim(),
+                                'address': addressController.text.trim(),
+                                'notes': notesController.text.trim(),
+                              });
+
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Pelanggan berhasil diperbarui'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                isSubmitting = false;
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Simpan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation(Customer customer) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -530,16 +846,48 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              Icon(Icons.edit_rounded, color: Colors.orange[600]),
+              Icon(Icons.warning_rounded, color: Colors.red[600]),
               const SizedBox(width: 8),
-              const Text('Edit Pelanggan'),
+              const Text('Hapus Pelanggan'),
             ],
           ),
-          content: Text('Edit data ${customer.name} akan segera hadir!'),
+          content: Text(
+            'Apakah Anda yakin ingin menghapus pelanggan "${customer.name}"? Tindakan ini tidak dapat dibatalkan.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await _databaseService.deleteCustomer(customer.id);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Pelanggan berhasil dihapus'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Hapus'),
             ),
           ],
         );
@@ -552,12 +900,14 @@ class CustomerCard extends StatelessWidget {
   final Customer customer;
   final VoidCallback onTap;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const CustomerCard({
     super.key,
     required this.customer,
     required this.onTap,
     required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -651,20 +1001,41 @@ class CustomerCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: onEdit,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: onEdit,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          color: Color(0xFF6366F1),
+                          size: 16,
+                        ),
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.edit_rounded,
-                      color: Color(0xFF6366F1),
-                      size: 16,
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.delete_rounded,
+                          color: Colors.red,
+                          size: 16,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -675,18 +1046,58 @@ class CustomerCard extends StatelessWidget {
   }
 }
 
-class CustomerDetailModal extends StatelessWidget {
+class CustomerDetailModal extends StatefulWidget {
   final Customer customer;
+  final DatabaseService databaseService;
+  final VoidCallback onEdit;
 
   const CustomerDetailModal({
     super.key,
     required this.customer,
+    required this.databaseService,
+    required this.onEdit,
   });
+
+  @override
+  State<CustomerDetailModal> createState() => _CustomerDetailModalState();
+}
+
+class _CustomerDetailModalState extends State<CustomerDetailModal> {
+  bool _showTransactions = false;
+  List<Map<String, dynamic>> _transactions = [];
+  bool _isLoadingTransactions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  void _loadTransactions() {
+    setState(() {
+      _isLoadingTransactions = true;
+    });
+
+    widget.databaseService.getCustomerTransactionsStream(widget.customer.id).listen((transactions) {
+      if (mounted) {
+        setState(() {
+          _transactions = transactions;
+          _isLoadingTransactions = false;
+        });
+      }
+    }, onError: (error) {
+      if (mounted) {
+        setState(() {
+          _isLoadingTransactions = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -741,7 +1152,7 @@ class CustomerDetailModal extends StatelessWidget {
           
           // Customer Details
           Expanded(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -754,14 +1165,14 @@ class CustomerDetailModal extends StatelessWidget {
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: customer.tierColor.withOpacity(0.1),
+                            color: widget.customer.tierColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Center(
                             child: Text(
-                              customer.initials,
+                              widget.customer.initials,
                               style: TextStyle(
-                                color: customer.tierColor,
+                                color: widget.customer.tierColor,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 28,
                               ),
@@ -770,7 +1181,7 @@ class CustomerDetailModal extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          customer.name,
+                          widget.customer.name,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF1F2937),
@@ -780,13 +1191,13 @@ class CustomerDetailModal extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: customer.tierColor.withOpacity(0.1),
+                            color: widget.customer.tierColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            customer.customerTier,
+                            widget.customer.customerTier,
                             style: TextStyle(
-                              color: customer.tierColor,
+                              color: widget.customer.tierColor,
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
                             ),
@@ -799,15 +1210,15 @@ class CustomerDetailModal extends StatelessWidget {
                   const SizedBox(height: 24),
                   
                   // Customer Details
-                  _buildDetailRow("ID Pelanggan", customer.id),
-                  _buildDetailRow("Nomor Telepon", customer.phone),
-                  _buildDetailRow("Email", customer.email),
-                  _buildDetailRow("Alamat", customer.address),
-                  _buildDetailRow("Total Transaksi", "${customer.transactionCount} kali"),
-                  _buildDetailRow("Total Belanja", 'Rp ${customer.totalSpent.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'),
-                  _buildDetailRow("Terakhir Transaksi", _formatDate(customer.lastTransaction)),
+                  _buildDetailRow("ID Pelanggan", widget.customer.id),
+                  _buildDetailRow("Nomor Telepon", widget.customer.phone),
+                  _buildDetailRow("Email", widget.customer.email),
+                  _buildDetailRow("Alamat", widget.customer.address),
+                  _buildDetailRow("Total Transaksi", "${widget.customer.transactionCount} kali"),
+                  _buildDetailRow("Total Belanja", 'Rp ${widget.customer.totalSpent.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'),
+                  _buildDetailRow("Terakhir Transaksi", _formatDate(widget.customer.lastTransaction)),
                   
-                  if (customer.notes.isNotEmpty) ...[
+                  if (widget.customer.notes.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Text(
                       "Catatan",
@@ -826,7 +1237,7 @@ class CustomerDetailModal extends StatelessWidget {
                         border: Border.all(color: Colors.grey.withOpacity(0.2)),
                       ),
                       child: Text(
-                        customer.notes,
+                        widget.customer.notes,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF374151),
                         ),
@@ -836,15 +1247,150 @@ class CustomerDetailModal extends StatelessWidget {
                   
                   const SizedBox(height: 24),
                   
+                  // Transaction History Section
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _showTransactions = !_showTransactions;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.receipt_long_rounded,
+                                color: Color(0xFF6366F1),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                "Riwayat Transaksi (${_transactions.length})",
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF6366F1),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Icon(
+                            _showTransactions
+                                ? Icons.expand_less_rounded
+                                : Icons.expand_more_rounded,
+                            color: const Color(0xFF6366F1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  if (_showTransactions) ...[
+                    const SizedBox(height: 16),
+                    _isLoadingTransactions
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        : _transactions.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_long_outlined,
+                                        size: 48,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Belum ada transaksi',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _transactions.length,
+                                itemBuilder: (context, index) {
+                                  final transaction = _transactions[index];
+                                  final date = transaction['createdAt'] != null
+                                      ? DateTime.parse(transaction['createdAt'] as String)
+                                      : DateTime.now();
+                                  final total = (transaction['total'] as num?)?.toDouble() ?? 0.0;
+                                  final items = transaction['items'] as List<dynamic>? ?? [];
+                                  
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.grey.withOpacity(0.2),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _formatDateTime(date),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${items.length} item',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          'Rp ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                            color: Color(0xFF6366F1),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                  ],
+                  
+                  const SizedBox(height: 24),
+                  
                   // Action Buttons
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            // TODO: Implement edit customer
-                          },
+                          onPressed: widget.onEdit,
                           icon: const Icon(Icons.edit_rounded),
                           label: const Text('Edit Data'),
                           style: ElevatedButton.styleFrom(
@@ -857,27 +1403,9 @@ class CustomerDetailModal extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            // TODO: Implement view transactions
-                          },
-                          icon: const Icon(Icons.receipt_long_rounded),
-                          label: const Text('Riwayat'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF6366F1),
-                            side: const BorderSide(color: Color(0xFF6366F1)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -917,5 +1445,9 @@ class CustomerDetailModal extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return "${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
   }
 }
