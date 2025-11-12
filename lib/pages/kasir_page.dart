@@ -233,6 +233,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       builder: (context) => PaymentModal(
         total: _total,
         cartItems: _cartItems,
+        databaseService: _databaseService,
         onPaymentSuccess: _handlePaymentSuccess,
       ),
     );
@@ -242,6 +243,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     required String paymentMethod,
     double? cashAmount,
     double? change,
+    String? customerId,
+    String? customerName,
+    double? discount = 0.0,
   }) async {
     try {
       // Prepare transaction items
@@ -258,10 +262,12 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         items: transactionItems,
         subtotal: _subtotal,
         tax: _tax,
-        total: _total,
+        total: _total - (discount ?? 0.0),
         paymentMethod: paymentMethod,
         cashAmount: cashAmount,
         change: change,
+        customerId: customerId,
+        customerName: customerName,
       );
 
       // Create notification for successful transaction
@@ -1492,16 +1498,21 @@ class CartItemCard extends StatelessWidget {
 class PaymentModal extends StatefulWidget {
   final double total;
   final List<CartItem> cartItems;
+  final DatabaseService databaseService;
   final Function({
     required String paymentMethod,
     double? cashAmount,
     double? change,
+    String? customerId,
+    String? customerName,
+    double? discount,
   }) onPaymentSuccess;
 
   const PaymentModal({
     super.key,
     required this.total,
     required this.cartItems,
+    required this.databaseService,
     required this.onPaymentSuccess,
   });
 
@@ -1512,8 +1523,13 @@ class PaymentModal extends StatefulWidget {
 class _PaymentModalState extends State<PaymentModal> {
   String _selectedPaymentMethod = 'Cash';
   final TextEditingController _cashController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController();
   double _cashAmount = 0.0;
   double _change = 0.0;
+  double _discount = 0.0;
+  String? _selectedCustomerId;
+  String? _selectedCustomerName;
+  List<Map<String, dynamic>> _customers = [];
 
   final List<PaymentMethod> _paymentMethods = [
     PaymentMethod(id: 'Cash', name: 'Tunai', icon: Icons.money_rounded),
@@ -1525,24 +1541,64 @@ class _PaymentModalState extends State<PaymentModal> {
   bool _isProcessingPayment = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadCustomers();
+    _discountController.addListener(_calculateDiscount);
+  }
+
+  Future<void> _loadCustomers() async {
+    try {
+      widget.databaseService.getCustomersStream().listen((customers) {
+        if (mounted) {
+          setState(() {
+            _customers = customers;
+          });
+        }
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  void _calculateDiscount() {
+    setState(() {
+      _discount = double.tryParse(_discountController.text) ?? 0.0;
+      if (_discount > widget.total) {
+        _discount = widget.total;
+        _discountController.text = widget.total.toStringAsFixed(0);
+      }
+      if (_selectedPaymentMethod == 'Cash') {
+        _calculateChange();
+      }
+    });
+  }
+
+  double get _finalTotal {
+    return (widget.total - _discount).clamp(0.0, double.infinity);
+  }
+
+  @override
   void dispose() {
     _cashController.dispose();
+    _discountController.removeListener(_calculateDiscount);
+    _discountController.dispose();
     super.dispose();
   }
 
   void _calculateChange() {
     setState(() {
       _cashAmount = double.tryParse(_cashController.text) ?? 0.0;
-      _change = _cashAmount - widget.total;
+      _change = _cashAmount - _finalTotal;
     });
   }
 
   Future<void> _processPayment() async {
     if (_selectedPaymentMethod == 'Cash') {
-      if (_cashAmount < widget.total) {
+      if (_cashAmount < _finalTotal) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Jumlah uang tidak mencukupi!'),
+          SnackBar(
+            content: Text('Jumlah uang tidak mencukupi! Kurang Rp ${(_finalTotal - _cashAmount).toStringAsFixed(0)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1553,6 +1609,9 @@ class _PaymentModalState extends State<PaymentModal> {
         paymentMethod: _selectedPaymentMethod,
         cashAmount: _cashAmount,
         change: _change > 0 ? _change : null,
+        customerId: _selectedCustomerId,
+        customerName: _selectedCustomerName,
+        discount: _discount,
       );
       return;
     }
@@ -1588,7 +1647,7 @@ class _PaymentModalState extends State<PaymentModal> {
       final expiredAt = DateTime.now().add(const Duration(hours: 24)).toIso8601String();
 
       final qrisResponse = await _xenditService.createQRIS(
-        amount: widget.total,
+        amount: _finalTotal,
         referenceId: referenceId,
         callbackUrl: 'https://api.xendit.co/qr_codes/callback',
         expiredAt: expiredAt,
@@ -1600,7 +1659,7 @@ class _PaymentModalState extends State<PaymentModal> {
 
       if (mounted) {
         Navigator.pop(context); // Close payment modal
-        _showQRISPaymentDialog(qrisResponse, referenceId);
+        _showQRISPaymentDialog(qrisResponse, referenceId, _finalTotal);
       }
     } catch (e) {
       setState(() {
@@ -1617,19 +1676,22 @@ class _PaymentModalState extends State<PaymentModal> {
     }
   }
 
-  void _showQRISPaymentDialog(Map<String, dynamic> qrisData, String referenceId) {
+  void _showQRISPaymentDialog(Map<String, dynamic> qrisData, String referenceId, double total) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => QRISPaymentDialog(
         qrisData: qrisData,
         referenceId: referenceId,
-        total: widget.total,
+        total: total,
         onPaymentVerified: () {
           widget.onPaymentSuccess(
             paymentMethod: 'QRIS',
             cashAmount: null,
             change: null,
+            customerId: _selectedCustomerId,
+            customerName: _selectedCustomerName,
+            discount: _discount,
           );
         },
         onCancel: () {
@@ -1665,7 +1727,7 @@ class _PaymentModalState extends State<PaymentModal> {
         externalId: externalId,
         bankCode: bankCode,
         name: 'KiosDarma Payment',
-        amount: widget.total,
+        amount: _finalTotal,
         expiredAt: expiredAt,
       );
 
@@ -1674,7 +1736,7 @@ class _PaymentModalState extends State<PaymentModal> {
       });
 
       if (mounted) {
-        _showVirtualAccountPaymentDialog(vaResponse, bankName);
+        _showVirtualAccountPaymentDialog(vaResponse, bankName, _finalTotal);
       }
     } catch (e) {
       setState(() {
@@ -1691,19 +1753,22 @@ class _PaymentModalState extends State<PaymentModal> {
     }
   }
 
-  void _showVirtualAccountPaymentDialog(Map<String, dynamic> vaData, String bankName) {
+  void _showVirtualAccountPaymentDialog(Map<String, dynamic> vaData, String bankName, double total) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => VirtualAccountPaymentDialog(
         vaData: vaData,
         bankName: bankName,
-        total: widget.total,
+        total: total,
         onPaymentVerified: () {
           widget.onPaymentSuccess(
             paymentMethod: 'VirtualAccount',
             cashAmount: null,
             change: null,
+            customerId: _selectedCustomerId,
+            customerName: _selectedCustomerName,
+            discount: _discount,
           );
         },
         onCancel: () {
@@ -1770,107 +1835,271 @@ class _PaymentModalState extends State<PaymentModal> {
           ),
           
           // Total Amount
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  "Total Pembayaran",
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          "Total Pembayaran",
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Rp ${_finalTotal.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (_discount > 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Diskon: Rp ${_discount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Rp ${widget.total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Customer Selection
+                  Text(
+                    "Pelanggan (Opsional)",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2937),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Payment Methods
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Metode Pembayaran",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 3,
-                  ),
-                  itemCount: _paymentMethods.length,
-                  itemBuilder: (context, index) {
-                    final method = _paymentMethods[index];
-                    final isSelected = _selectedPaymentMethod == method.id;
-                    
-                    return GestureDetector(
-                      onTap: () {
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButton<String>(
+                      value: _selectedCustomerId,
+                      isExpanded: true,
+                      hint: const Text('Pilih pelanggan atau biarkan kosong'),
+                      underline: Container(),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Tanpa Pelanggan'),
+                        ),
+                        ..._customers.map((customer) {
+                          return DropdownMenuItem<String>(
+                            value: customer['id'] as String,
+                            child: Text(customer['name'] as String? ?? 'Unknown'),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
                         setState(() {
-                          _selectedPaymentMethod = method.id;
+                          _selectedCustomerId = value;
+                          if (value != null) {
+                            final customer = _customers.firstWhere((c) => c['id'] == value);
+                            _selectedCustomerName = customer['name'] as String?;
+                          } else {
+                            _selectedCustomerName = null;
+                          }
                         });
-                        HapticFeedback.lightImpact();
                       },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Discount/Coupon
+                  Text(
+                    "Diskon / Kupon",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _discountController,
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan jumlah diskon (Rp)',
+                      prefixIcon: const Icon(Icons.discount_rounded, color: Color(0xFF6366F1)),
+                      suffixText: 'Rp',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  
+                  const SizedBox(height: 24),
+          
+                  // Payment Methods
+                  Text(
+                    "Metode Pembayaran",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 3,
+                    ),
+                    itemCount: _paymentMethods.length,
+                    itemBuilder: (context, index) {
+                      final method = _paymentMethods[index];
+                      final isSelected = _selectedPaymentMethod == method.id;
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedPaymentMethod = method.id;
+                            if (method.id == 'Cash') {
+                              _calculateChange();
+                            }
+                          });
+                          HapticFeedback.lightImpact();
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                method.icon,
+                                color: isSelected ? Colors.white : const Color(0xFF6366F1),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                method.name,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: isSelected ? Colors.white : const Color(0xFF1F2937),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  // Cash Input (if Cash selected)
+                  if (_selectedPaymentMethod == 'Cash' && !_isProcessingPayment) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      "Jumlah Uang",
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _cashController,
+                      onChanged: (_) => _calculateChange(),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan jumlah uang',
+                        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[500],
+                        ),
+                        prefixText: 'Rp ',
+                        prefixStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6366F1),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    if (_change > 0) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
-                            width: 2,
+                            color: Colors.green.withOpacity(0.2),
+                            width: 1,
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              method.icon,
-                              color: isSelected ? Colors.white : const Color(0xFF6366F1),
+                            const Icon(
+                              Icons.money_rounded,
+                              color: Colors.green,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              method.name,
+                              'Kembalian: Rp ${_change.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: isSelected ? Colors.white : const Color(0xFF1F2937),
+                                color: Colors.green[700],
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    );
-                  },
-                ),
-              ],
+                    ],
+                  ],
+                  
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
           
@@ -1887,86 +2116,6 @@ class _PaymentModalState extends State<PaymentModal> {
               'Memproses pembayaran...',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Colors.grey[600],
-              ),
-            ),
-          ],
-
-          // Cash Input (if Cash selected)
-          if (_selectedPaymentMethod == 'Cash' && !_isProcessingPayment) ...[
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Jumlah Uang",
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _cashController,
-                    onChanged: (_) => _calculateChange(),
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: 'Masukkan jumlah uang',
-                      hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[500],
-                      ),
-                      prefixText: 'Rp ',
-                      prefixStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6366F1),
-                        fontWeight: FontWeight.w600,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-                  if (_change > 0) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.money_rounded,
-                            color: Colors.green,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Kembalian: Rp ${_change.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
               ),
             ),
           ],

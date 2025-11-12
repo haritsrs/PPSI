@@ -26,9 +26,12 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   
   String _selectedPeriod = 'Hari';
   String _selectedFilter = 'Semua';
+  String _searchQuery = '';
+  String _selectedPaymentMethod = 'Semua';
   
   final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
   final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Rentang Tanggal'];
+  final List<String> _paymentMethods = ['Semua', 'Cash', 'QRIS', 'VirtualAccount'];
   
   // Date range selection
   DateTime? _startDate;
@@ -36,6 +39,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   bool _useDateRange = false;
   
   final DatabaseService _databaseService = DatabaseService();
+  final TextEditingController _searchController = TextEditingController();
   List<Transaction> _transactions = [];
   bool _isLoading = true;
   bool _localeInitialized = false;
@@ -112,11 +116,14 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   @override
   void dispose() {
     _animationController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   List<Transaction> get _filteredTransactions {
     return _transactions.where((transaction) {
+      // Date filter
+      bool matchesDate = true;
       if (_useDateRange && _startDate != null && _endDate != null) {
         final transactionDate = DateTime(
           transaction.date.year,
@@ -125,25 +132,50 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
         );
         final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
         final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day).add(const Duration(days: 1));
-        return transactionDate.isAfter(start.subtract(const Duration(days: 1))) &&
+        matchesDate = transactionDate.isAfter(start.subtract(const Duration(days: 1))) &&
                transactionDate.isBefore(end);
+      } else {
+        switch (_selectedFilter) {
+          case 'Hari Ini':
+            final today = DateTime.now();
+            matchesDate = transaction.date.year == today.year &&
+                   transaction.date.month == today.month &&
+                   transaction.date.day == today.day;
+            break;
+          case 'Minggu Ini':
+            matchesDate = transaction.date.isAfter(DateTime.now().subtract(const Duration(days: 7)));
+            break;
+          case 'Bulan Ini':
+            final now = DateTime.now();
+            matchesDate = transaction.date.year == now.year &&
+                   transaction.date.month == now.month;
+            break;
+          default:
+            matchesDate = true;
+        }
       }
       
-      switch (_selectedFilter) {
-        case 'Hari Ini':
-          final today = DateTime.now();
-          return transaction.date.year == today.year &&
-                 transaction.date.month == today.month &&
-                 transaction.date.day == today.day;
-        case 'Minggu Ini':
-          return transaction.date.isAfter(DateTime.now().subtract(const Duration(days: 7)));
-        case 'Bulan Ini':
-          final now = DateTime.now();
-          return transaction.date.year == now.year &&
-                 transaction.date.month == now.month;
-        default:
-          return true;
+      if (!matchesDate) return false;
+      
+      // Payment method filter
+      if (_selectedPaymentMethod != 'Semua' && transaction.paymentMethod != _selectedPaymentMethod) {
+        return false;
       }
+      
+      // Search filter
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchesId = transaction.id.toLowerCase().contains(query);
+        final matchesCustomer = transaction.customerName.toLowerCase().contains(query);
+        final matchesTotal = transaction.total.toString().contains(query);
+        final matchesPayment = transaction.paymentMethod.toLowerCase().contains(query);
+        
+        if (!matchesId && !matchesCustomer && !matchesTotal && !matchesPayment) {
+          return false;
+        }
+      }
+      
+      return true;
     }).toList();
   }
 
@@ -409,6 +441,79 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      // Search Bar
+                      TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Cari transaksi (ID, pelanggan, total, metode pembayaran)...',
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1)),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _searchController.clear();
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Payment Method Filter
+                      Row(
+                        children: [
+                          const Icon(Icons.payment_rounded, size: 20, color: Color(0xFF6366F1)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Metode Pembayaran:',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: _selectedPaymentMethod,
+                              isExpanded: true,
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _selectedPaymentMethod = newValue!;
+                                });
+                              },
+                              underline: Container(),
+                              items: _paymentMethods.map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(
+                                    value,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: const Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ),
                       // Date range display
                       if (_useDateRange && _startDate != null && _endDate != null) ...[
                         const SizedBox(height: 16),
@@ -583,27 +688,18 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
 
   void _showTransactionDetail(Transaction transaction) async {
     // Get full transaction data for printing
-    final fullTransactionData = await _databaseService.transactionsRef
-        .child(transaction.id)
-        .get()
-        .then((snapshot) {
-      if (snapshot.exists) {
-        return {
-          'id': transaction.id,
-          ...Map<String, dynamic>.from(snapshot.value as Map),
-        };
-      }
-      return null;
-    });
+    final fullTransactionData = await _databaseService.getTransaction(transaction.id);
 
     if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => TransactionDetailModal(
         transaction: transaction,
         fullTransactionData: fullTransactionData,
+        databaseService: _databaseService,
         onPrint: fullTransactionData != null
             ? () {
                 Navigator.pop(context);
@@ -616,6 +712,9 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                 );
               }
             : null,
+        onCancelled: () {
+          _loadTransactions();
+        },
       ),
     );
   }
@@ -1533,22 +1632,109 @@ class TransactionCard extends StatelessWidget {
   }
 }
 
-class TransactionDetailModal extends StatelessWidget {
+class TransactionDetailModal extends StatefulWidget {
   final Transaction transaction;
   final Map<String, dynamic>? fullTransactionData;
   final VoidCallback? onPrint;
+  final DatabaseService databaseService;
+  final VoidCallback? onCancelled;
 
   const TransactionDetailModal({
     super.key,
     required this.transaction,
     this.fullTransactionData,
     this.onPrint,
+    required this.databaseService,
+    this.onCancelled,
   });
 
   @override
+  State<TransactionDetailModal> createState() => _TransactionDetailModalState();
+}
+
+class _TransactionDetailModalState extends State<TransactionDetailModal> {
+  bool _isLoading = false;
+  String _currentStatus = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.transaction.status;
+  }
+
+  Future<void> _cancelTransaction() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Batalkan Transaksi'),
+          ],
+        ),
+        content: const Text('Apakah Anda yakin ingin membatalkan transaksi ini? Stok produk akan dikembalikan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Ya, Batalkan'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await widget.databaseService.cancelTransaction(widget.transaction.id);
+      if (mounted) {
+        setState(() {
+          _currentStatus = 'Dibatalkan';
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transaksi berhasil dibatalkan'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onCancelled?.call();
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final canCancel = _currentStatus != 'Dibatalkan' && _currentStatus != 'Dikembalikan';
+    
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
+      height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -1608,12 +1794,12 @@ class TransactionDetailModal extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow("ID Transaksi", transaction.id),
-                  _buildDetailRow("Tanggal", _formatDateTime(transaction.date)),
-                  _buildDetailRow("Pelanggan", transaction.customerName),
-                  _buildDetailRow("Jumlah Item", "${transaction.items} item"),
-                  _buildDetailRow("Metode Pembayaran", transaction.paymentMethod),
-                  _buildDetailRow("Status", transaction.status),
+                  _buildDetailRow("ID Transaksi", widget.transaction.id),
+                  _buildDetailRow("Tanggal", _formatDateTime(widget.transaction.date)),
+                  _buildDetailRow("Pelanggan", widget.transaction.customerName),
+                  _buildDetailRow("Jumlah Item", "${widget.transaction.items} item"),
+                  _buildDetailRow("Metode Pembayaran", widget.transaction.paymentMethod),
+                  _buildDetailRow("Status", _currentStatus),
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
@@ -1637,7 +1823,7 @@ class TransactionDetailModal extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Rp ${transaction.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                          'Rp ${widget.transaction.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -1649,24 +1835,53 @@ class TransactionDetailModal extends StatelessWidget {
                   
                   const SizedBox(height: 24),
                   
-                  // Print Button
-                  if (onPrint != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: onPrint,
-                        icon: const Icon(Icons.print_rounded),
-                        label: const Text('Cetak Struk'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  // Action Buttons
+                  Row(
+                    children: [
+                      if (widget.onPrint != null)
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: widget.onPrint,
+                            icon: const Icon(Icons.print_rounded),
+                            label: const Text('Cetak'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      if (canCancel && widget.onPrint != null) const SizedBox(width: 12),
+                      if (canCancel)
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _cancelTransaction,
+                            icon: _isLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(Icons.cancel_rounded),
+                            label: const Text('Batalkan'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),

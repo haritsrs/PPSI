@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
+import '../services/settings_service.dart';
 
 class PengaturanPage extends StatefulWidget {
   const PengaturanPage({super.key});
@@ -57,6 +58,127 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
     ));
     
     _animationController.forward();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      _notificationsEnabled = true;
+      _soundEnabled = true;
+      _hapticEnabled = true;
+      _darkModeEnabled = false;
+      _autoBackupEnabled = true;
+      _offlineModeEnabled = false;
+      _printerEnabled = true;
+      _barcodeScannerEnabled = true;
+      _selectedLanguage = 'Bahasa Indonesia';
+      _selectedCurrency = 'IDR (Rupiah)';
+      _selectedPrinter = 'Default Printer';
+    });
+
+    // Load from settings service
+    _notificationsEnabled = await SettingsService.getSetting(
+      SettingsService.keyNotificationsEnabled,
+      true,
+    );
+    _soundEnabled = await SettingsService.getSetting(
+      SettingsService.keySoundEnabled,
+      true,
+    );
+    _hapticEnabled = await SettingsService.getSetting(
+      SettingsService.keyHapticEnabled,
+      true,
+    );
+    _darkModeEnabled = await SettingsService.getSetting(
+      SettingsService.keyDarkModeEnabled,
+      false,
+    );
+    _autoBackupEnabled = await SettingsService.getSetting(
+      SettingsService.keyAutoBackupEnabled,
+      true,
+    );
+    _offlineModeEnabled = await SettingsService.getSetting(
+      SettingsService.keyOfflineModeEnabled,
+      false,
+    );
+    _printerEnabled = await SettingsService.getSetting(
+      SettingsService.keyPrinterEnabled,
+      true,
+    );
+    _barcodeScannerEnabled = await SettingsService.getSetting(
+      SettingsService.keyBarcodeScannerEnabled,
+      true,
+    );
+    _selectedLanguage = await SettingsService.getSetting(
+      SettingsService.keyLanguage,
+      'Bahasa Indonesia',
+    );
+    _selectedCurrency = await SettingsService.getSetting(
+      SettingsService.keyCurrency,
+      'IDR (Rupiah)',
+    );
+    _selectedPrinter = await SettingsService.getSetting(
+      SettingsService.keyPrinter,
+      'Default Printer',
+    );
+
+    // Sync from Firebase if online (only once on initial load)
+    if (!_offlineModeEnabled && mounted) {
+      try {
+        await SettingsService.syncFromFirebase();
+        // Reload settings after sync
+        _notificationsEnabled = await SettingsService.getSetting(
+          SettingsService.keyNotificationsEnabled,
+          true,
+        );
+        _soundEnabled = await SettingsService.getSetting(
+          SettingsService.keySoundEnabled,
+          true,
+        );
+        _hapticEnabled = await SettingsService.getSetting(
+          SettingsService.keyHapticEnabled,
+          true,
+        );
+        _darkModeEnabled = await SettingsService.getSetting(
+          SettingsService.keyDarkModeEnabled,
+          false,
+        );
+        _autoBackupEnabled = await SettingsService.getSetting(
+          SettingsService.keyAutoBackupEnabled,
+          true,
+        );
+        _offlineModeEnabled = await SettingsService.getSetting(
+          SettingsService.keyOfflineModeEnabled,
+          false,
+        );
+        _printerEnabled = await SettingsService.getSetting(
+          SettingsService.keyPrinterEnabled,
+          true,
+        );
+        _barcodeScannerEnabled = await SettingsService.getSetting(
+          SettingsService.keyBarcodeScannerEnabled,
+          true,
+        );
+        _selectedLanguage = await SettingsService.getSetting(
+          SettingsService.keyLanguage,
+          'Bahasa Indonesia',
+        );
+        _selectedCurrency = await SettingsService.getSetting(
+          SettingsService.keyCurrency,
+          'IDR (Rupiah)',
+        );
+        _selectedPrinter = await SettingsService.getSetting(
+          SettingsService.keyPrinter,
+          'Default Printer',
+        );
+      } catch (e) {
+        print('Error syncing from Firebase: $e');
+      }
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -242,10 +364,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Tema aplikasi",
                       trailing: Switch(
                         value: _darkModeEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _darkModeEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyDarkModeEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -268,10 +394,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Aktifkan notifikasi",
                       trailing: Switch(
                         value: _notificationsEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _notificationsEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyNotificationsEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -283,10 +413,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Notifikasi suara",
                       trailing: Switch(
                         value: _soundEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _soundEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keySoundEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -298,10 +432,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Haptic feedback",
                       trailing: Switch(
                         value: _hapticEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _hapticEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyHapticEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -330,10 +468,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Cetak struk otomatis",
                       trailing: Switch(
                         value: _printerEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _printerEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyPrinterEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -345,10 +487,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Aktifkan scanner",
                       trailing: Switch(
                         value: _barcodeScannerEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _barcodeScannerEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyBarcodeScannerEnabled,
+                            value,
+                          );
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -371,10 +517,37 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Backup data harian",
                       trailing: Switch(
                         value: _autoBackupEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _autoBackupEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyAutoBackupEnabled,
+                            value,
+                          );
+                          if (value) {
+                            // Perform immediate backup when enabled
+                            try {
+                              await SettingsService.performBackup();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Backup berhasil dilakukan'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error backup: $e'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              }
+                            }
+                          }
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
@@ -386,14 +559,68 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                       subtitle: "Bekerja tanpa internet",
                       trailing: Switch(
                         value: _offlineModeEnabled,
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           setState(() {
                             _offlineModeEnabled = value;
                           });
+                          await SettingsService.setSetting(
+                            SettingsService.keyOfflineModeEnabled,
+                            value,
+                          );
+                          if (!value) {
+                            // Sync to Firebase when going online
+                            try {
+                              await SettingsService.syncToFirebase();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Pengaturan disinkronkan ke cloud'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error sync: $e'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              }
+                            }
+                          }
                           HapticFeedback.lightImpact();
                         },
                         activeColor: const Color(0xFF6366F1),
                       ),
+                    ),
+                    _buildSettingItem(
+                      icon: Icons.backup_rounded,
+                      title: "Backup Sekarang",
+                      subtitle: "Lakukan backup manual",
+                      onTap: () async {
+                        try {
+                          await SettingsService.performBackup();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Backup berhasil dilakukan'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error backup: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
                     ),
                     _buildSettingItem(
                       icon: Icons.lock_rounded,
@@ -558,10 +785,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                 title: Text(language),
                 value: language,
                 groupValue: _selectedLanguage,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() {
                     _selectedLanguage = value!;
                   });
+                  await SettingsService.setSetting(
+                    SettingsService.keyLanguage,
+                    value!,
+                  );
                   Navigator.pop(context);
                 },
               );
@@ -592,10 +823,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                 title: Text(currency),
                 value: currency,
                 groupValue: _selectedCurrency,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() {
                     _selectedCurrency = value!;
                   });
+                  await SettingsService.setSetting(
+                    SettingsService.keyCurrency,
+                    value!,
+                  );
                   Navigator.pop(context);
                 },
               );
@@ -626,10 +861,14 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                 title: Text(printer),
                 value: printer,
                 groupValue: _selectedPrinter,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() {
                     _selectedPrinter = value!;
                   });
+                  await SettingsService.setSetting(
+                    SettingsService.keyPrinter,
+                    value!,
+                  );
                   Navigator.pop(context);
                 },
               );

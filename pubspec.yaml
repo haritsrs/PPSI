@@ -70,6 +70,12 @@ dependencies:
   share_plus: ^10.1.2
   path_provider: ^2.1.5
   
+  # Local storage
+  shared_preferences: ^2.3.2
+  
+  # Image compression
+  flutter_image_compress: ^2.3.0
+  
   # Date formatting
   intl: ^0.19.0
   

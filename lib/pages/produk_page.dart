@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../models/product_model.dart';
 import '../services/database_service.dart';
+import '../services/storage_service.dart';
+import 'produk_page_dialogs.dart';
 
 class ProdukPage extends StatefulWidget {
   const ProdukPage({super.key});
@@ -443,17 +447,34 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                                     color: const Color(0xFF1F2937),
                                   ),
                                 ),
-                                TextButton.icon(
-                                  onPressed: () {
-                                    HapticFeedback.lightImpact();
-                                    _showAddProductDialog();
-                                  },
-                                  icon: const Icon(Icons.add_rounded, size: 18),
-                                  label: const Text('Tambah Produk'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF6366F1),
-                                    backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
-                                  ),
+                                Row(
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        _showBulkStockUpdateDialog();
+                                      },
+                                      icon: const Icon(Icons.inventory_2_rounded, size: 18),
+                                      label: const Text('Update Bulk'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF10B981),
+                                        backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        _showAddProductDialog();
+                                      },
+                                      icon: const Icon(Icons.add_rounded, size: 18),
+                                      label: const Text('Tambah Produk'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF6366F1),
+                                        backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -613,6 +634,33 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         onEditStock: () {
           Navigator.pop(context);
           _showEditStockDialog(product);
+        },
+        onViewHistory: () {
+          Navigator.pop(context);
+          _showStockHistoryDialog(product);
+        },
+      ),
+    );
+  }
+
+  void _showStockHistoryDialog(Product product) {
+    showDialog(
+      context: context,
+      builder: (context) => StockHistoryDialog(
+        product: product,
+        databaseService: _databaseService,
+      ),
+    );
+  }
+
+  void _showBulkStockUpdateDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => BulkStockUpdateDialog(
+        products: _products,
+        databaseService: _databaseService,
+        onSaved: () {
+          HapticFeedback.lightImpact();
         },
       ),
     );
@@ -777,12 +825,28 @@ class ProductCard extends StatelessWidget {
                 color: statusColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: Text(
-                  product.image.isNotEmpty ? product.image : '📦',
-                  style: const TextStyle(fontSize: 32),
-                ),
-              ),
+              child: product.imageUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Text(
+                              product.image.isNotEmpty ? product.image : '📦',
+                              style: const TextStyle(fontSize: 32),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        product.image.isNotEmpty ? product.image : '📦',
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -903,12 +967,14 @@ class ProductDetailModal extends StatelessWidget {
   final Product product;
   final VoidCallback onEdit;
   final VoidCallback onEditStock;
+  final VoidCallback onViewHistory;
 
   const ProductDetailModal({
     super.key,
     required this.product,
     required this.onEdit,
     required this.onEditStock,
+    required this.onViewHistory,
   });
 
   @override
@@ -989,12 +1055,28 @@ class ProductDetailModal extends StatelessWidget {
                 width: 2,
               ),
             ),
-            child: Center(
-              child: Text(
-                product.image.isNotEmpty ? product.image : '📦',
-                style: const TextStyle(fontSize: 64),
-              ),
-            ),
+            child: product.imageUrl.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.network(
+                      product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Text(
+                            product.image.isNotEmpty ? product.image : '📦',
+                            style: const TextStyle(fontSize: 64),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      product.image.isNotEmpty ? product.image : '📦',
+                      style: const TextStyle(fontSize: 64),
+                    ),
+                  ),
           ),
           
           const SizedBox(height: 24),
@@ -1083,6 +1165,23 @@ class ProductDetailModal extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: onViewHistory,
+                      icon: const Icon(Icons.history_rounded),
+                      label: const Text('Riwayat Stok'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6366F1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: const BorderSide(color: Color(0xFF6366F1)),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -1151,8 +1250,12 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
   
   String _selectedEmoji = '📦';
   bool _isLoading = false;
+  File? _selectedImageFile;
+  String? _imageUrl;
+  bool _isUploadingImage = false;
   
   final DatabaseService _databaseService = DatabaseService();
+  final ImagePicker _imagePicker = ImagePicker();
   
   // Popular emojis for products
   final List<String> _emojiCategories = [
@@ -1178,6 +1281,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
       _categoryController.text = widget.product!.category;
       _barcodeController.text = widget.product!.barcode;
       _selectedEmoji = widget.product!.image.isNotEmpty ? widget.product!.image : '📦';
+      _imageUrl = widget.product!.imageUrl.isNotEmpty ? widget.product!.imageUrl : null;
     }
   }
 
@@ -1194,6 +1298,107 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImageFile = File(image.path);
+          _imageUrl = null; // Clear existing URL when new image is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImageFile = File(image.path);
+          _imageUrl = null; // Clear existing URL when new image is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error taking photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showImageSourceDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Pilih Sumber Gambar'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Galeri'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Kamera'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteImage() async {
+    if (_imageUrl != null && widget.product != null) {
+      // Delete from Firebase Storage
+      try {
+        await StorageService.deleteProductImage(_imageUrl!);
+      } catch (e) {
+        print('Error deleting image: $e');
+      }
+    }
+    
+    setState(() {
+      _selectedImageFile = null;
+      _imageUrl = null;
+    });
+  }
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -1204,6 +1409,44 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
     });
 
     try {
+      String finalImageUrl = _imageUrl ?? '';
+      
+      // Upload new image if selected
+      if (_selectedImageFile != null) {
+        setState(() {
+          _isUploadingImage = true;
+        });
+        
+        try {
+          // Delete old image if exists
+          if (widget.product != null && widget.product!.imageUrl.isNotEmpty) {
+            await StorageService.deleteProductImage(widget.product!.imageUrl);
+          }
+          
+          // Get product ID (use existing or generate new)
+          final productId = widget.product?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+          
+          // Upload new image
+          finalImageUrl = await StorageService.uploadProductImage(
+            imageFile: _selectedImageFile!,
+            productId: productId,
+          );
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error uploading image: $e'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } finally {
+          setState(() {
+            _isUploadingImage = false;
+          });
+        }
+      }
+
       final productData = {
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
@@ -1214,15 +1457,30 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
         'category': _categoryController.text.trim(),
         'barcode': _barcodeController.text.trim(),
         'image': _selectedEmoji,
-        'imageUrl': '',
+        'imageUrl': finalImageUrl,
       };
 
+      String productId;
       if (widget.product != null) {
         // Update existing product
-        await _databaseService.updateProduct(widget.product!.id, productData);
+        productId = widget.product!.id;
+        await _databaseService.updateProduct(productId, productData);
       } else {
         // Add new product
-        await _databaseService.addProduct(productData);
+        productId = await _databaseService.addProduct(productData);
+        
+        // If we have a new image but product ID wasn't available before, re-upload with correct ID
+        if (_selectedImageFile != null && finalImageUrl.isEmpty) {
+          try {
+            finalImageUrl = await StorageService.uploadProductImage(
+              imageFile: _selectedImageFile!,
+              productId: productId,
+            );
+            await _databaseService.updateProduct(productId, {'imageUrl': finalImageUrl});
+          } catch (e) {
+            print('Error re-uploading image: $e');
+          }
+        }
       }
 
       if (mounted) {
@@ -1297,6 +1555,115 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Image Upload Section
+                      Text(
+                        "Gambar Produk",
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            // Image Preview
+                            GestureDetector(
+                              onTap: _showImageSourceDialog,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: _isUploadingImage
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : _selectedImageFile != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(14),
+                                            child: Image.file(
+                                              _selectedImageFile!,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : _imageUrl != null && _imageUrl!.isNotEmpty
+                                            ? ClipRRect(
+                                                borderRadius: BorderRadius.circular(14),
+                                                child: Image.network(
+                                                  _imageUrl!,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return Center(
+                                                      child: Text(
+                                                        _selectedEmoji,
+                                                        style: const TextStyle(fontSize: 48),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      _selectedEmoji,
+                                                      style: const TextStyle(fontSize: 48),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    const Icon(
+                                                      Icons.add_photo_alternate_rounded,
+                                                      size: 20,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _isUploadingImage ? null : _showImageSourceDialog,
+                                  icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+                                  label: const Text('Unggah Gambar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6366F1),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                                if ((_selectedImageFile != null || (_imageUrl != null && _imageUrl!.isNotEmpty)) && !_isUploadingImage) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: _deleteImage,
+                                    icon: const Icon(Icons.delete_rounded),
+                                    color: Colors.red,
+                                    tooltip: 'Hapus Gambar',
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
                       // Emoji Selector
                       Text(
                         "Pilih Emoji",
@@ -1629,8 +1996,22 @@ class EditStockDialog extends StatefulWidget {
 class _EditStockDialogState extends State<EditStockDialog> {
   final _formKey = GlobalKey<FormState>();
   final _stockController = TextEditingController();
+  final _notesController = TextEditingController();
+  String _selectedReason = 'Manual Adjustment';
   bool _isLoading = false;
   final DatabaseService _databaseService = DatabaseService();
+
+  final List<String> _adjustmentReasons = [
+    'Manual Adjustment',
+    'Stock Opname',
+    'Pembelian',
+    'Retur dari Supplier',
+    'Retur dari Pelanggan',
+    'Kerusakan',
+    'Kadaluarsa',
+    'Hilang',
+    'Lainnya',
+  ];
 
   @override
   void initState() {
@@ -1641,6 +2022,7 @@ class _EditStockDialogState extends State<EditStockDialog> {
   @override
   void dispose() {
     _stockController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -1655,7 +2037,12 @@ class _EditStockDialogState extends State<EditStockDialog> {
 
     try {
       final newStock = int.parse(_stockController.text.trim());
-      await _databaseService.updateProductStock(widget.product.id, newStock);
+      await _databaseService.updateProductStock(
+        widget.product.id,
+        newStock,
+        reason: _selectedReason,
+        notes: _notesController.text.trim(),
+      );
 
       if (mounted) {
         Navigator.pop(context);
@@ -1734,6 +2121,41 @@ class _EditStockDialogState extends State<EditStockDialog> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedReason,
+                decoration: InputDecoration(
+                  labelText: 'Alasan Penyesuaian',
+                  prefixIcon: const Icon(Icons.info_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: _adjustmentReasons.map((reason) {
+                  return DropdownMenuItem<String>(
+                    value: reason,
+                    child: Text(reason),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedReason = value!;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _notesController,
+                decoration: InputDecoration(
+                  labelText: 'Catatan (Opsional)',
+                  hintText: 'Tambahkan catatan untuk penyesuaian stok',
+                  prefixIcon: const Icon(Icons.note_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                maxLines: 2,
               ),
               const SizedBox(height: 24),
               Row(
