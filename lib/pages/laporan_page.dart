@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'dart:io';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:excel/excel.dart' hide Border;
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../services/database_service.dart';
 
 class LaporanPage extends StatefulWidget {
@@ -19,11 +27,17 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   String _selectedFilter = 'Semua';
   
   final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
-  final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini'];
+  final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Rentang Tanggal'];
+  
+  // Date range selection
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _useDateRange = false;
   
   final DatabaseService _databaseService = DatabaseService();
   List<Transaction> _transactions = [];
   bool _isLoading = true;
+  bool _localeInitialized = false;
 
   @override
   void initState() {
@@ -50,7 +64,17 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     ));
     
     _animationController.forward();
+    _initializeLocale();
     _loadTransactions();
+  }
+
+  Future<void> _initializeLocale() async {
+    if (!_localeInitialized) {
+      await initializeDateFormatting('id_ID', null);
+      setState(() {
+        _localeInitialized = true;
+      });
+    }
   }
 
   Future<void> _loadTransactions() async {
@@ -92,13 +116,30 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
 
   List<Transaction> get _filteredTransactions {
     return _transactions.where((transaction) {
+      if (_useDateRange && _startDate != null && _endDate != null) {
+        final transactionDate = DateTime(
+          transaction.date.year,
+          transaction.date.month,
+          transaction.date.day,
+        );
+        final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+        final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day).add(const Duration(days: 1));
+        return transactionDate.isAfter(start.subtract(const Duration(days: 1))) &&
+               transactionDate.isBefore(end);
+      }
+      
       switch (_selectedFilter) {
         case 'Hari Ini':
-          return transaction.date.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+          final today = DateTime.now();
+          return transaction.date.year == today.year &&
+                 transaction.date.month == today.month &&
+                 transaction.date.day == today.day;
         case 'Minggu Ini':
           return transaction.date.isAfter(DateTime.now().subtract(const Duration(days: 7)));
         case 'Bulan Ini':
-          return transaction.date.isAfter(DateTime.now().subtract(const Duration(days: 30)));
+          final now = DateTime.now();
+          return transaction.date.year == now.year &&
+                 transaction.date.month == now.month;
         default:
           return true;
       }
@@ -342,6 +383,12 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                             onChanged: (String? newValue) {
                               setState(() {
                                 _selectedFilter = newValue!;
+                                if (newValue == 'Rentang Tanggal') {
+                                  _useDateRange = true;
+                                  _showDateRangePicker();
+                                } else {
+                                  _useDateRange = false;
+                                }
                               });
                             },
                             underline: Container(),
@@ -360,6 +407,36 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                           ),
                         ],
                       ),
+                      // Date range display
+                      if (_useDateRange && _startDate != null && _endDate != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, color: Color(0xFF6366F1), size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF6366F1),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _showDateRangePicker,
+                                child: const Text('Ubah'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       _filteredTransactions.isEmpty
                           ? Center(
@@ -483,13 +560,22 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   }
 
   Widget _buildChart() {
-    // Sample chart data
-    final List<double> data = [25000, 35000, 28000, 42000, 38000, 45000, 52000];
-    final double maxValue = data.reduce(math.max);
+    final chartData = _calculateChartData(_filteredTransactions);
+    
+    if (chartData.isEmpty) {
+      return Center(
+        child: Text(
+          'Tidak ada data untuk ditampilkan',
+          style: TextStyle(color: Colors.grey[600]),
+        ),
+      );
+    }
+    
+    final double maxValue = chartData.reduce(math.max);
     
     return CustomPaint(
       size: const Size(double.infinity, 200),
-      painter: ChartPainter(data, maxValue),
+      painter: ChartPainter(chartData, maxValue),
     );
   }
 
@@ -499,6 +585,45 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
       backgroundColor: Colors.transparent,
       builder: (context) => TransactionDetailModal(transaction: transaction),
     );
+  }
+
+  Future<void> _showDateRangePicker() async {
+    // Ensure locale is initialized before showing date picker
+    if (!_localeInitialized) {
+      await _initializeLocale();
+    }
+    
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
+      locale: const Locale('id', 'ID'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6366F1),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1F2937),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+        _useDateRange = true;
+        _selectedFilter = 'Rentang Tanggal';
+      });
+    }
   }
 
   void _showExportDialog() {
@@ -520,29 +645,685 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Batal'),
             ),
-            ElevatedButton(
-              onPressed: () {
+            ElevatedButton.icon(
+              onPressed: () async {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Laporan berhasil diekspor!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                await _exportToPDF();
               },
-              child: const Text('PDF'),
+              icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+              label: const Text('PDF'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
             ),
-            ElevatedButton(
-              onPressed: () {
+            ElevatedButton.icon(
+              onPressed: () async {
                 Navigator.of(context).pop();
+                await _exportToExcel();
+              },
+              icon: const Icon(Icons.table_chart_rounded, size: 18),
+              label: const Text('Excel'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _exportToPDF() async {
+    try {
+      HapticFeedback.mediumImpact();
+      
+      // Ensure locale is initialized
+      if (!_localeInitialized) {
+        await _initializeLocale();
+      }
+      
+      // Show loading
+      if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Laporan berhasil diekspor!'),
-                    backgroundColor: Colors.green,
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 16),
+                Text('Membuat PDF...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      final pdf = pw.Document();
+      final filtered = _filteredTransactions;
+      final dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
+
+      // Calculate chart data
+      final chartData = _calculateChartData(filtered);
+      
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (pw.Context context) {
+            return [
+              // Header
+              pw.Header(
+                level: 0,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'Laporan Transaksi',
+                          style: pw.TextStyle(
+                            fontSize: 24,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blueGrey900,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Periode: ${_getPeriodText()}',
+                          style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
+                        ),
+                      ],
+                    ),
+                    pw.Text(
+                      DateFormat('dd MMMM yyyy', 'id_ID').format(DateTime.now()),
+                      style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+                    ),
+                  ],
+                ),
+              ),
+              
+              pw.SizedBox(height: 20),
+              
+              // Summary Cards
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSummaryBox('Total Pendapatan', _totalRevenue, true),
+                  _buildSummaryBox('Total Transaksi', _totalTransactions.toDouble(), false),
+                ],
+              ),
+              
+              pw.SizedBox(height: 30),
+              
+              // Chart Section
+              pw.Text(
+                'Grafik Pendapatan',
+                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 10),
+              _buildChartWidget(chartData),
+              
+              pw.SizedBox(height: 30),
+              
+              // Transaction List
+              pw.Text(
+                'Daftar Transaksi (${filtered.length})',
+                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 10),
+              
+              // Table Header
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                    children: [
+                      _buildTableCell('ID', isHeader: true),
+                      _buildTableCell('Tanggal', isHeader: true),
+                      _buildTableCell('Pelanggan', isHeader: true),
+                      _buildTableCell('Item', isHeader: true),
+                      _buildTableCell('Total', isHeader: true),
+                    ],
+                  ),
+                  ...filtered.map((transaction) {
+                    return pw.TableRow(
+                      children: [
+                        _buildTableCell(transaction.id.substring(0, 8)),
+                        _buildTableCell(dateTimeFormat.format(transaction.date)),
+                        _buildTableCell(transaction.customerName),
+                        _buildTableCell('${transaction.items}'),
+                        _buildTableCell('Rp ${_formatCurrency(transaction.total)}'),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            ];
+          },
+        ),
+      );
+
+      // Save PDF - Use platform-agnostic approach
+      final pdfBytes = await pdf.save();
+      File? file;
+      
+      try {
+        // Try path_provider first
+        try {
+          final output = await getTemporaryDirectory();
+          file = File('${output.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.pdf');
+          await file.writeAsBytes(pdfBytes);
+        } catch (e) {
+          // Fallback: try application documents directory
+          try {
+            final output = await getApplicationDocumentsDirectory();
+            file = File('${output.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.pdf');
+            await file.writeAsBytes(pdfBytes);
+          } catch (e2) {
+            // Last resort: use system temp directory
+            try {
+              final tempDir = Directory.systemTemp;
+              file = File('${tempDir.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.pdf');
+              await file.writeAsBytes(pdfBytes);
+            } catch (e3) {
+              // If all else fails, show error
+              if (mounted) {
+                await Share.share(
+                  'Laporan Transaksi - ${_getPeriodText()}\n\nFile PDF tidak dapat disimpan. Silakan restart aplikasi untuk mengaktifkan plugin path_provider.',
+                  subject: 'Laporan Transaksi',
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: Tidak dapat mengakses direktori file. Error: $e\n\nSilakan restart aplikasi setelah menjalankan "flutter clean && flutter pub get && flutter run"'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 7),
                   ),
                 );
+              }
+              return;
+            }
+          }
+        }
+
+        // Save to Downloads/Documents and show success
+        if (mounted) {
+          // Try to save to a more accessible location (Documents folder)
+          try {
+            final documentsDir = await getApplicationDocumentsDirectory();
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final fileName = 'Laporan_Transaksi_$timestamp.pdf';
+            final downloadsFile = File('${documentsDir.path}/$fileName');
+            await downloadsFile.writeAsBytes(pdfBytes);
+            
+            // Show success dialog with options
+            _showDownloadSuccessDialog(
+              context: context,
+              filePath: downloadsFile.path,
+              fileName: fileName,
+              fileType: 'PDF',
+              onShare: () async {
+                Navigator.pop(context);
+                try {
+                  await Share.shareXFiles(
+                    [XFile(downloadsFile.path)],
+                    text: 'Laporan Transaksi - ${_getPeriodText()}',
+                    subject: 'Laporan Transaksi',
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error sharing: $e'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                }
               },
-              child: const Text('Excel'),
+            );
+          } catch (saveError) {
+            // If saving to Documents fails, just use the temp file and share
+            try {
+              await Share.shareXFiles(
+                [XFile(file.path)],
+                text: 'Laporan Transaksi - ${_getPeriodText()}',
+                subject: 'Laporan Transaksi',
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('PDF berhasil dibuat di: ${file.path}'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            } catch (shareError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('PDF berhasil dibuat di: ${file.path}\nError sharing: $shareError'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error membuat PDF: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportToExcel() async {
+    try {
+      HapticFeedback.mediumImpact();
+      
+      // Ensure locale is initialized
+      if (!_localeInitialized) {
+        await _initializeLocale();
+      }
+      
+      // Show loading
+      if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 16),
+                Text('Membuat Excel...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      final excel = Excel.createExcel();
+      excel.delete('Sheet1');
+      final sheet = excel['Laporan Transaksi'];
+      
+      final filtered = _filteredTransactions;
+      final dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
+
+      // Header
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Laporan Transaksi';
+      sheet.merge(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+                  CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0));
+      
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value = 'Periode: ${_getPeriodText()}';
+      sheet.merge(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
+                  CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 1));
+      
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2)).value = 'Tanggal Ekspor: ${DateFormat('dd/MM/yyyy HH:mm', 'id_ID').format(DateTime.now())}';
+      sheet.merge(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2),
+                  CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 2));
+      
+      // Summary
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 4)).value = 'Total Pendapatan:';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4)).value = 'Rp ${_formatCurrency(_totalRevenue)}';
+      
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 5)).value = 'Total Transaksi:';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 5)).value = _totalTransactions;
+      
+      // Table Header
+      final headerRow = 7;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: headerRow)).value = 'ID Transaksi';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: headerRow)).value = 'Tanggal';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: headerRow)).value = 'Pelanggan';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: headerRow)).value = 'Item';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: headerRow)).value = 'Total';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: headerRow)).value = 'Metode Pembayaran';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: headerRow)).value = 'Status';
+
+      // Data rows
+      for (int i = 0; i < filtered.length; i++) {
+        final transaction = filtered[i];
+        final row = headerRow + 1 + i;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = transaction.id;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = dateTimeFormat.format(transaction.date);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = transaction.customerName;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = transaction.items;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = transaction.total;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = transaction.paymentMethod;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = transaction.status;
+      }
+
+      // Save Excel - Use platform-agnostic approach
+      final excelBytes = excel.save();
+      if (excelBytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: Tidak dapat membuat file Excel'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
+      File? file;
+      
+      try {
+        // Try path_provider first
+        try {
+          final output = await getTemporaryDirectory();
+          file = File('${output.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+          await file.writeAsBytes(excelBytes);
+        } catch (e) {
+          // Fallback: try application documents directory
+          try {
+            final output = await getApplicationDocumentsDirectory();
+            file = File('${output.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+            await file.writeAsBytes(excelBytes);
+          } catch (e2) {
+            // Last resort: use system temp directory
+            try {
+              final tempDir = Directory.systemTemp;
+              file = File('${tempDir.path}/laporan_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+              await file.writeAsBytes(excelBytes);
+            } catch (e3) {
+              // If all else fails, show error
+              if (mounted) {
+                await Share.share(
+                  'Laporan Transaksi - ${_getPeriodText()}\n\nFile Excel tidak dapat disimpan. Silakan restart aplikasi untuk mengaktifkan plugin path_provider.',
+                  subject: 'Laporan Transaksi',
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: Tidak dapat mengakses direktori file. Error: $e\n\nSilakan restart aplikasi setelah menjalankan "flutter clean && flutter pub get && flutter run"'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 7),
+                  ),
+                );
+              }
+              return;
+            }
+          }
+        }
+
+        // Save to Downloads/Documents and show success
+        if (mounted) {
+          // Try to save to a more accessible location (Documents folder)
+          try {
+            final documentsDir = await getApplicationDocumentsDirectory();
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final fileName = 'Laporan_Transaksi_$timestamp.xlsx';
+            final downloadsFile = File('${documentsDir.path}/$fileName');
+            await downloadsFile.writeAsBytes(excelBytes);
+            
+            // Show success dialog with options
+            _showDownloadSuccessDialog(
+              context: context,
+              filePath: downloadsFile.path,
+              fileName: fileName,
+              fileType: 'Excel',
+              onShare: () async {
+                Navigator.pop(context);
+                try {
+                  await Share.shareXFiles(
+                    [XFile(downloadsFile.path)],
+                    text: 'Laporan Transaksi - ${_getPeriodText()}',
+                    subject: 'Laporan Transaksi',
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error sharing: $e'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                }
+              },
+            );
+          } catch (saveError) {
+            // If saving to Documents fails, just use the temp file and share
+            try {
+              await Share.shareXFiles(
+                [XFile(file.path)],
+                text: 'Laporan Transaksi - ${_getPeriodText()}',
+                subject: 'Laporan Transaksi',
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Excel berhasil dibuat di: ${file.path}'),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            } catch (shareError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Excel berhasil dibuat di: ${file.path}\nError sharing: $shareError'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error membuat Excel: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getPeriodText() {
+    if (_useDateRange && _startDate != null && _endDate != null) {
+      return '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}';
+    }
+    return _selectedFilter;
+  }
+
+  List<double> _calculateChartData(List<Transaction> transactions) {
+    if (transactions.isEmpty) return [];
+    
+    final Map<String, double> dailyRevenue = {};
+    for (var transaction in transactions) {
+      final dateKey = DateFormat('yyyy-MM-dd').format(transaction.date);
+      dailyRevenue[dateKey] = (dailyRevenue[dateKey] ?? 0.0) + transaction.total;
+    }
+    
+    final sortedDates = dailyRevenue.keys.toList()..sort();
+    return sortedDates.map((date) => dailyRevenue[date]!).toList();
+  }
+
+  pw.Widget _buildChartWidget(List<double> data) {
+    if (data.isEmpty) {
+      return pw.Text('Tidak ada data untuk ditampilkan');
+    }
+    
+    final maxValue = data.reduce(math.max);
+    final minValue = data.reduce(math.min);
+    final range = maxValue - minValue;
+    
+    // Build chart as a simple bar chart using containers
+    return pw.Container(
+      height: 150,
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: data.map((value) {
+          final height = range > 0 ? ((value - minValue) / range) * 150 : 50.0;
+          return pw.Container(
+            width: 20,
+            height: height,
+            decoration: pw.BoxDecoration(
+              color: PdfColors.blue700,
+              borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(2)),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  pw.Widget _buildSummaryBox(String title, double value, bool isCurrency) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            title,
+            style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            isCurrency ? 'Rp ${_formatCurrency(value)}' : value.toStringAsFixed(0),
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildTableCell(String text, {bool isHeader = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: isHeader ? 10 : 9,
+          fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  String _formatCurrency(double value) {
+    return value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+  }
+
+  void _showDownloadSuccessDialog({
+    required BuildContext context,
+    required String filePath,
+    required String fileName,
+    required String fileType,
+    required VoidCallback onShare,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.green[600], size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'File Berhasil Disimpan',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'File $fileType telah disimpan ke:',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: SelectableText(
+                  filePath,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Anda dapat menemukan file ini di folder Documents aplikasi.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Tutup'),
+            ),
+            ElevatedButton.icon(
+              onPressed: onShare,
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('Bagikan'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         );
@@ -599,6 +1380,7 @@ class ChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
