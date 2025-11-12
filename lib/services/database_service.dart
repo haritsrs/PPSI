@@ -1,6 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
 
 class DatabaseService {
   static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
@@ -118,6 +119,9 @@ class DatabaseService {
   // Transactions operations
   DatabaseReference get transactionsRef => _database.child('transactions');
   
+  // Withdrawals operations
+  DatabaseReference get withdrawalsRef => _database.child('withdrawals');
+  
   // Add a new transaction
   Future<String> addTransaction({
     required List<Map<String, dynamic>> items,
@@ -188,30 +192,111 @@ class DatabaseService {
     });
   }
 
-  // Get total store balance from all transactions
+  // Get total store balance from QRIS and VirtualAccount transactions minus withdrawals
   Stream<double> getStoreBalanceStream() {
+    // Use a simpler approach: combine transactions and withdrawals in a single calculation
+    // Listen to both streams and emit whenever either changes
+    final controller = StreamController<double>.broadcast();
+    double transactionsTotal = 0.0;
+    double withdrawalsTotal = 0.0;
+    bool hasTransactions = false;
+    bool hasWithdrawals = false;
+    
+    void emitBalance() {
+      // Emit balance once we have at least transactions data
+      // Withdrawals default to 0 if not loaded yet
+      if (hasTransactions || hasWithdrawals) {
+        final balance = (transactionsTotal - withdrawalsTotal).clamp(0.0, double.infinity);
+        if (!controller.isClosed) {
+          controller.add(balance);
+        }
+      }
+    }
+    
+    // Listen to transactions
+    final transactionsSubscription = transactionsRef.onValue.listen((event) {
+      transactionsTotal = 0.0;
+      if (event.snapshot.value != null) {
+        final Map<dynamic, dynamic> transactionData = event.snapshot.value as Map<dynamic, dynamic>;
+        transactionData.forEach((key, value) {
+          if (value is Map) {
+            final paymentMethod = value['paymentMethod'] as String?;
+            // Only include QRIS and VirtualAccount transactions (exclude Cash/Tunai)
+            if (paymentMethod == 'QRIS' || paymentMethod == 'VirtualAccount') {
+              final total = value['total'];
+              if (total != null) {
+                transactionsTotal += (total as num).toDouble();
+              }
+            }
+          }
+        });
+      }
+      hasTransactions = true;
+      emitBalance();
+    }, onError: (error) {
+      if (!controller.isClosed) {
+        controller.addError(error);
+      }
+    });
+    
+    // Listen to withdrawals
+    final withdrawalsSubscription = withdrawalsRef.onValue.listen((event) {
+      withdrawalsTotal = 0.0;
+      if (event.snapshot.value != null) {
+        final Map<dynamic, dynamic> withdrawalData = event.snapshot.value as Map<dynamic, dynamic>;
+        withdrawalData.forEach((key, value) {
+          if (value is Map) {
+            final amount = value['amount'];
+            final status = value['status'] as String? ?? 'pending';
+            // Count all withdrawals (pending, processing, completed) to reduce balance immediately
+            // Rejected withdrawals don't count
+            if (status != 'rejected' && amount != null) {
+              withdrawalsTotal += (amount as num).toDouble();
+            }
+          }
+        });
+      }
+      hasWithdrawals = true;
+      emitBalance();
+    }, onError: (error) {
+      if (!controller.isClosed) {
+        controller.addError(error);
+      }
+    });
+    
+    // Clean up subscriptions when controller is closed
+    controller.onCancel = () {
+      transactionsSubscription.cancel();
+      withdrawalsSubscription.cancel();
+    };
+    
+    return controller.stream;
+  }
+
+  // Get total revenue (penghasilan) from ALL transactions for reporting purposes
+  Stream<double> getRevenueStream() {
     return transactionsRef.onValue.map((event) {
       if (event.snapshot.value == null) {
         return 0.0;
       }
       
       final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-      double totalBalance = 0.0;
+      double totalRevenue = 0.0;
       
       data.forEach((key, value) {
         if (value is Map) {
           final total = value['total'];
           if (total != null) {
-            totalBalance += (total as num).toDouble();
+            totalRevenue += (total as num).toDouble();
           }
         }
       });
       
-      return totalBalance;
+      return totalRevenue;
     });
   }
 
-  // Get today's revenue
+  // Get today's revenue (only QRIS and VirtualAccount for consistency with saldo toko)
   Stream<double> getTodayRevenueStream() {
     return transactionsRef.onValue.map((event) {
       if (event.snapshot.value == null) {
@@ -227,19 +312,23 @@ class DatabaseService {
       
       data.forEach((key, value) {
         if (value is Map) {
-          final createdAt = value['createdAt'];
-          if (createdAt != null) {
-            try {
-              final transactionDate = DateTime.parse(createdAt as String);
-              if (transactionDate.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
-                  transactionDate.isBefore(tomorrowStart)) {
-                final total = value['total'];
-                if (total != null) {
-                  todayRevenue += (total as num).toDouble();
+          final paymentMethod = value['paymentMethod'] as String?;
+          // Only include QRIS and VirtualAccount transactions (exclude Cash/Tunai)
+          if (paymentMethod == 'QRIS' || paymentMethod == 'VirtualAccount') {
+            final createdAt = value['createdAt'];
+            if (createdAt != null) {
+              try {
+                final transactionDate = DateTime.parse(createdAt as String);
+                if (transactionDate.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+                    transactionDate.isBefore(tomorrowStart)) {
+                  final total = value['total'];
+                  if (total != null) {
+                    todayRevenue += (total as num).toDouble();
+                  }
                 }
+              } catch (e) {
+                // Skip invalid dates
               }
-            } catch (e) {
-              // Skip invalid dates
             }
           }
         }
@@ -249,7 +338,7 @@ class DatabaseService {
     });
   }
 
-  // Get yesterday's revenue
+  // Get yesterday's revenue (only QRIS and VirtualAccount for consistency with saldo toko)
   Stream<double> getYesterdayRevenueStream() {
     return transactionsRef.onValue.map((event) {
       if (event.snapshot.value == null) {
@@ -265,19 +354,23 @@ class DatabaseService {
       
       data.forEach((key, value) {
         if (value is Map) {
-          final createdAt = value['createdAt'];
-          if (createdAt != null) {
-            try {
-              final transactionDate = DateTime.parse(createdAt as String);
-              if (transactionDate.isAfter(yesterdayStart.subtract(const Duration(milliseconds: 1))) &&
-                  transactionDate.isBefore(todayStart)) {
-                final total = value['total'];
-                if (total != null) {
-                  yesterdayRevenue += (total as num).toDouble();
+          final paymentMethod = value['paymentMethod'] as String?;
+          // Only include QRIS and VirtualAccount transactions (exclude Cash/Tunai)
+          if (paymentMethod == 'QRIS' || paymentMethod == 'VirtualAccount') {
+            final createdAt = value['createdAt'];
+            if (createdAt != null) {
+              try {
+                final transactionDate = DateTime.parse(createdAt as String);
+                if (transactionDate.isAfter(yesterdayStart.subtract(const Duration(milliseconds: 1))) &&
+                    transactionDate.isBefore(todayStart)) {
+                  final total = value['total'];
+                  if (total != null) {
+                    yesterdayRevenue += (total as num).toDouble();
+                  }
                 }
+              } catch (e) {
+                // Skip invalid dates
               }
-            } catch (e) {
-              // Skip invalid dates
             }
           }
         }
@@ -612,6 +705,109 @@ class DatabaseService {
     });
     
     return transactions.reversed.toList(); // Most recent first
+  }
+
+  // Add a withdrawal (pencairan)
+  Future<String> addWithdrawal({
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountHolderName,
+    String? notes,
+  }) async {
+    final newWithdrawalRef = withdrawalsRef.push();
+    final withdrawalId = newWithdrawalRef.key!;
+    
+    final withdrawalData = {
+      'id': withdrawalId,
+      'amount': amount,
+      'bankName': bankName,
+      'accountNumber': accountNumber,
+      'accountHolderName': accountHolderName,
+      'status': 'pending', // pending, processing, completed, rejected
+      'notes': notes ?? '',
+      'createdAt': DateTime.now().toIso8601String(),
+      'createdBy': currentUserId ?? 'unknown',
+    };
+    
+    await newWithdrawalRef.set(withdrawalData);
+    
+    // Create notification for withdrawal request
+    try {
+      await addNotification(
+        title: 'Permintaan Pencairan',
+        message: 'Permintaan pencairan sebesar Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} telah diajukan',
+        type: 'withdrawal',
+        data: {
+          'withdrawalId': withdrawalId,
+          'amount': amount,
+          'status': 'pending',
+        },
+      );
+    } catch (e) {
+      // Ignore notification errors
+    }
+    
+    return withdrawalId;
+  }
+
+  // Get withdrawals stream
+  Stream<List<Map<String, dynamic>>> getWithdrawalsStream() {
+    return withdrawalsRef.orderByChild('createdAt').onValue.map((event) {
+      if (event.snapshot.value == null) {
+        return <Map<String, dynamic>>[];
+      }
+      
+      final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> withdrawals = [];
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          withdrawals.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+        }
+      });
+      
+      return withdrawals.reversed.toList(); // Most recent first
+    });
+  }
+
+  // Update withdrawal status
+  Future<void> updateWithdrawalStatus(String withdrawalId, String status, {String? notes}) async {
+    final updates = <String, dynamic>{
+      'status': status,
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+    if (notes != null) {
+      updates['notes'] = notes;
+    }
+    await withdrawalsRef.child(withdrawalId).update(updates);
+  }
+
+  // Get total withdrawals amount (all statuses except rejected)
+  Future<double> getTotalWithdrawals() async {
+    final snapshot = await withdrawalsRef.get();
+    if (snapshot.value == null) {
+      return 0.0;
+    }
+    
+    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+    double totalWithdrawals = 0.0;
+    
+    data.forEach((key, value) {
+      if (value is Map) {
+        final amount = value['amount'];
+        final status = value['status'] as String? ?? 'pending';
+        // Count all withdrawals except rejected
+        if (status != 'rejected' && amount != null) {
+          totalWithdrawals += (amount as num).toDouble();
+        }
+      }
+    });
+    
+    return totalWithdrawals;
   }
 }
 

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../services/database_service.dart';
+import '../widgets/print_receipt_dialog.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -146,6 +147,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     }).toList();
   }
 
+  // Total penghasilan (income) from all transactions for reporting
   double get _totalRevenue {
     return _filteredTransactions.fold(0.0, (sum, transaction) => sum + transaction.total);
   }
@@ -294,7 +296,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                   children: [
                     Expanded(
                       child: _buildSummaryCard(
-                        title: "Total Pendapatan",
+                        title: "Total Penghasilan",
                         value: _totalRevenue,
                         icon: Icons.trending_up_rounded,
                         color: const Color(0xFF10B981),
@@ -334,7 +336,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Grafik Pendapatan",
+                        "Grafik Penghasilan",
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1F2937),
@@ -579,11 +581,42 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     );
   }
 
-  void _showTransactionDetail(Transaction transaction) {
+  void _showTransactionDetail(Transaction transaction) async {
+    // Get full transaction data for printing
+    final fullTransactionData = await _databaseService.transactionsRef
+        .child(transaction.id)
+        .get()
+        .then((snapshot) {
+      if (snapshot.exists) {
+        return {
+          'id': transaction.id,
+          ...Map<String, dynamic>.from(snapshot.value as Map),
+        };
+      }
+      return null;
+    });
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => TransactionDetailModal(transaction: transaction),
+      builder: (context) => TransactionDetailModal(
+        transaction: transaction,
+        fullTransactionData: fullTransactionData,
+        onPrint: fullTransactionData != null
+            ? () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (context) => PrintReceiptDialog(
+                    transactionId: transaction.id,
+                    transactionData: fullTransactionData,
+                  ),
+                );
+              }
+            : null,
+      ),
     );
   }
 
@@ -755,7 +788,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSummaryBox('Total Pendapatan', _totalRevenue, true),
+                  _buildSummaryBox('Total Penghasilan', _totalRevenue, true),
                   _buildSummaryBox('Total Transaksi', _totalTransactions.toDouble(), false),
                 ],
               ),
@@ -764,7 +797,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
               
               // Chart Section
               pw.Text(
-                'Grafik Pendapatan',
+                'Grafik Penghasilan',
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 10),
@@ -901,7 +934,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('PDF berhasil dibuat di: ${file.path}'),
-                  backgroundColor: Colors.green,
+                    backgroundColor: Colors.green,
                   duration: const Duration(seconds: 3),
                 ),
               );
@@ -989,7 +1022,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                   CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 2));
       
       // Summary
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 4)).value = 'Total Pendapatan:';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 4)).value = 'Total Penghasilan:';
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4)).value = 'Rp ${_formatCurrency(_totalRevenue)}';
       
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 5)).value = 'Total Transaksi:';
@@ -1502,10 +1535,14 @@ class TransactionCard extends StatelessWidget {
 
 class TransactionDetailModal extends StatelessWidget {
   final Transaction transaction;
+  final Map<String, dynamic>? fullTransactionData;
+  final VoidCallback? onPrint;
 
   const TransactionDetailModal({
     super.key,
     required this.transaction,
+    this.fullTransactionData,
+    this.onPrint,
   });
 
   @override
@@ -1609,6 +1646,27 @@ class TransactionDetailModal extends StatelessWidget {
                       ],
                     ),
                   ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Print Button
+                  if (onPrint != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onPrint,
+                        icon: const Icon(Icons.print_rounded),
+                        label: const Text('Cetak Struk'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

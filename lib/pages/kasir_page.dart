@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../services/database_service.dart';
 import '../services/xendit_service.dart';
 import '../widgets/pattern_background.dart';
+import '../widgets/print_receipt_dialog.dart';
 import '../utils/responsive_helper.dart';
 
 class KasirPage extends StatefulWidget {
@@ -288,6 +289,19 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       
       Navigator.pop(context);
       
+      // Get transaction data for printing
+      final transactionData = {
+        'id': transactionId,
+        'items': transactionItems,
+        'subtotal': _subtotal,
+        'tax': _tax,
+        'total': _total,
+        'paymentMethod': paymentMethod,
+        'cashAmount': cashAmount,
+        'change': change,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
       // Show success dialog
       if (mounted) {
         showDialog(
@@ -295,6 +309,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           barrierDismissible: false,
           builder: (context) => TransactionSuccessDialog(
             total: _total,
+            transactionId: transactionId,
+            transactionData: transactionData,
             onClose: () {
               Navigator.pop(context);
             },
@@ -2010,11 +2026,15 @@ class _PaymentModalState extends State<PaymentModal> {
 
 class TransactionSuccessDialog extends StatelessWidget {
   final double total;
+  final String? transactionId;
+  final Map<String, dynamic>? transactionData;
   final VoidCallback onClose;
 
   const TransactionSuccessDialog({
     super.key,
     required this.total,
+    this.transactionId,
+    this.transactionData,
     required this.onClose,
   });
 
@@ -2082,10 +2102,21 @@ class TransactionSuccessDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
-                      // TODO: Print receipt
-                      HapticFeedback.lightImpact();
-                    },
+                    onPressed: transactionId != null && transactionData != null
+                        ? () {
+                            HapticFeedback.lightImpact();
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              builder: (context) => PrintReceiptDialog(
+                                transactionId: transactionId!,
+                                transactionData: transactionData!,
+                              ),
+                            );
+                          }
+                        : () {
+                            HapticFeedback.lightImpact();
+                          },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF6366F1)),
                       shape: RoundedRectangleBorder(
