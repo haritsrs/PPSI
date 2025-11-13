@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
 import '../services/database_service.dart';
+import '../utils/security_utils.dart';
 
 // Stock History Dialog
 class StockHistoryDialog extends StatefulWidget {
@@ -239,19 +240,22 @@ class _BulkStockUpdateDialogState extends State<BulkStockUpdateDialog> {
 
   Future<void> _saveBulkUpdate() async {
     final updates = <Map<String, String>>[];
+    final sanitizedReason = SecurityUtils.sanitizeInput(_selectedReason);
+    final sanitizedNotes = SecurityUtils.sanitizeInput(_notesController.text);
     
     for (final entry in _selectedProducts.entries) {
       if (entry.value) {
         final productId = entry.key;
         final controller = _stockControllers[productId];
         if (controller != null && controller.text.isNotEmpty) {
-          final stock = int.tryParse(controller.text.trim());
+          final stockText = SecurityUtils.sanitizeNumber(controller.text).replaceAll(RegExp(r'[^0-9]'), '');
+          final stock = int.tryParse(stockText);
           if (stock != null && stock >= 0) {
             updates.add({
               'productId': productId,
               'stock': stock.toString(),
-              'reason': _selectedReason,
-              'notes': _notesController.text.trim(),
+              'reason': sanitizedReason.isEmpty ? 'Bulk Update' : sanitizedReason,
+              'notes': sanitizedNotes,
             });
           }
         }

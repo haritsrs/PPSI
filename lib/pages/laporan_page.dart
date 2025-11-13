@@ -15,6 +15,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../services/database_service.dart';
 import '../widgets/print_receipt_dialog.dart';
 import '../utils/error_helper.dart';
+import '../utils/security_utils.dart';
+import '../widgets/loading_skeletons.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -49,8 +51,10 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   bool _localeInitialized = false;
   bool _isRetrying = false;
   bool _hasLoadedOnce = false;
+  bool _isRefreshing = false;
   String? _errorMessage;
   bool _isOffline = false;
+  Completer<void>? _refreshCompleter;
 
   bool get _showInitialLoader => _isLoading && !_hasLoadedOnce;
   bool get _showFullErrorState => _errorMessage != null && !_hasLoadedOnce;
@@ -142,16 +146,32 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     await _loadTransactions();
   }
 
-  Future<void> _loadTransactions() async {
+  Future<void> _refreshTransactions() {
+    _loadTransactions(isRefresh: true);
+    return _refreshCompleter?.future ?? Future.value();
+  }
+
+  Future<void> _loadTransactions({bool isRefresh = false}) async {
     _transactionsSubscription?.cancel();
 
     if (!mounted) return;
 
-    setState(() {
-      if (!_hasLoadedOnce) {
-        _isLoading = true;
+    if (isRefresh) {
+      if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+        _refreshCompleter!.complete();
       }
-      _isRetrying = _hasLoadedOnce;
+      _refreshCompleter = Completer<void>();
+    }
+
+    setState(() {
+      if (isRefresh) {
+        _isRefreshing = true;
+      } else {
+        if (!_hasLoadedOnce) {
+          _isLoading = true;
+        }
+        _isRetrying = _hasLoadedOnce;
+      }
       _errorMessage = null;
     });
 
@@ -162,9 +182,12 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           _transactions = transactionsData.map(Transaction.fromFirebase).toList();
           _isLoading = false;
           _isRetrying = false;
+          _isRefreshing = false;
           _errorMessage = null;
           _hasLoadedOnce = true;
         });
+        _refreshCompleter?.complete();
+        _refreshCompleter = null;
       },
       onError: (error) {
         final message = getFriendlyErrorMessage(
@@ -173,10 +196,15 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
         );
         if (!mounted) return;
         setState(() {
-          _isLoading = false;
-          _isRetrying = false;
+          if (!isRefresh) {
+            _isLoading = false;
+            _isRetrying = false;
+          }
+          _isRefreshing = false;
           _errorMessage = message;
         });
+        _refreshCompleter?.complete();
+        _refreshCompleter = null;
       },
     );
   }
@@ -288,6 +316,36 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
             ),
           ),
           if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionDismissBackground({
+    required Color color,
+    required IconData icon,
+    required Alignment alignment,
+    required String label,
+  }) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -434,12 +492,12 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _showInitialLoader
-                ? const Center(
-                    key: ValueKey('reports-loader'),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                    ),
-                  )
+              ? const SingleChildScrollView(
+                  key: ValueKey('reports-loader'),
+                  physics: AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(20),
+                  child: ReportListSkeleton(),
+                )
                 : _showFullErrorState
                     ? _buildErrorState()
                     : _buildContent(),
@@ -450,13 +508,18 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   }
 
   Widget _buildContent() {
-    return SingleChildScrollView(
-      key: const ValueKey('reports-content'),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_isOffline)
+    return RefreshIndicator(
+      onRefresh: _refreshTransactions,
+      color: const Color(0xFF6366F1),
+      displacement: 48,
+      child: SingleChildScrollView(
+        key: const ValueKey('reports-content'),
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_isOffline)
             _buildStatusBanner(
               color: Colors.orange,
               icon: Icons.wifi_off_rounded,
@@ -472,7 +535,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                 ),
               ),
             ),
-          if (_showInlineErrorBanner)
+            if (_showInlineErrorBanner)
             _buildStatusBanner(
               color: Colors.red,
               icon: Icons.error_outline_rounded,
@@ -488,7 +551,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                 ),
               ),
             ),
-          if (_isRetrying && _hasLoadedOnce)
+            if (_isRetrying && _hasLoadedOnce)
             _buildStatusBanner(
               color: Colors.blue,
               icon: Icons.sync_rounded,
@@ -502,6 +565,15 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                 ),
               ),
             ),
+            if (_isRefreshing && !_showInitialLoader)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  color: Color(0xFF6366F1),
+                  backgroundColor: Color(0xFFE2E8F0),
+                ),
+              ),
           // Period Toggle
           Container(
             padding: const EdgeInsets.all(20),
@@ -834,9 +906,46 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                               itemCount: _filteredTransactions.length,
                               itemBuilder: (context, index) {
                                 final transaction = _filteredTransactions[index];
-                                return TransactionCard(
-                                  transaction: transaction,
-                                  onTap: () => _showTransactionDetail(transaction),
+                                return TweenAnimationBuilder<double>(
+                                  duration: Duration(milliseconds: 220 + (index * 12)),
+                                  curve: Curves.easeOutCubic,
+                                  tween: Tween<double>(begin: 0, end: 1),
+                                  builder: (context, value, child) {
+                                    return Opacity(
+                                      opacity: value,
+                                      child: Transform.translate(
+                                        offset: Offset(0, (1 - value) * 16),
+                                        child: child,
+                                      ),
+                                    );
+                                  },
+                                  child: Dismissible(
+                                    key: ValueKey('transaction-${transaction.id}'),
+                                    background: _buildTransactionDismissBackground(
+                                      color: Colors.indigo.shade100,
+                                      icon: Icons.visibility_rounded,
+                                      alignment: Alignment.centerLeft,
+                                      label: 'Detail',
+                                    ),
+                                    secondaryBackground: _buildTransactionDismissBackground(
+                                      color: Colors.green.shade100,
+                                      icon: Icons.print_rounded,
+                                      alignment: Alignment.centerRight,
+                                      label: 'Cetak',
+                                    ),
+                                    confirmDismiss: (direction) async {
+                                      if (direction == DismissDirection.startToEnd) {
+                                        _showTransactionDetail(transaction);
+                                      } else {
+                                        await _quickPrint(transaction);
+                                      }
+                                      return false;
+                                    },
+                                    child: TransactionCard(
+                                      transaction: transaction,
+                                      onTap: () => _showTransactionDetail(transaction),
+                                    ),
+                                  ),
                                 );
                               },
                             ),
@@ -847,7 +956,8 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
             ),
           ),
           const SizedBox(height: 20),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -980,6 +1090,43 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
       final message = getFriendlyErrorMessage(
         error,
         fallbackMessage: 'Gagal memuat detail transaksi.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _quickPrint(Transaction transaction) async {
+    try {
+      final fullTransactionData = await _databaseService.getTransaction(transaction.id);
+      if (!mounted) return;
+
+      if (fullTransactionData == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Detail transaksi tidak ditemukan.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => PrintReceiptDialog(
+          transactionId: transaction.id,
+          transactionData: fullTransactionData,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal menyiapkan struk.',
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2242,10 +2389,19 @@ class Transaction {
     final itemsCount = itemsList.length;
 
     // Get customer name (if available, otherwise use default)
-    final customerName = data['customerName'] as String? ?? 'Pelanggan';
+    final encryptionHelper = EncryptionHelper();
+    String customerName = 'Pelanggan';
+    if (data['customerName'] is String) {
+      final rawName = data['customerName'] as String;
+      if (data['customerNameEncrypted'] == true) {
+        customerName = encryptionHelper.decryptIfPossible(rawName) ?? 'Pelanggan';
+      } else {
+        customerName = SecurityUtils.sanitizeInput(rawName);
+      }
+    }
 
     // Get payment method
-    final paymentMethod = data['paymentMethod'] as String? ?? 'Cash';
+    final paymentMethod = SecurityUtils.sanitizeInput(data['paymentMethod'] as String? ?? 'Cash');
 
     // Get total
     final total = (data['total'] as num?)?.toDouble() ?? 0.0;

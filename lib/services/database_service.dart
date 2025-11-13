@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 
 import '../utils/app_exception.dart';
 import '../utils/error_helper.dart';
+import '../utils/security_utils.dart';
 
 class DatabaseService {
   static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
   
   late final DatabaseReference _database;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final EncryptionHelper _encryptionHelper = EncryptionHelper();
 
   DatabaseService() {
     _database = FirebaseDatabase.instanceFor(
@@ -25,6 +28,21 @@ class DatabaseService {
 
   // Products operations
   DatabaseReference get productsRef => _database.child('products');
+  DatabaseReference get auditLogsRef => _database.child('auditLogs');
+  
+  Future<void> _logAuditEvent(String action, Map<String, dynamic> payload) async {
+    try {
+      final sanitizedDetails = SecurityUtils.sanitizeMap(payload);
+      await auditLogsRef.push().set({
+        'action': action,
+        'details': sanitizedDetails,
+        'timestamp': DateTime.now().toIso8601String(),
+        'userId': currentUserId ?? 'unknown',
+      });
+    } catch (error) {
+      debugPrint('Audit log error for $action: $error');
+    }
+  }
   
   // Stream of all products
   Stream<List<Map<String, dynamic>>> getProductsStream() {
@@ -124,12 +142,21 @@ class DatabaseService {
   // Add a new product
   Future<String> addProduct(Map<String, dynamic> productData) async {
     try {
+      if (!RateLimiter.allow('add_product', interval: const Duration(milliseconds: 900))) {
+        throw const RateLimitException('Terlalu banyak permintaan penambahan produk. Coba lagi sesaat lagi.');
+      }
+      final sanitizedData = SecurityUtils.sanitizeMap(productData);
       final newProductRef = productsRef.push();
       await newProductRef.set({
-        ...productData,
+        ...sanitizedData,
         'createdAt': DateTime.now().toIso8601String(),
         'updatedAt': DateTime.now().toIso8601String(),
         'createdBy': currentUserId ?? 'unknown',
+      });
+      await _logAuditEvent('add_product', {
+        'productId': newProductRef.key,
+        'name': sanitizedData['name'] ?? '',
+        'category': sanitizedData['category'] ?? '',
       });
       return newProductRef.key!;
     } catch (error) {
@@ -143,9 +170,18 @@ class DatabaseService {
   // Update a product
   Future<void> updateProduct(String productId, Map<String, dynamic> productData) async {
     try {
+      if (!RateLimiter.allow('update_product', interval: const Duration(milliseconds: 600))) {
+        throw const RateLimitException('Terlalu banyak perubahan produk dalam waktu singkat.');
+      }
+      final sanitizedData = SecurityUtils.sanitizeMap(productData);
       await productsRef.child(productId).update({
-        ...productData,
+        ...sanitizedData,
         'updatedAt': DateTime.now().toIso8601String(),
+      });
+      await _logAuditEvent('update_product', {
+        'productId': productId,
+        'name': sanitizedData['name'] ?? '',
+        'updatedFields': sanitizedData.keys.toList(),
       });
     } catch (error) {
       throw toAppException(
@@ -158,7 +194,17 @@ class DatabaseService {
   // Delete a product
   Future<void> deleteProduct(String productId) async {
     try {
+      if (!RateLimiter.allow('delete_product', interval: const Duration(milliseconds: 600))) {
+        throw const RateLimitException('Penghapusan terlalu sering. Tunggu sebentar sebelum mencoba lagi.');
+      }
+      final snapshot = await productsRef.child(productId).get();
+      final currentData = snapshot.value;
       await productsRef.child(productId).remove();
+      await _logAuditEvent('delete_product', {
+        'productId': productId,
+        if (currentData is Map && currentData['name'] != null)
+          'name': SecurityUtils.sanitizeInput(currentData['name'] as String),
+      });
     } catch (error) {
       throw toAppException(
         error,
@@ -175,6 +221,11 @@ class DatabaseService {
     String? notes,
   }) async {
     try {
+      if (!RateLimiter.allow('update_product_stock', interval: const Duration(milliseconds: 400))) {
+        throw const RateLimitException('Permintaan pembaruan stok terlalu sering. Coba lagi sebentar lagi.');
+      }
+      final sanitizedReason = SecurityUtils.sanitizeInput(reason ?? 'Manual Adjustment');
+      final sanitizedNotes = SecurityUtils.sanitizeInput(notes ?? '');
       final productRef = productsRef.child(productId);
       final snapshot = await productRef.get();
       
@@ -200,8 +251,8 @@ class DatabaseService {
         'oldStock': oldStock,
         'newStock': newStock,
         'difference': newStock - oldStock,
-        'reason': reason ?? 'Manual Adjustment',
-        'notes': notes ?? '',
+        'reason': sanitizedReason,
+        'notes': sanitizedNotes,
         'createdAt': DateTime.now().toIso8601String(),
         'createdBy': currentUserId ?? 'unknown',
       });
@@ -244,6 +295,13 @@ class DatabaseService {
           print('Error creating out of stock notification: $e');
         }
       }
+
+      await _logAuditEvent('update_product_stock', {
+        'productId': productId,
+        'oldStock': oldStock,
+        'newStock': newStock,
+        'reason': sanitizedReason,
+      });
     } catch (error) {
       throw toAppException(
         error,
@@ -321,6 +379,13 @@ class DatabaseService {
           print('Error creating out of stock notification: $e');
         }
       }
+
+      await _logAuditEvent('decrement_product_stock', {
+        'productId': productId,
+        'oldStock': currentStock,
+        'newStock': newStock,
+        'quantity': quantity,
+      });
     } catch (error) {
       throw toAppException(
         error,
@@ -388,13 +453,24 @@ class DatabaseService {
   // Bulk update stock for multiple products
   Future<void> bulkUpdateStock(List<Map<String, String>> updates) async {
     try {
+      if (!RateLimiter.allow('bulk_update_stock', interval: const Duration(seconds: 1))) {
+        throw const RateLimitException('Bulk update terlalu sering. Coba lagi sesaat lagi.');
+      }
       final batch = <String, dynamic>{};
       final historyBatch = <String, dynamic>{};
+      final sanitizedUpdates = updates
+          .map((update) => {
+                'productId': update['productId'] ?? '',
+                'stock': update['stock'] ?? '0',
+                'reason': SecurityUtils.sanitizeInput(update['reason'] ?? ''),
+                'notes': SecurityUtils.sanitizeInput(update['notes'] ?? ''),
+              })
+          .toList();
       
-      for (final update in updates) {
+      for (final update in sanitizedUpdates) {
         final productId = update['productId']!;
         final newStock = int.parse(update['stock']!);
-        final reason = update['reason'] ?? 'Bulk Update';
+        final reason = update['reason']!.isEmpty ? 'Bulk Update' : update['reason']!;
         final notes = update['notes'] ?? '';
         
         // Get current stock
@@ -454,6 +530,14 @@ class DatabaseService {
       if (historyBatch.isNotEmpty) {
         await _database.update(historyBatch);
       }
+
+      if (sanitizedUpdates.isNotEmpty) {
+        await _logAuditEvent('bulk_update_stock', {
+          'count': sanitizedUpdates.length,
+          'productIds': sanitizedUpdates.map((update) => update['productId']).toList(),
+          'reasons': sanitizedUpdates.map((update) => update['reason']).toSet().toList(),
+        });
+      }
     } catch (error) {
       throw toAppException(
         error,
@@ -481,23 +565,42 @@ class DatabaseService {
     String? customerName,
     double? discount,
   }) async {
+    if (!RateLimiter.allow('add_transaction', interval: const Duration(milliseconds: 500))) {
+      throw const RateLimitException('Terlalu banyak transaksi dibuat dalam waktu bersamaan.');
+    }
     final newTransactionRef = transactionsRef.push();
     final transactionId = newTransactionRef.key!;
+
+    final sanitizedItems = items
+        .map((item) {
+          final sanitized = Map<String, dynamic>.from(item);
+          if (sanitized['productName'] is String) {
+            sanitized['productName'] = SecurityUtils.sanitizeInput(sanitized['productName'] as String);
+          }
+          return sanitized;
+        })
+        .toList();
+
+    final sanitizedPaymentMethod = SecurityUtils.sanitizeInput(paymentMethod);
+    final sanitizedCustomerName =
+        customerName != null ? SecurityUtils.sanitizeInput(customerName) : null;
     
     final transactionData = {
       'id': transactionId,
-      'items': items,
+      'items': sanitizedItems,
       'subtotal': subtotal,
       'tax': tax,
       'total': total,
-      'paymentMethod': paymentMethod,
+      'paymentMethod': sanitizedPaymentMethod,
       'cashAmount': cashAmount,
       'change': change,
       'createdAt': DateTime.now().toIso8601String(),
       'createdBy': currentUserId ?? 'unknown',
       'status': 'Selesai',
       if (customerId != null) 'customerId': customerId,
-      if (customerName != null) 'customerName': customerName,
+      if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty)
+        'customerName': _encryptionHelper.encrypt(sanitizedCustomerName),
+      if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty) 'customerNameEncrypted': true,
       if (discount != null && discount > 0) 'discount': discount,
     };
     
@@ -514,6 +617,14 @@ class DatabaseService {
     if (customerId != null) {
       await updateCustomerTransactionStats(customerId, total);
     }
+
+    await _logAuditEvent('add_transaction', {
+      'transactionId': transactionId,
+      'itemCount': sanitizedItems.length,
+      'total': total,
+      'paymentMethod': sanitizedPaymentMethod,
+      if (customerId != null) 'customerId': customerId,
+    });
     
     return transactionId;
   }
@@ -535,9 +646,19 @@ class DatabaseService {
       
       data.forEach((key, value) {
         if (value is Map) {
+          final mapped = Map<String, dynamic>.from(value);
+          if (mapped['customerNameEncrypted'] == true && mapped['customerName'] is String) {
+            final decrypted = _encryptionHelper.decryptIfPossible(mapped['customerName'] as String);
+            if (decrypted != null) {
+              mapped['customerName'] = decrypted;
+            }
+          }
+          mapped.remove('customerNameEncrypted');
+          final sanitized = SecurityUtils.sanitizeMap(mapped);
+          sanitized.remove('customerNameEncrypted');
           transactions.add({
             'id': key,
-            ...Map<String, dynamic>.from(value),
+            ...sanitized,
           });
         }
       });
@@ -1127,10 +1248,19 @@ class DatabaseService {
       if (!snapshot.exists) {
         return null;
       }
-      
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      if (data['customerNameEncrypted'] == true && data['customerName'] is String) {
+        final decrypted = _encryptionHelper.decryptIfPossible(data['customerName'] as String);
+        if (decrypted != null) {
+          data['customerName'] = decrypted;
+        }
+      }
+      data.remove('customerNameEncrypted');
+      final sanitized = SecurityUtils.sanitizeMap(data);
+      sanitized.remove('customerNameEncrypted');
       return {
         'id': transactionId,
-        ...Map<String, dynamic>.from(snapshot.value as Map),
+        ...sanitized,
       };
     } catch (error) {
       throw toAppException(
@@ -1151,19 +1281,29 @@ class DatabaseService {
     final newWithdrawalRef = withdrawalsRef.push();
     final withdrawalId = newWithdrawalRef.key!;
     
+    final sanitizedBankName = SecurityUtils.sanitizeInput(bankName);
+    final sanitizedAccountHolderName = SecurityUtils.sanitizeInput(accountHolderName);
+    final sanitizedAccountNumber = SecurityUtils.sanitizeNumber(accountNumber).replaceAll(RegExp(r'[^0-9]'), '');
+    final sanitizedNotes = SecurityUtils.sanitizeInput(notes ?? '');
+
     final withdrawalData = {
       'id': withdrawalId,
       'amount': amount,
-      'bankName': bankName,
-      'accountNumber': accountNumber,
-      'accountHolderName': accountHolderName,
+      'bankName': sanitizedBankName,
+      'accountNumber': sanitizedAccountNumber,
+      'accountHolderName': sanitizedAccountHolderName,
       'status': 'pending', // pending, processing, completed, rejected
-      'notes': notes ?? '',
+      'notes': sanitizedNotes,
       'createdAt': DateTime.now().toIso8601String(),
       'createdBy': currentUserId ?? 'unknown',
     };
     
     await newWithdrawalRef.set(withdrawalData);
+    await _logAuditEvent('add_withdrawal', {
+      'withdrawalId': withdrawalId,
+      'amount': amount,
+      'bankName': sanitizedBankName,
+    });
     
     // Create notification for withdrawal request
     try {

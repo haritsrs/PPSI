@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'firebase_options.dart';
 import 'pages/auth_wrapper.dart';
+import 'pages/onboarding_page.dart';
 import 'views/home_view.dart';
 import 'theme/app_theme.dart';
 
@@ -34,11 +37,35 @@ Future<void> main() async {
     ],
   );
 
-  runApp(const KiosDarmaApp());
+  final prefs = await SharedPreferences.getInstance();
+  final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+
+  runApp(KiosDarmaApp(hasSeenOnboarding: hasSeenOnboarding));
 }
 
-class KiosDarmaApp extends StatelessWidget {
-  const KiosDarmaApp({super.key});
+class KiosDarmaApp extends StatefulWidget {
+  const KiosDarmaApp({super.key, required this.hasSeenOnboarding});
+
+  final bool hasSeenOnboarding;
+
+  @override
+  State<KiosDarmaApp> createState() => _KiosDarmaAppState();
+}
+
+class _KiosDarmaAppState extends State<KiosDarmaApp> {
+  late bool _hasSeenOnboarding;
+
+  @override
+  void initState() {
+    super.initState();
+    _hasSeenOnboarding = widget.hasSeenOnboarding;
+  }
+
+  void _handleOnboardingFinished() {
+    setState(() {
+      _hasSeenOnboarding = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +73,11 @@ class KiosDarmaApp extends StatelessWidget {
       title: 'KiosDarma',
       theme: AppTheme.theme,
       // Routing setup: AuthWrapper handles authentication state
-      home: const AuthWrapper(),
+      home: _hasSeenOnboarding
+          ? const AuthWrapper()
+          : OnboardingPage(
+              onFinished: _handleOnboardingFinished,
+            ),
       routes: {
         '/home': (context) => const HomeView(),
       },

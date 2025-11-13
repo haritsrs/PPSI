@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../services/database_service.dart';
 import '../services/xendit_service.dart';
 import '../utils/error_helper.dart';
+import '../utils/security_utils.dart';
 import '../widgets/pattern_background.dart';
 import '../widgets/print_receipt_dialog.dart';
 import '../utils/responsive_helper.dart';
@@ -622,35 +623,37 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       // Prepare transaction items
       final transactionItems = _cartItems.map((item) => {
         'productId': item.product.id,
-        'productName': item.product.name,
+        'productName': SecurityUtils.sanitizeInput(item.product.name),
         'quantity': item.quantity,
         'price': item.product.price,
         'subtotal': item.product.price * item.quantity,
       }).toList();
 
       // Save transaction to Firebase
+      final sanitizedPaymentMethod = SecurityUtils.sanitizeInput(paymentMethod);
+      final sanitizedCustomerName = customerName != null ? SecurityUtils.sanitizeInput(customerName) : null;
       final transactionId = await _databaseService.addTransaction(
         items: transactionItems,
         subtotal: _subtotal,
         tax: _tax,
         total: _total - (discount ?? 0.0),
-        paymentMethod: paymentMethod,
+        paymentMethod: sanitizedPaymentMethod,
         cashAmount: cashAmount,
         change: change,
         customerId: customerId,
-        customerName: customerName,
+        customerName: sanitizedCustomerName,
       );
 
       // Create notification for successful transaction
       try {
         await _databaseService.addNotification(
           title: 'Transaksi Berhasil',
-          message: 'Transaksi sebesar Rp ${_total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} berhasil diproses dengan metode $paymentMethod',
+          message: 'Transaksi sebesar Rp ${_total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} berhasil diproses dengan metode $sanitizedPaymentMethod',
           type: 'transaction',
           data: {
             'transactionId': transactionId,
             'total': _total,
-            'paymentMethod': paymentMethod,
+            'paymentMethod': sanitizedPaymentMethod,
           },
         );
       } catch (e) {
@@ -673,7 +676,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         'subtotal': _subtotal,
         'tax': _tax,
         'total': _total,
-        'paymentMethod': paymentMethod,
+        'paymentMethod': sanitizedPaymentMethod,
         'cashAmount': cashAmount,
         'change': change,
         'createdAt': DateTime.now().toIso8601String(),

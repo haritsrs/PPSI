@@ -2,6 +2,7 @@ enum AppExceptionType {
   network,
   offline,
   timeout,
+  rateLimit,
   unauthorized,
   validation,
   notFound,
@@ -56,6 +57,15 @@ class UnauthorizedException extends AppException {
       : super(
           message,
           type: AppExceptionType.unauthorized,
+          details: details,
+        );
+}
+
+class RateLimitException extends AppException {
+  const RateLimitException(String message, {String? details})
+      : super(
+          message,
+          type: AppExceptionType.rateLimit,
           details: details,
         );
 }

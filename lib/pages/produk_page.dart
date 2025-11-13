@@ -10,6 +10,8 @@ import '../models/product_model.dart';
 import '../services/database_service.dart';
 import '../services/storage_service.dart';
 import '../utils/error_helper.dart';
+import '../utils/security_utils.dart';
+import '../widgets/loading_skeletons.dart';
 import 'produk_page_dialogs.dart';
 
 class ProdukPage extends StatefulWidget {
@@ -292,6 +294,36 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     setState(() {
       _searchQuery = '';
     });
+  }
+
+  Widget _buildDismissBackground({
+    required Color color,
+    required IconData icon,
+    required Alignment alignment,
+    required String label,
+  }) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatusBanner({
@@ -756,13 +788,49 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                         itemCount: _filteredProducts.length,
                         itemBuilder: (context, index) {
                           final product = _filteredProducts[index];
-                          return ProductCard(
-                            key: ValueKey('product-${product.id}'),
-                            product: product,
-                            onTap: () => _showProductDetail(product),
-                            onEdit: () => _showEditProductDialog(product),
-                            onDelete: () => _showDeleteConfirmDialog(product),
-                            onEditStock: () => _showEditStockDialog(product),
+                          return TweenAnimationBuilder<double>(
+                            duration: Duration(milliseconds: 220 + (index * 12)),
+                            curve: Curves.easeOutCubic,
+                            tween: Tween<double>(begin: 0, end: 1),
+                            builder: (context, value, child) {
+                              return Opacity(
+                                opacity: value,
+                                child: Transform.translate(
+                                  offset: Offset(0, (1 - value) * 16),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Dismissible(
+                              key: ValueKey('product-${product.id}'),
+                              background: _buildDismissBackground(
+                                color: Colors.blue.shade100,
+                                icon: Icons.edit_rounded,
+                                alignment: Alignment.centerLeft,
+                                label: 'Edit',
+                              ),
+                              secondaryBackground: _buildDismissBackground(
+                                color: Colors.red.shade100,
+                                icon: Icons.delete_rounded,
+                                alignment: Alignment.centerRight,
+                                label: 'Hapus',
+                              ),
+                              confirmDismiss: (direction) async {
+                                if (direction == DismissDirection.startToEnd) {
+                                  _showEditProductDialog(product);
+                                } else {
+                                  _showDeleteConfirmDialog(product);
+                                }
+                                return false;
+                              },
+                              child: ProductCard(
+                                product: product,
+                                onTap: () => _showProductDetail(product),
+                                onEdit: () => _showEditProductDialog(product),
+                                onDelete: () => _showDeleteConfirmDialog(product),
+                                onEditStock: () => _showEditStockDialog(product),
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -923,12 +991,12 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _showInitialLoader
-              ? const Center(
-                    key: ValueKey('products-loader'),
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                  ),
-                )
+          ? const SingleChildScrollView(
+              key: ValueKey('products-loader'),
+              physics: AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.all(20),
+              child: ProductListSkeleton(),
+            )
                 : _showFullErrorState
                     ? _buildErrorState()
                     : _buildContent(),
@@ -945,6 +1013,9 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     required Color color,
     required bool isCurrency,
   }) {
+    final displayValue = isCurrency
+        ? 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'
+        : value.toStringAsFixed(0);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -997,13 +1068,15 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            isCurrency 
-                ? 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'
-                : value.toStringAsFixed(0),
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              displayValue,
+              key: ValueKey('$title-$displayValue'),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1F2937),
+                  ),
             ),
           ),
         ],
@@ -1824,6 +1897,23 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
     });
   }
 
+  double? _tryParsePrice(String value) {
+    final sanitized = SecurityUtils.sanitizeNumber(value);
+    if (sanitized.isEmpty) return null;
+    final normalized = sanitized.replaceAll('.', '').replaceAll(',', '.');
+    return double.tryParse(normalized);
+  }
+
+  double _parsePrice(String value) => _tryParsePrice(value) ?? 0;
+
+  int? _tryParseInt(String value) {
+    final sanitized = SecurityUtils.sanitizeNumber(value).replaceAll(RegExp(r'[^0-9-]'), '');
+    if (sanitized.isEmpty) return null;
+    return int.tryParse(sanitized);
+  }
+
+  int _parseInt(String value) => _tryParseInt(value) ?? 0;
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -1877,14 +1967,14 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
       }
 
       final productData = {
-        'name': _nameController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'price': double.parse(_priceController.text.trim()),
-        'stock': int.parse(_stockController.text.trim()),
-        'minStock': int.parse(_minStockController.text.trim()),
-        'supplier': _supplierController.text.trim(),
-        'category': _categoryController.text.trim(),
-        'barcode': _barcodeController.text.trim(),
+        'name': SecurityUtils.sanitizeInput(_nameController.text),
+        'description': SecurityUtils.sanitizeInput(_descriptionController.text),
+        'price': _parsePrice(_priceController.text),
+        'stock': _parseInt(_stockController.text),
+        'minStock': _parseInt(_minStockController.text),
+        'supplier': SecurityUtils.sanitizeInput(_supplierController.text),
+        'category': SecurityUtils.sanitizeInput(_categoryController.text),
+        'barcode': SecurityUtils.sanitizeInput(_barcodeController.text),
         'image': _selectedEmoji,
         'imageUrl': finalImageUrl,
       };
@@ -2260,7 +2350,8 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Harga wajib diisi';
                                 }
-                                if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                                final parsed = _tryParsePrice(value);
+                                if (parsed == null || parsed <= 0) {
                                   return 'Harga tidak valid';
                                 }
                                 return null;
@@ -2284,7 +2375,8 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Stok wajib diisi';
                                 }
-                                if (int.tryParse(value) == null || int.parse(value) < 0) {
+                                final parsed = _tryParseInt(value);
+                                if (parsed == null || parsed < 0) {
                                   return 'Stok tidak valid';
                                 }
                                 return null;
@@ -2314,7 +2406,8 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Stok minimum wajib diisi';
                                 }
-                                if (int.tryParse(value) == null || int.parse(value) < 0) {
+                                final parsed = _tryParseInt(value);
+                                if (parsed == null || parsed < 0) {
                                   return 'Stok minimum tidak valid';
                                 }
                                 return null;
