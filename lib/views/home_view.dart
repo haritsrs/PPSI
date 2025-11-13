@@ -103,35 +103,16 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   }
 
   void _onItemTapped(int index) {
+    HapticFeedback.lightImpact();
+
+    if (_selectedIndex == index) {
+      // TODO: Optionally scroll to top for the current tab.
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });
-    
-    HapticFeedback.lightImpact();
-    
-    switch (index) {
-      case 0:
-        // Already on home - scroll to top if needed
-        break;
-      case 1:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ProdukPage()),
-        );
-        break;
-      case 2:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const KasirPage()),
-        );
-        break;
-      case 3:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const LaporanPage()),
-        );
-        break;
-    }
   }
 
   Widget? _buildDrawer(BuildContext context) {
@@ -331,45 +312,59 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: CustomAppBar(databaseService: _databaseService),
-      drawer: _buildDrawer(context),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(20 * ResponsiveHelper.getPaddingScale(context)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ProfileHeader(
-                  currentUser: _currentUser,
-                  databaseService: _databaseService,
-                ),
-                
-                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+  Widget _buildHomeContent(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(20 * ResponsiveHelper.getPaddingScale(context)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ProfileHeader(
+                currentUser: _currentUser,
+                databaseService: _databaseService,
+              ),
+              
+              SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                BannerCarousel(bannerImages: _bannerImages),
-                
-                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+              BannerCarousel(bannerImages: _bannerImages),
+              
+              SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                BusinessMenu(
-                  onShowComingSoon: showComingSoonDialog,
-                ),
+              BusinessMenu(
+                onShowComingSoon: showComingSoonDialog,
+              ),
 
-                SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
+              SizedBox(height: 32 * ResponsiveHelper.getPaddingScale(context)),
 
-                const NewsSection(),
-                
-                SizedBox(height: 20 * ResponsiveHelper.getPaddingScale(context)),
-              ],
-            ),
+              const NewsSection(),
+              
+              SizedBox(height: 20 * ResponsiveHelper.getPaddingScale(context)),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showHomeChrome = _selectedIndex == 0;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: showHomeChrome ? CustomAppBar(databaseService: _databaseService) : null,
+      drawer: showHomeChrome ? _buildDrawer(context) : null,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildHomeContent(context),
+          const ProdukPage(),
+          const KasirPage(),
+          const LaporanPage(),
+        ],
       ),
       bottomNavigationBar: CustomBottomNavBar(
         selectedIndex: _selectedIndex,
