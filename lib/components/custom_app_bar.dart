@@ -28,6 +28,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     final appBarHeight = ResponsiveHelper.getAppBarHeight(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
     final isVertical = ResponsiveHelper.isVertical(context);
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final isLandscape = mediaQuery?.orientation == Orientation.landscape;
     final isTallPhoneLandscape = ResponsiveHelper.isTallPhoneInLandscape(context);
     
     return PreferredSize(
@@ -113,8 +115,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ],
         ),
-        actions: isTallPhoneLandscape
-            ? [] // Hide all actions when hamburger menu is shown
+        actions: (isTallPhoneLandscape || isLandscape)
+            ? [] // Hide actions to keep layout clean in landscape/hamburger mode
             : [
           Container(
             margin: EdgeInsets.only(right: 8 * iconScale),

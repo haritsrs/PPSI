@@ -66,6 +66,8 @@ class BusinessMenu extends StatelessWidget {
       },
     ];
     
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Container(
       padding: EdgeInsets.all(20 * paddingScale),
       decoration: BoxDecoration(
@@ -91,29 +93,56 @@ class BusinessMenu extends StatelessWidget {
             ),
           ),
           SizedBox(height: 20 * paddingScale),
-          SizedBox(
-            height: 120 * paddingScale,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
-              itemCount: menuItems.length,
-              itemBuilder: (context, index) {
-                final item = menuItems[index];
-                return Container(
-                  width: 100 * paddingScale,
-                  margin: EdgeInsets.only(
-                    right: 16 * paddingScale,
+          if (isLandscape)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 16 * paddingScale,
+                    crossAxisSpacing: 16 * paddingScale,
+                    childAspectRatio: 1.1,
                   ),
-                  child: HomeFeature(
-                    icon: item['icon'] as IconData,
-                    label: item['label'] as String,
-                    color: item['color'] as Color,
-                    onTap: item['onTap'] as VoidCallback,
-                  ),
+                  itemCount: menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = menuItems[index];
+                    return HomeFeature(
+                      icon: item['icon'] as IconData,
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      onTap: item['onTap'] as VoidCallback,
+                    );
+                  },
                 );
               },
+            )
+          else
+            SizedBox(
+              height: 120 * paddingScale,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 12 * paddingScale),
+                itemCount: menuItems.length,
+                itemBuilder: (context, index) {
+                  final item = menuItems[index];
+                  return Container(
+                    width: 100 * paddingScale,
+                    margin: EdgeInsets.only(
+                      right: index == menuItems.length - 1 ? 0 : 16 * paddingScale,
+                    ),
+                    child: HomeFeature(
+                      icon: item['icon'] as IconData,
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      onTap: item['onTap'] as VoidCallback,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
       ),
     );

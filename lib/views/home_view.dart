@@ -349,23 +349,117 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildPageStack(BuildContext context) {
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        _buildHomeContent(context),
+        const ProdukPage(),
+        const KasirPage(),
+        const LaporanPage(),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeLayout(BuildContext context) {
     final showHomeChrome = _selectedIndex == 0;
+    final paddingScale = ResponsiveHelper.getPaddingScale(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: showHomeChrome ? CustomAppBar(databaseService: _databaseService) : null,
       drawer: showHomeChrome ? _buildDrawer(context) : null,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeContent(context),
-          const ProdukPage(),
-          const KasirPage(),
-          const LaporanPage(),
-        ],
+      body: SafeArea(
+        child: Row(
+          children: [
+            Container(
+              margin: EdgeInsets.symmetric(
+                horizontal: 12 * paddingScale,
+                vertical: 16 * paddingScale,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: NavigationRail(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: _onItemTapped,
+                extended: ResponsiveHelper.isWideScreen(context),
+                labelType: ResponsiveHelper.isWideScreen(context)
+                    ? NavigationRailLabelType.none
+                    : NavigationRailLabelType.selected,
+                selectedIconTheme: const IconThemeData(
+                  color: Color(0xFF6366F1),
+                  size: 28,
+                ),
+                unselectedIconTheme: const IconThemeData(
+                  color: Color(0xFF9CA3AF),
+                  size: 24,
+                ),
+                selectedLabelTextStyle: const TextStyle(
+                  color: Color(0xFF6366F1),
+                  fontWeight: FontWeight.w700,
+                ),
+                unselectedLabelTextStyle: const TextStyle(
+                  color: Color(0xFF9CA3AF),
+                  fontWeight: FontWeight.w500,
+                ),
+                indicatorColor: const Color(0xFFEEF2FF),
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.home_rounded),
+                    label: Text('Beranda'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.store_rounded),
+                    label: Text('Produk'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.point_of_sale_rounded),
+                    label: Text('Kasir'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.analytics_rounded),
+                    label: Text('Laporan'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: _buildPageStack(context),
+              ),
+            ),
+            SizedBox(width: 16 * paddingScale),
+          ],
+        ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showHomeChrome = _selectedIndex == 0;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      return _buildLandscapeLayout(context);
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: showHomeChrome ? CustomAppBar(databaseService: _databaseService) : null,
+      drawer: showHomeChrome ? _buildDrawer(context) : null,
+      body: _buildPageStack(context),
       bottomNavigationBar: CustomBottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,

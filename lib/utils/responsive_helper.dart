@@ -32,8 +32,9 @@ class ResponsiveHelper {
   // Check if screen is wide (16:9 or 16:10)
   static bool isWideScreen(BuildContext context) {
     final aspectRatio = getAspectRatio(context);
-    // 16:9 = 1.78, 16:10 = 1.6, 4:3 = 1.33
-    return aspectRatio >= 1.5;
+    final shortestSide = getScreenSize(context).shortestSide;
+    // Consider displays that are clearly wide or in desktop-like modes.
+    return aspectRatio >= 1.5 && shortestSide >= 500;
   }
 
   // Check if screen is very wide (16:9)

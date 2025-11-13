@@ -15,63 +15,65 @@ class CustomBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomNavHeight = ResponsiveHelper.getBottomNavBarHeight(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
-    // Get the system navigation bar height (Android navbar)
-    final systemNavBarHeight = MediaQuery.of(context).padding.bottom;
-    
-    return Container(
-      // Add padding for system navigation bar to place app navbar above it
-      padding: EdgeInsets.only(bottom: systemNavBarHeight),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        height: bottomNavHeight,
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          currentIndex: selectedIndex,
-          onTap: onItemTapped,
-          selectedItemColor: const Color(0xFF6366F1),
-          unselectedItemColor: const Color(0xFF9CA3AF),
-          selectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12 * ResponsiveHelper.getFontScale(context),
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 12 * ResponsiveHelper.getFontScale(context),
-          ),
-          iconSize: 24 * iconScale,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.home_rounded, size: 24 * iconScale),
-              label: "Beranda",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.store_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.store_rounded, size: 24 * iconScale),
-              label: "Produk",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
-              label: "Kasir",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
-              activeIcon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
-              label: "Laporan",
+    final fontScale = ResponsiveHelper.getFontScale(context);
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
           ],
+        ),
+        child: SizedBox(
+          height: bottomNavHeight,
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            currentIndex: selectedIndex,
+            onTap: onItemTapped,
+            selectedItemColor: const Color(0xFF6366F1),
+            unselectedItemColor: const Color(0xFF9CA3AF),
+            selectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12 * fontScale,
+            ),
+            unselectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 12 * fontScale,
+            ),
+            iconSize: 24 * iconScale,
+            items: [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_rounded, size: 24 * iconScale),
+                activeIcon: Icon(Icons.home_rounded, size: 24 * iconScale),
+                label: "Beranda",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.store_rounded, size: 24 * iconScale),
+                activeIcon: Icon(Icons.store_rounded, size: 24 * iconScale),
+                label: "Produk",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
+                activeIcon:
+                    Icon(Icons.point_of_sale_rounded, size: 24 * iconScale),
+                label: "Kasir",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.analytics_rounded, size: 24 * iconScale),
+                activeIcon:
+                    Icon(Icons.analytics_rounded, size: 24 * iconScale),
+                label: "Laporan",
+              ),
+            ],
+          ),
         ),
       ),
     );
