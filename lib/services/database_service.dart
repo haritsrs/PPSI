@@ -1,7 +1,11 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
+
+import '../utils/app_exception.dart';
+import '../utils/error_helper.dart';
 
 class DatabaseService {
   static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
@@ -24,7 +28,12 @@ class DatabaseService {
   
   // Stream of all products
   Stream<List<Map<String, dynamic>>> getProductsStream() {
-    return productsRef.onValue.map((event) {
+    return productsRef.onValue.handleError((error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat data produk.',
+      );
+    }).map((event) {
       if (event.snapshot.value == null) {
         return <Map<String, dynamic>>[];
       }
@@ -47,49 +56,115 @@ class DatabaseService {
 
   // Get all products once
   Future<List<Map<String, dynamic>>> getProducts() async {
-    final snapshot = await productsRef.get();
-    if (snapshot.value == null) {
-      return [];
-    }
-    
-    final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-    final List<Map<String, dynamic>> products = [];
-    
-    data.forEach((key, value) {
-      if (value is Map) {
-        products.add({
-          'id': key,
-          ...Map<String, dynamic>.from(value),
-        });
+    try {
+      final snapshot = await productsRef.get();
+      if (snapshot.value == null) {
+        return [];
       }
-    });
-    
-    return products;
+      
+      final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> products = [];
+      
+      data.forEach((key, value) {
+        if (value is Map) {
+          products.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+        }
+      });
+      
+      return products;
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat data produk.',
+      );
+    }
+  }
+
+  Future<({List<Map<String, dynamic>> items, String? lastKey, bool hasMore})> fetchProductsPage({
+    int limit = 25,
+    String? startAfterKey,
+  }) async {
+    assert(limit > 0, 'limit must be greater than zero');
+
+    try {
+      Query query = productsRef.orderByKey().limitToFirst(limit);
+      if (startAfterKey != null && startAfterKey.isNotEmpty) {
+        query = query.startAfter(startAfterKey);
+      }
+
+      final snapshot = await query.get();
+      final items = <Map<String, dynamic>>[];
+      String? lastKey;
+
+      for (final child in snapshot.children) {
+        final key = child.key;
+        final value = child.value;
+        if (key != null && value is Map) {
+          items.add({
+            'id': key,
+            ...Map<String, dynamic>.from(value),
+          });
+          lastKey = key;
+        }
+      }
+
+      final hasMore = snapshot.children.length == limit;
+      return (items: items, lastKey: lastKey, hasMore: hasMore);
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat data produk.',
+      );
+    }
   }
 
   // Add a new product
   Future<String> addProduct(Map<String, dynamic> productData) async {
-    final newProductRef = productsRef.push();
-    await newProductRef.set({
-      ...productData,
-      'createdAt': DateTime.now().toIso8601String(),
-      'updatedAt': DateTime.now().toIso8601String(),
-      'createdBy': currentUserId ?? 'unknown',
-    });
-    return newProductRef.key!;
+    try {
+      final newProductRef = productsRef.push();
+      await newProductRef.set({
+        ...productData,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+        'createdBy': currentUserId ?? 'unknown',
+      });
+      return newProductRef.key!;
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menambahkan produk.',
+      );
+    }
   }
 
   // Update a product
   Future<void> updateProduct(String productId, Map<String, dynamic> productData) async {
-    await productsRef.child(productId).update({
-      ...productData,
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
+    try {
+      await productsRef.child(productId).update({
+        ...productData,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui produk.',
+      );
+    }
   }
 
   // Delete a product
   Future<void> deleteProduct(String productId) async {
-    await productsRef.child(productId).remove();
+    try {
+      await productsRef.child(productId).remove();
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menghapus produk.',
+      );
+    }
   }
 
   // Update product stock with history tracking
@@ -99,83 +174,94 @@ class DatabaseService {
     String? reason,
     String? notes,
   }) async {
-    final productRef = productsRef.child(productId);
-    final snapshot = await productRef.get();
-    
-    if (!snapshot.exists) {
-      throw Exception('Product not found');
-    }
-    
-    final productData = Map<String, dynamic>.from(snapshot.value as Map);
-    final oldStock = (productData['stock'] as num?)?.toInt() ?? 0;
-    final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
-    
-    // Update stock
-    await productRef.update({
-      'stock': newStock,
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-    
-    // Record stock history
-    final stockHistoryRef = _database.child('stockHistory').child(productId).push();
-    await stockHistoryRef.set({
-      'productId': productId,
-      'productName': productData['name'] as String? ?? '',
-      'oldStock': oldStock,
-      'newStock': newStock,
-      'difference': newStock - oldStock,
-      'reason': reason ?? 'Manual Adjustment',
-      'notes': notes ?? '',
-      'createdAt': DateTime.now().toIso8601String(),
-      'createdBy': currentUserId ?? 'unknown',
-    });
-    
-    // Check for low stock and create notification
-    if (newStock <= minStock && oldStock > minStock) {
-      // Stock just went low
-      try {
-        await addNotification(
-          title: 'Stok Rendah',
-          message: '${productData['name']} stok rendah (${newStock} unit)',
-          type: 'low_stock',
-          data: {
-            'productId': productId,
-            'productName': productData['name'],
-            'currentStock': newStock,
-            'minStock': minStock,
-          },
-        );
-      } catch (e) {
-        // Ignore notification errors
-        print('Error creating low stock notification: $e');
+    try {
+      final productRef = productsRef.child(productId);
+      final snapshot = await productRef.get();
+      
+      if (!snapshot.exists) {
+        throw const NotFoundException('Produk tidak ditemukan.');
       }
-    }
-    
-    // Check for out of stock
-    if (newStock == 0 && oldStock > 0) {
-      try {
-        await addNotification(
-          title: 'Stok Habis',
-          message: '${productData['name']} stok habis',
-          type: 'out_of_stock',
-          data: {
-            'productId': productId,
-            'productName': productData['name'],
-          },
-        );
-      } catch (e) {
-        // Ignore notification errors
-        print('Error creating out of stock notification: $e');
+      
+      final productData = Map<String, dynamic>.from(snapshot.value as Map);
+      final oldStock = (productData['stock'] as num?)?.toInt() ?? 0;
+      final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
+      
+      // Update stock
+      await productRef.update({
+        'stock': newStock,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      
+      // Record stock history
+      final stockHistoryRef = _database.child('stockHistory').child(productId).push();
+      await stockHistoryRef.set({
+        'productId': productId,
+        'productName': productData['name'] as String? ?? '',
+        'oldStock': oldStock,
+        'newStock': newStock,
+        'difference': newStock - oldStock,
+        'reason': reason ?? 'Manual Adjustment',
+        'notes': notes ?? '',
+        'createdAt': DateTime.now().toIso8601String(),
+        'createdBy': currentUserId ?? 'unknown',
+      });
+      
+      // Check for low stock and create notification
+      if (newStock <= minStock && oldStock > minStock) {
+        // Stock just went low
+        try {
+          await addNotification(
+            title: 'Stok Rendah',
+            message: '${productData['name']} stok rendah (${newStock} unit)',
+            type: 'low_stock',
+            data: {
+              'productId': productId,
+              'productName': productData['name'],
+              'currentStock': newStock,
+              'minStock': minStock,
+            },
+          );
+        } catch (e) {
+          // Ignore notification errors
+          print('Error creating low stock notification: $e');
+        }
       }
+      
+      // Check for out of stock
+      if (newStock == 0 && oldStock > 0) {
+        try {
+          await addNotification(
+            title: 'Stok Habis',
+            message: '${productData['name']} stok habis',
+            type: 'out_of_stock',
+            data: {
+              'productId': productId,
+              'productName': productData['name'],
+            },
+          );
+        } catch (e) {
+          // Ignore notification errors
+          print('Error creating out of stock notification: $e');
+        }
+      }
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui stok produk.',
+      );
     }
   }
 
   // Decrement product stock (for sales) with history tracking
   Future<void> decrementProductStock(String productId, int quantity) async {
-    final productRef = productsRef.child(productId);
-    final snapshot = await productRef.get();
-    
-    if (snapshot.exists) {
+    try {
+      final productRef = productsRef.child(productId);
+      final snapshot = await productRef.get();
+      
+      if (!snapshot.exists) {
+        throw const NotFoundException('Produk tidak ditemukan.');
+      }
+      
       final productData = Map<String, dynamic>.from(snapshot.value as Map);
       final currentStock = (productData['stock'] as num?)?.toInt() ?? 0;
       final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
@@ -235,6 +321,11 @@ class DatabaseService {
           print('Error creating out of stock notification: $e');
         }
       }
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui stok produk.',
+      );
     }
   }
 
@@ -296,71 +387,78 @@ class DatabaseService {
 
   // Bulk update stock for multiple products
   Future<void> bulkUpdateStock(List<Map<String, String>> updates) async {
-    final batch = <String, dynamic>{};
-    final historyBatch = <String, dynamic>{};
-    
-    for (final update in updates) {
-      final productId = update['productId']!;
-      final newStock = int.parse(update['stock']!);
-      final reason = update['reason'] ?? 'Bulk Update';
-      final notes = update['notes'] ?? '';
+    try {
+      final batch = <String, dynamic>{};
+      final historyBatch = <String, dynamic>{};
       
-      // Get current stock
-      final productRef = productsRef.child(productId);
-      final snapshot = await productRef.get();
-      
-      if (snapshot.exists) {
-        final productData = Map<String, dynamic>.from(snapshot.value as Map);
-        final oldStock = (productData['stock'] as num?)?.toInt() ?? 0;
-        final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
+      for (final update in updates) {
+        final productId = update['productId']!;
+        final newStock = int.parse(update['stock']!);
+        final reason = update['reason'] ?? 'Bulk Update';
+        final notes = update['notes'] ?? '';
         
-        // Prepare stock update
-        batch['products/$productId/stock'] = newStock;
-        batch['products/$productId/updatedAt'] = DateTime.now().toIso8601String();
+        // Get current stock
+        final productRef = productsRef.child(productId);
+        final snapshot = await productRef.get();
         
-        // Prepare history entry
-        final historyKey = 'stockHistory/$productId/${DateTime.now().millisecondsSinceEpoch}';
-        historyBatch[historyKey] = {
-          'productId': productId,
-          'productName': productData['name'] as String? ?? '',
-          'oldStock': oldStock,
-          'newStock': newStock,
-          'difference': newStock - oldStock,
-          'reason': reason,
-          'notes': notes,
-          'createdAt': DateTime.now().toIso8601String(),
-          'createdBy': currentUserId ?? 'unknown',
-        };
-        
-        // Check for low stock notifications
-        if (newStock <= minStock && oldStock > minStock) {
-          try {
-            await addNotification(
-              title: 'Stok Rendah',
-              message: '${productData['name']} stok rendah (${newStock} unit)',
-              type: 'low_stock',
-              data: {
-                'productId': productId,
-                'productName': productData['name'],
-                'currentStock': newStock,
-                'minStock': minStock,
-              },
-            );
-          } catch (e) {
-            print('Error creating low stock notification: $e');
+        if (snapshot.exists) {
+          final productData = Map<String, dynamic>.from(snapshot.value as Map);
+          final oldStock = (productData['stock'] as num?)?.toInt() ?? 0;
+          final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
+          
+          // Prepare stock update
+          batch['products/$productId/stock'] = newStock;
+          batch['products/$productId/updatedAt'] = DateTime.now().toIso8601String();
+          
+          // Prepare history entry
+          final historyKey = 'stockHistory/$productId/${DateTime.now().millisecondsSinceEpoch}';
+          historyBatch[historyKey] = {
+            'productId': productId,
+            'productName': productData['name'] as String? ?? '',
+            'oldStock': oldStock,
+            'newStock': newStock,
+            'difference': newStock - oldStock,
+            'reason': reason,
+            'notes': notes,
+            'createdAt': DateTime.now().toIso8601String(),
+            'createdBy': currentUserId ?? 'unknown',
+          };
+          
+          // Check for low stock notifications
+          if (newStock <= minStock && oldStock > minStock) {
+            try {
+              await addNotification(
+                title: 'Stok Rendah',
+                message: '${productData['name']} stok rendah (${newStock} unit)',
+                type: 'low_stock',
+                data: {
+                  'productId': productId,
+                  'productName': productData['name'],
+                  'currentStock': newStock,
+                  'minStock': minStock,
+                },
+              );
+            } catch (e) {
+              print('Error creating low stock notification: $e');
+            }
           }
         }
       }
-    }
-    
-    // Execute batch update
-    if (batch.isNotEmpty) {
-      await _database.update(batch);
-    }
-    
-    // Add history entries
-    if (historyBatch.isNotEmpty) {
-      await _database.update(historyBatch);
+      
+      // Execute batch update
+      if (batch.isNotEmpty) {
+        await _database.update(batch);
+      }
+      
+      // Add history entries
+      if (historyBatch.isNotEmpty) {
+        await _database.update(historyBatch);
+      }
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui stok produk secara massal.',
+      );
     }
   }
 
@@ -422,7 +520,12 @@ class DatabaseService {
 
   // Get transactions stream
   Stream<List<Map<String, dynamic>>> getTransactionsStream() {
-    return transactionsRef.orderByChild('createdAt').onValue.map((event) {
+    return transactionsRef.orderByChild('createdAt').onValue.handleError((error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat data transaksi.',
+      );
+    }).map((event) {
       if (event.snapshot.value == null) {
         return <Map<String, dynamic>>[];
       }
@@ -633,17 +736,24 @@ class DatabaseService {
 
   // Get categories from products
   Future<List<String>> getCategories() async {
-    final products = await getProducts();
-    final categories = <String>{'Semua'};
-    
-    for (var product in products) {
-      final category = product['category'] as String?;
-      if (category != null && category.isNotEmpty) {
-        categories.add(category);
+    try {
+      final products = await getProducts();
+      final categories = <String>{'Semua'};
+      
+      for (var product in products) {
+        final category = product['category'] as String?;
+        if (category != null && category.isNotEmpty) {
+          categories.add(category);
+        }
       }
+      
+      return categories.toList()..sort();
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat kategori produk.',
+      );
     }
-    
-    return categories.toList()..sort();
   }
 
   // Notifications operations
@@ -1012,15 +1122,22 @@ class DatabaseService {
 
   // Get a single transaction by ID
   Future<Map<String, dynamic>?> getTransaction(String transactionId) async {
-    final snapshot = await transactionsRef.child(transactionId).get();
-    if (!snapshot.exists) {
-      return null;
+    try {
+      final snapshot = await transactionsRef.child(transactionId).get();
+      if (!snapshot.exists) {
+        return null;
+      }
+      
+      return {
+        'id': transactionId,
+        ...Map<String, dynamic>.from(snapshot.value as Map),
+      };
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat detail transaksi.',
+      );
     }
-    
-    return {
-      'id': transactionId,
-      ...Map<String, dynamic>.from(snapshot.value as Map),
-    };
   }
 
   // Add a withdrawal (pencairan)

@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
-import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:excel/excel.dart' hide Border;
@@ -11,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../services/database_service.dart';
 import '../widgets/print_receipt_dialog.dart';
+import '../utils/error_helper.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -43,6 +47,18 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   List<Transaction> _transactions = [];
   bool _isLoading = true;
   bool _localeInitialized = false;
+  bool _isRetrying = false;
+  bool _hasLoadedOnce = false;
+  String? _errorMessage;
+  bool _isOffline = false;
+
+  bool get _showInitialLoader => _isLoading && !_hasLoadedOnce;
+  bool get _showFullErrorState => _errorMessage != null && !_hasLoadedOnce;
+  bool get _showInlineErrorBanner => _errorMessage != null && _hasLoadedOnce;
+
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _transactionsSubscription;
 
   @override
   void initState() {
@@ -69,6 +85,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     ));
     
     _animationController.forward();
+    _initializeConnectivity();
     _initializeLocale();
     _loadTransactions();
   }
@@ -82,39 +99,92 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _loadTransactions() async {
+  Future<void> _initializeConnectivity() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      _handleConnectivityChange(results, emitSetState: false);
+    } catch (_) {
+      // Ignore connectivity check errors
+    }
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+  }
+
+  void _handleConnectivityChange(
+    List<ConnectivityResult> results, {
+    bool emitSetState = true,
+  }) {
+    final isOffline = results.isEmpty || results.every((result) => result == ConnectivityResult.none);
+    if (!mounted) return;
+
+    if (emitSetState) {
+      setState(() {
+        _isOffline = isOffline;
+      });
+    } else {
+      _isOffline = isOffline;
+    }
+
+    if (!isOffline && _errorMessage != null && !_isRetrying) {
+      _retryLoadTransactions();
+    }
+  }
+
+  Future<void> _retryLoadTransactions() async {
+    if (_isRetrying) return;
+    if (!mounted) return;
+
     setState(() {
-      _isLoading = true;
+      _isRetrying = true;
+      _errorMessage = null;
     });
 
-    try {
-      _databaseService.getTransactionsStream().listen((transactionsData) {
-        if (mounted) {
-          setState(() {
-            _transactions = transactionsData.map((data) {
-              return Transaction.fromFirebase(data);
-            }).toList();
-            _isLoading = false;
-          });
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading transactions: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    await _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    _transactionsSubscription?.cancel();
+
+    if (!mounted) return;
+
+    setState(() {
+      if (!_hasLoadedOnce) {
+        _isLoading = true;
       }
-    }
+      _isRetrying = _hasLoadedOnce;
+      _errorMessage = null;
+    });
+
+    _transactionsSubscription = _databaseService.getTransactionsStream().listen(
+      (transactionsData) {
+        if (!mounted) return;
+        setState(() {
+          _transactions = transactionsData.map(Transaction.fromFirebase).toList();
+          _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = null;
+          _hasLoadedOnce = true;
+        });
+      },
+      onError: (error) {
+        final message = getFriendlyErrorMessage(
+          error,
+          fallbackMessage: 'Gagal memuat data transaksi.',
+        );
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = message;
+        });
+      },
+    );
   }
 
   @override
   void dispose() {
+    _transactionsSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     _animationController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -188,6 +258,117 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     return _filteredTransactions.length;
   }
 
+  Widget _buildStatusBanner({
+    required MaterialColor color,
+    required IconData icon,
+    required String message,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: color.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      key: const ValueKey('reports-error'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: Color(0xFFDC2626),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak dapat memuat data transaksi',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1F2937),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            if (_errorMessage != null)
+              Text(
+                _errorMessage!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            if (_isOffline) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Periksa koneksi internet Anda sebelum mencoba lagi.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[500],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _isRetrying ? null : _retryLoadTransactions,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: _isRetrying
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _isRetrying ? 'Mencoba lagi...' : 'Coba Lagi',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -250,17 +431,94 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _showInitialLoader
+                ? const Center(
+                    key: ValueKey('reports-loader'),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    ),
+                  )
+                : _showFullErrorState
+                    ? _buildErrorState()
+                    : _buildContent(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      key: const ValueKey('reports-content'),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isOffline)
+            _buildStatusBanner(
+              color: Colors.orange,
+              icon: Icons.wifi_off_rounded,
+              message: 'Anda sedang offline. Data dapat tidak terbaru.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadTransactions,
+                child: Text(
+                  'Segarkan',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          if (_showInlineErrorBanner)
+            _buildStatusBanner(
+              color: Colors.red,
+              icon: Icons.error_outline_rounded,
+              message: _errorMessage ?? 'Terjadi kesalahan.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadTransactions,
+                child: Text(
+                  'Coba Lagi',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.red[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          if (_isRetrying && _hasLoadedOnce)
+            _buildStatusBanner(
+              color: Colors.blue,
+              icon: Icons.sync_rounded,
+              message: 'Menyegarkan data transaksi...',
+              trailing: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                ),
+              ),
+            ),
+          // Period Toggle
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 // Period Toggle
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -585,11 +843,11 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -687,36 +945,49 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   }
 
   void _showTransactionDetail(Transaction transaction) async {
-    // Get full transaction data for printing
-    final fullTransactionData = await _databaseService.getTransaction(transaction.id);
+    try {
+      final fullTransactionData = await _databaseService.getTransaction(transaction.id);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => TransactionDetailModal(
-        transaction: transaction,
-        fullTransactionData: fullTransactionData,
-        databaseService: _databaseService,
-        onPrint: fullTransactionData != null
-            ? () {
-                Navigator.pop(context);
-                showDialog(
-                  context: context,
-                  builder: (context) => PrintReceiptDialog(
-                    transactionId: transaction.id,
-                    transactionData: fullTransactionData,
-                  ),
-                );
-              }
-            : null,
-        onCancelled: () {
-          _loadTransactions();
-        },
-      ),
-    );
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => TransactionDetailModal(
+          transaction: transaction,
+          fullTransactionData: fullTransactionData,
+          databaseService: _databaseService,
+          onPrint: fullTransactionData != null
+              ? () {
+                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    builder: (context) => PrintReceiptDialog(
+                      transactionId: transaction.id,
+                      transactionData: fullTransactionData,
+                    ),
+                  );
+                }
+              : null,
+          onCancelled: () {
+            _loadTransactions();
+          },
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal memuat detail transaksi.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _showDateRangePicker() async {
@@ -1048,26 +1319,32 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
             }
           }
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error membuat PDF: $e'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+      } catch (error) {
+        if (!mounted) return;
+        final message = getFriendlyErrorMessage(
+          error,
+          fallbackMessage: 'Gagal membuat file PDF.',
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(message),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal membuat laporan PDF.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1267,26 +1544,32 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
             }
           }
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error membuat Excel: $e'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+      } catch (error) {
+        if (!mounted) return;
+        final message = getFriendlyErrorMessage(
+          error,
+          fallbackMessage: 'Gagal membuat file Excel.',
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(message),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal membuat laporan Excel.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

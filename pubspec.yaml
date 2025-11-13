@@ -57,8 +57,14 @@ dependencies:
   # HTTP client for API calls
   http: ^1.2.0
   
+  # Connectivity monitoring
+  connectivity_plus: ^6.0.3
+  
   # QR Code generator
   qr_flutter: ^4.1.0
+  
+  # Image caching
+  cached_network_image: ^3.4.1
   
   # PDF generation (printing package includes pdf, but we need it for exports)
   pdf: ^3.11.1

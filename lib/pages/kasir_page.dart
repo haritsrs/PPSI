@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/database_service.dart';
 import '../services/xendit_service.dart';
+import '../utils/error_helper.dart';
 import '../widgets/pattern_background.dart';
 import '../widgets/print_receipt_dialog.dart';
 import '../utils/responsive_helper.dart';
@@ -20,7 +24,11 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   late Animation<Offset> _slideAnimation;
   
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _barcodeFocusNode = FocusNode(skipTraversal: true, debugLabel: 'barcodeScanner');
   final DatabaseService _databaseService = DatabaseService();
+  
+  String _barcodeBuffer = '';
+  Timer? _barcodeResetTimer;
   
   String _selectedCategory = 'Semua';
   String _searchQuery = '';
@@ -35,6 +43,18 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   List<Product> _products = [];
   List<String> _categories = ['Semua'];
   bool _isLoading = true;
+  bool _isRetrying = false;
+  bool _hasLoadedOnce = false;
+  String? _errorMessage;
+  bool _isOffline = false;
+
+  bool get _showInitialLoader => _isLoading && !_hasLoadedOnce;
+  bool get _showFullErrorState => _errorMessage != null && !_hasLoadedOnce;
+  bool get _showInlineErrorBanner => _errorMessage != null && _hasLoadedOnce;
+
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _productsSubscription;
 
   @override
   void initState() {
@@ -61,43 +81,62 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     ));
     
     _animationController.forward();
+    _initializeConnectivity();
     _loadProducts();
     _loadCategories();
     _calculateTotals();
+    
+    _refocusScanner();
   }
 
   @override
   void dispose() {
+    _productsSubscription?.cancel();
+    _connectivitySubscription?.cancel();
+    _barcodeResetTimer?.cancel();
     _animationController.dispose();
     _searchController.dispose();
+    _barcodeFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _loadProducts() async {
+    _productsSubscription?.cancel();
+
+    if (!mounted) return;
+
     setState(() {
-      _isLoading = true;
+      if (!_hasLoadedOnce) {
+        _isLoading = true;
+      }
+      _isRetrying = _hasLoadedOnce;
+      _errorMessage = null;
     });
 
-    try {
-      _databaseService.getProductsStream().listen((productsData) {
+    _productsSubscription = _databaseService.getProductsStream().listen(
+      (productsData) {
+        if (!mounted) return;
         setState(() {
-          _products = productsData.map((data) => Product.fromFirebase(data)).toList();
+          _products = productsData.map(Product.fromFirebase).toList();
           _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = null;
+          _hasLoadedOnce = true;
         });
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading products: $e'),
-            backgroundColor: Colors.red,
-          ),
+      },
+      onError: (error) {
+        final message = getFriendlyErrorMessage(
+          error,
+          fallbackMessage: 'Gagal memuat data produk.',
         );
-      }
-    }
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = message;
+        });
+      },
+    );
   }
 
   Future<void> _loadCategories() async {
@@ -106,15 +145,249 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       setState(() {
         _categories = ['Semua', ...categories];
       });
-    } catch (e) {
-      // Handle error silently or show a message
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal memuat kategori produk.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
+  }
+
+  Future<void> _initializeConnectivity() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      _handleConnectivityChange(results, emitSetState: false);
+    } catch (_) {
+      // Ignore connectivity check errors
+    }
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+  }
+
+  void _handleConnectivityChange(
+    List<ConnectivityResult> results, {
+    bool emitSetState = true,
+  }) {
+    final isOffline = results.isEmpty || results.every((result) => result == ConnectivityResult.none);
+    if (!mounted) return;
+
+    if (emitSetState) {
+      setState(() {
+        _isOffline = isOffline;
+      });
+    } else {
+      _isOffline = isOffline;
+    }
+
+    if (!isOffline && _errorMessage != null && !_isRetrying) {
+      _retryLoadProducts();
+    }
+  }
+
+  Future<void> _retryLoadProducts() async {
+    if (_isRetrying) return;
+    if (!mounted) return;
+
+    setState(() {
+      _isRetrying = true;
+      _errorMessage = null;
+    });
+
+    await _loadProducts();
   }
 
   void _calculateTotals() {
     _subtotal = _cartItems.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
     _tax = _subtotal * 0.11; // 11% tax
     _total = _subtotal + _tax;
+  }
+
+  Widget _buildStatusBanner({
+    required MaterialColor color,
+    required IconData icon,
+    required String message,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: color.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      key: const ValueKey('kasir-products-error'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: Color(0xFFDC2626),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak dapat memuat data produk',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1F2937),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            if (_errorMessage != null)
+              Text(
+                _errorMessage!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            if (_isOffline) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Periksa koneksi internet Anda sebelum mencoba lagi.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[500],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _isRetrying ? null : _retryLoadProducts,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: _isRetrying
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _isRetrying ? 'Mencoba lagi...' : 'Coba Lagi',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductGridContent({
+    required int crossAxisCount,
+    required double paddingScale,
+    required double iconScale,
+    required EdgeInsetsGeometry gridPadding,
+    required double crossAxisSpacing,
+    required double mainAxisSpacing,
+    required double childAspectRatio,
+  }) {
+    if (_filteredProducts.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 64 * iconScale,
+                color: Colors.grey[400],
+              ),
+              SizedBox(height: 16 * paddingScale),
+              Text(
+                _products.isEmpty ? "Belum ada produk" : "Tidak ada produk yang cocok",
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8 * paddingScale),
+              if (_products.isEmpty)
+                ElevatedButton.icon(
+                  onPressed: _showAddProductDialog,
+                  icon: Icon(Icons.add_rounded, size: 20 * iconScale),
+                  label: const Text('Tambah Produk Pertama'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16 * paddingScale,
+                      vertical: 12 * paddingScale,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: gridPadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: crossAxisSpacing,
+        mainAxisSpacing: mainAxisSpacing,
+        childAspectRatio: childAspectRatio,
+      ),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (context, index) {
+        final product = _filteredProducts[index];
+        return ProductCard(
+          product: product,
+          onAddToCart: () => _addToCart(product),
+        );
+      },
+    );
   }
 
   void _addToCart(Product product) {
@@ -194,6 +467,97 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     });
   }
 
+  void _handleRawKeyEvent(RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) {
+      return;
+    }
+
+    final logicalKey = event.logicalKey;
+
+    if (logicalKey == LogicalKeyboardKey.enter || logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _barcodeResetTimer?.cancel();
+      final code = _barcodeBuffer.trim();
+      _barcodeBuffer = '';
+      if (code.isNotEmpty) {
+        _handleBarcode(code);
+      } else {
+        _refocusScanner();
+      }
+      return;
+    }
+
+    if (logicalKey == LogicalKeyboardKey.backspace) {
+      if (_barcodeBuffer.isNotEmpty) {
+        _barcodeBuffer = _barcodeBuffer.substring(0, _barcodeBuffer.length - 1);
+      }
+      return;
+    }
+
+    final character = event.character;
+    if (character != null && character.isNotEmpty) {
+      final codeUnit = character.codeUnitAt(0);
+      final isPrintable = codeUnit >= 32 && codeUnit != 127;
+      if (isPrintable) {
+        _barcodeBuffer += character;
+        _barcodeResetTimer?.cancel();
+        _barcodeResetTimer = Timer(const Duration(milliseconds: 120), () {
+          final bufferedCode = _barcodeBuffer.trim();
+          _barcodeBuffer = '';
+          if (bufferedCode.isNotEmpty) {
+            _handleBarcode(bufferedCode);
+          } else {
+            _refocusScanner();
+          }
+        });
+      }
+    }
+  }
+
+  void _refocusScanner() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _barcodeFocusNode.requestFocus();
+      }
+    });
+  }
+
+  Future<void> _handleBarcode(String barcode) async {
+    final normalizedCode = barcode.trim();
+    if (normalizedCode.isEmpty) {
+      _refocusScanner();
+      return;
+    }
+
+    Product? matchedProduct;
+    for (final product in _products) {
+      final productBarcode = product.barcode.trim();
+      if (productBarcode.isEmpty) {
+        continue;
+      }
+      if (productBarcode.toLowerCase() == normalizedCode.toLowerCase()) {
+        matchedProduct = product;
+        break;
+      }
+    }
+
+    if (matchedProduct == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Produk dengan barcode "$normalizedCode" tidak ditemukan'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      _refocusScanner();
+      return;
+    }
+
+    _addToCart(matchedProduct);
+    _refocusScanner();
+  }
+
   List<Product> get _filteredProducts {
     return _products.where((product) {
       final matchesCategory = _selectedCategory == 'Semua' || product.category == _selectedCategory;
@@ -212,7 +576,14 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           HapticFeedback.lightImpact();
         },
       ),
-    );
+    ).then((_) => _refocusScanner());
+  }
+
+  void _showBarcodeScannerInstructions() {
+    showDialog(
+      context: context,
+      builder: (context) => const BarcodeScannerInstructionsDialog(),
+    ).then((_) => _refocusScanner());
   }
 
   void _showPaymentModal() {
@@ -236,7 +607,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         databaseService: _databaseService,
         onPaymentSuccess: _handlePaymentSuccess,
       ),
-    );
+    ).then((_) => _refocusScanner());
   }
 
   Future<void> _handlePaymentSuccess({
@@ -285,7 +656,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       } catch (e) {
         // Notification creation failed, but transaction was successful
         // Log error but don't show to user
-        print('Error creating notification: $e');
+        debugPrint('Error creating notification: $e');
       }
 
       setState(() {
@@ -323,16 +694,19 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing payment: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (error) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal memproses pembayaran.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -399,6 +773,21 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
             child: IconButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
+                _showBarcodeScannerInstructions();
+              },
+              icon: Icon(Icons.help_outline_rounded, color: Colors.white, size: 24 * iconScale),
+              tooltip: 'Cara Menggunakan Barcode Scanner',
+            ),
+          ),
+          Container(
+            margin: EdgeInsets.only(right: 8 * paddingScale),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
                 _showAddProductDialog();
               },
               icon: Icon(Icons.add_rounded, color: Colors.white, size: 24 * iconScale),
@@ -422,15 +811,20 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
         ],
       ),
-      body: PatternBackground(
-        patternType: PatternType.dots,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: isMobile
-                ? _buildMobileLayout(context, crossAxisCount, paddingScale, iconScale)
-                : _buildDesktopLayout(context, crossAxisCount, paddingScale, iconScale, screenWidth),
+      body: RawKeyboardListener(
+        focusNode: _barcodeFocusNode,
+        autofocus: true,
+        onKey: _handleRawKeyEvent,
+        child: PatternBackground(
+          patternType: PatternType.dots,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: isMobile
+                  ? _buildMobileLayout(context, crossAxisCount, paddingScale, iconScale)
+                  : _buildDesktopLayout(context, crossAxisCount, paddingScale, iconScale, screenWidth),
+            ),
           ),
         ),
       ),
@@ -574,76 +968,85 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
             ],
           ),
         ),
+        if (_isOffline)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+            child: _buildStatusBanner(
+              color: Colors.orange,
+              icon: Icons.wifi_off_rounded,
+              message: 'Anda sedang offline. Data produk mungkin tidak terbaru.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadProducts,
+                child: Text(
+                  'Segarkan',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          ),
+        if (_showInlineErrorBanner)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+            child: _buildStatusBanner(
+              color: Colors.red,
+              icon: Icons.error_outline_rounded,
+              message: _errorMessage ?? 'Terjadi kesalahan.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadProducts,
+                child: Text(
+                  'Coba Lagi',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.red[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          ),
+        if (_isRetrying && _hasLoadedOnce)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+            child: _buildStatusBanner(
+              color: Colors.blue,
+              icon: Icons.sync_rounded,
+              message: 'Menyegarkan data produk...',
+              trailing: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                ),
+              ),
+            ),
+          ),
         
         // Products Grid
         Expanded(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                  ),
-                )
-              : _filteredProducts.isEmpty
-                  ? Center(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 64 * iconScale,
-                              color: Colors.grey[400],
-                            ),
-                            SizedBox(height: 16 * paddingScale),
-                            Text(
-                              _products.isEmpty
-                                  ? "Belum ada produk"
-                                  : "Tidak ada produk yang cocok",
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 8 * paddingScale),
-                            if (_products.isEmpty)
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
-                                child: ElevatedButton.icon(
-                                  onPressed: _showAddProductDialog,
-                                  icon: Icon(Icons.add_rounded, size: 20 * iconScale),
-                                  label: const Text('Tambah Produk Pertama'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF6366F1),
-                                    foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16 * paddingScale,
-                                      vertical: 12 * paddingScale,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: EdgeInsets.all(16 * paddingScale),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _showInitialLoader
+                ? const Center(
+                    key: ValueKey('kasir-products-loader'),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    ),
+                  )
+                : _showFullErrorState
+                    ? _buildErrorState()
+                    : _buildProductGridContent(
                         crossAxisCount: crossAxisCount,
+                        paddingScale: paddingScale,
+                        iconScale: iconScale,
+                        gridPadding: EdgeInsets.all(16 * paddingScale),
                         crossAxisSpacing: 12 * paddingScale,
                         mainAxisSpacing: 12 * paddingScale,
                         childAspectRatio: 0.75,
                       ),
-                      itemCount: _filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final product = _filteredProducts[index];
-                        return ProductCard(
-                          product: product,
-                          onAddToCart: () => _addToCart(product),
-                        );
-                      },
-                    ),
+          ),
         ),
       ],
     );
@@ -752,63 +1155,88 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
               
               // Products Grid
               Expanded(
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                        ),
-                      )
-                    : _filteredProducts.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 64 * iconScale,
-                                  color: Colors.grey[400],
-                                ),
-                                SizedBox(height: 16 * paddingScale),
-                                Text(
-                                  _products.isEmpty
-                                      ? "Belum ada produk"
-                                      : "Tidak ada produk yang cocok",
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                SizedBox(height: 8 * paddingScale),
-                                if (_products.isEmpty)
-                                  ElevatedButton.icon(
-                                    onPressed: _showAddProductDialog,
-                                    icon: Icon(Icons.add_rounded, size: 20 * iconScale),
-                                    label: const Text('Tambah Produk Pertama'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF6366F1),
-                                      foregroundColor: Colors.white,
-                                    ),
-                                  ),
-                              ],
+          child: Column(
+            children: [
+              if (_isOffline)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  child: _buildStatusBanner(
+                    color: Colors.orange,
+                    icon: Icons.wifi_off_rounded,
+                    message: 'Anda sedang offline. Data produk mungkin tidak terbaru.',
+                    trailing: TextButton(
+                      onPressed: _isRetrying ? null : _retryLoadProducts,
+                      child: Text(
+                        'Segarkan',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Colors.orange[700],
+                              fontWeight: FontWeight.w600,
                             ),
-                          )
-                        : GridView.builder(
-                            padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      ),
+                    ),
+                  ),
+                ),
+              if (_showInlineErrorBanner)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  child: _buildStatusBanner(
+                    color: Colors.red,
+                    icon: Icons.error_outline_rounded,
+                    message: _errorMessage ?? 'Terjadi kesalahan.',
+                    trailing: TextButton(
+                      onPressed: _isRetrying ? null : _retryLoadProducts,
+                      child: Text(
+                        'Coba Lagi',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Colors.red[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_isRetrying && _hasLoadedOnce)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  child: _buildStatusBanner(
+                    color: Colors.blue,
+                    icon: Icons.sync_rounded,
+                    message: 'Menyegarkan data produk...',
+                    trailing: const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: _showInitialLoader
+                      ? const Center(
+                          key: ValueKey('kasir-products-loader-desktop'),
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                          ),
+                        )
+                      : _showFullErrorState
+                          ? _buildErrorState()
+                          : _buildProductGridContent(
                               crossAxisCount: crossAxisCount,
+                              paddingScale: paddingScale,
+                              iconScale: iconScale,
+                              gridPadding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
                               crossAxisSpacing: 16 * paddingScale,
                               mainAxisSpacing: 16 * paddingScale,
                               childAspectRatio: 0.8,
                             ),
-                            itemCount: _filteredProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = _filteredProducts[index];
-                              return ProductCard(
-                                product: product,
-                                onAddToCart: () => _addToCart(product),
-                              );
-                            },
-                          ),
+                ),
+              ),
+            ],
+          ),
               ),
             ],
           ),
@@ -1626,18 +2054,21 @@ class _PaymentModalState extends State<PaymentModal> {
       } else if (_selectedPaymentMethod == 'VirtualAccount') {
         await _processVirtualAccountPayment();
       }
-    } catch (e) {
+    } catch (error) {
       setState(() {
         _isProcessingPayment = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Pembayaran gagal diproses.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1738,18 +2169,21 @@ class _PaymentModalState extends State<PaymentModal> {
       if (mounted) {
         _showVirtualAccountPaymentDialog(vaResponse, bankName, _finalTotal);
       }
-    } catch (e) {
+    } catch (error) {
       setState(() {
         _isProcessingPayment = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating Virtual Account: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal membuat Virtual Account.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -2400,15 +2834,18 @@ class _AddProductDialogState extends State<AddProductDialog> {
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding product: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (error) {
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal menambahkan produk.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -2712,6 +3149,7 @@ class Product {
   final String category;
   final String image;
   final int stock;
+  final String barcode;
 
   Product({
     required this.id,
@@ -2720,6 +3158,7 @@ class Product {
     required this.category,
     required this.image,
     required this.stock,
+    this.barcode = '',
   });
 
   factory Product.fromFirebase(Map<String, dynamic> data) {
@@ -2730,6 +3169,7 @@ class Product {
       category: data['category'] as String? ?? '',
       image: data['image'] as String? ?? '📦',
       stock: (data['stock'] as num?)?.toInt() ?? 0,
+      barcode: data['barcode'] as String? ?? '',
     );
   }
 
@@ -2740,6 +3180,7 @@ class Product {
       'category': category,
       'image': image,
       'stock': stock,
+      'barcode': barcode,
     };
   }
 }
@@ -3069,6 +3510,148 @@ class VirtualAccountBankSelectionDialog extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Barcode Scanner Instructions Dialog
+class BarcodeScannerInstructionsDialog extends StatelessWidget {
+  const BarcodeScannerInstructionsDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final paddingScale = ResponsiveHelper.getPaddingScale(context);
+    final fontSize = ResponsiveHelper.getFontScale(context);
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        padding: EdgeInsets.all(24 * paddingScale),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8 * paddingScale),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.qr_code_scanner_rounded,
+                          color: const Color(0xFF6366F1),
+                          size: 24 * ResponsiveHelper.getIconScale(context),
+                        ),
+                      ),
+                      SizedBox(width: 12 * paddingScale),
+                      Flexible(
+                        child: Text(
+                          "Cara Menggunakan Barcode Scanner",
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F2937),
+                            fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 20) * fontSize,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              SizedBox(height: 24 * paddingScale),
+              _buildInstructionStep(context, step: 1, title: "Siapkan Barcode Scanner", description: "Pastikan barcode scanner (barcode gun) sudah terhubung ke perangkat Anda melalui USB atau Bluetooth.", icon: Icons.usb_rounded, paddingScale: paddingScale, fontSize: fontSize),
+              SizedBox(height: 16 * paddingScale),
+              _buildInstructionStep(context, step: 2, title: "Aktifkan Mode Scanner", description: "Tekan tombol pada barcode scanner untuk mengaktifkan mode scanning. Lampu indikator akan menyala.", icon: Icons.power_settings_new_rounded, paddingScale: paddingScale, fontSize: fontSize),
+              SizedBox(height: 16 * paddingScale),
+              _buildInstructionStep(context, step: 3, title: "Arahkan ke Barcode Produk", description: "Arahkan sinar laser dari scanner ke barcode produk. Pastikan barcode terlihat jelas dan tidak terhalang.", icon: Icons.center_focus_strong_rounded, paddingScale: paddingScale, fontSize: fontSize),
+              SizedBox(height: 16 * paddingScale),
+              _buildInstructionStep(context, step: 4, title: "Scan Barcode", description: "Tekan tombol trigger pada scanner atau biarkan scanner membaca barcode secara otomatis. Produk akan otomatis ditambahkan ke keranjang.", icon: Icons.qr_code_scanner_rounded, paddingScale: paddingScale, fontSize: fontSize),
+              SizedBox(height: 16 * paddingScale),
+              _buildInstructionStep(context, step: 5, title: "Lanjutkan Scanning", description: "Setelah produk ditambahkan, scanner siap untuk scan produk berikutnya. Tidak perlu klik atau fokus manual - scanner selalu siap.", icon: Icons.repeat_rounded, paddingScale: paddingScale, fontSize: fontSize),
+              SizedBox(height: 24 * paddingScale),
+              Container(
+                padding: EdgeInsets.all(16 * paddingScale),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3), width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline_rounded, color: Colors.blue[700], size: 20 * ResponsiveHelper.getIconScale(context)),
+                        SizedBox(width: 8 * paddingScale),
+                        Text("Tips", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.blue[700], fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontSize)),
+                      ],
+                    ),
+                    SizedBox(height: 8 * paddingScale),
+                    Text("• Pastikan produk sudah memiliki barcode yang terdaftar di sistem\n• Jika produk tidak ditemukan, pastikan barcode sudah ditambahkan saat membuat produk\n• Scanner akan otomatis fokus kembali setelah setiap scan\n• Untuk menghapus item dari keranjang, gunakan tombol hapus pada item tersebut", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.blue[900], fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontSize, height: 1.5)),
+                  ],
+                ),
+              ),
+              SizedBox(height: 24 * paddingScale),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 16 * paddingScale), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  child: Text("Mengerti", style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w600, fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontSize)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstructionStep(BuildContext context, {required int step, required String title, required String description, required IconData icon, required double paddingScale, required double fontSize}) {
+    return Container(
+      padding: EdgeInsets.all(16 * paddingScale),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40 * paddingScale,
+            height: 40 * paddingScale,
+            decoration: BoxDecoration(color: const Color(0xFF6366F1).withOpacity(0.1), borderRadius: BorderRadius.circular(20 * paddingScale)),
+            child: Center(child: Text('$step', style: TextStyle(color: const Color(0xFF6366F1), fontWeight: FontWeight.w700, fontSize: 16 * fontSize))),
+          ),
+          SizedBox(width: 12 * paddingScale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: const Color(0xFF6366F1), size: 18 * ResponsiveHelper.getIconScale(context)),
+                    SizedBox(width: 6 * paddingScale),
+                    Flexible(child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF1F2937), fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontSize))),
+                  ],
+                ),
+                SizedBox(height: 4 * paddingScale),
+                Text(description, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600], fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontSize, height: 1.4)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

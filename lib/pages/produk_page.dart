@@ -1,10 +1,15 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../models/product_model.dart';
 import '../services/database_service.dart';
 import '../services/storage_service.dart';
+import '../utils/error_helper.dart';
 import 'produk_page_dialogs.dart';
 
 class ProdukPage extends StatefulWidget {
@@ -15,12 +20,15 @@ class ProdukPage extends StatefulWidget {
 }
 
 class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
+  static const int _pageSize = 25;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
+  late final ScrollController _scrollController;
   
   String _selectedCategory = 'Semua';
   String _selectedFilter = 'Semua';
@@ -32,6 +40,22 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
   // Products from Firebase
   List<Product> _products = [];
   bool _isLoading = true;
+  bool _isRetrying = false;
+  bool _hasLoadedOnce = false;
+  bool _isPaginating = false;
+  bool _isRefreshing = false;
+  bool _hasMore = true;
+  String? _lastProductKey;
+  String? _errorMessage;
+  bool _isOffline = false;
+  Timer? _searchDebounce;
+
+  bool get _showInitialLoader => _isLoading && !_hasLoadedOnce;
+  bool get _showFullErrorState => _errorMessage != null && !_hasLoadedOnce;
+  bool get _showInlineErrorBanner => _errorMessage != null && _hasLoadedOnce;
+
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
@@ -57,186 +81,391 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
       curve: Curves.easeOutCubic,
     ));
     
+    _scrollController = ScrollController()
+      ..addListener(_onScroll);
     _animationController.forward();
-    _loadProducts();
-    _loadCategories();
+    _initializeConnectivity();
+    _loadInitialProducts();
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _animationController.dispose();
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadInitialProducts({bool isRefresh = false}) async {
+    if (!mounted) return;
+
+    if (isRefresh) {
+      setState(() {
+        _isRefreshing = true;
+        _errorMessage = null;
+      });
+    } else {
+      setState(() {
+        if (!_hasLoadedOnce) {
+          _isLoading = true;
+        }
+        if (!_isRetrying) {
+          _isRetrying = _hasLoadedOnce && _errorMessage != null;
+        }
+        _errorMessage = null;
+      });
+    }
+
+    _lastProductKey = null;
+    _hasMore = true;
+
+    try {
+      final result = await _databaseService.fetchProductsPage(limit: _pageSize);
+      final fetchedProducts = result.items.map(Product.fromFirebase).toList();
+      final updatedCategories = _buildCategoriesFromProducts(fetchedProducts);
+
+      if (!mounted) return;
+      setState(() {
+        _products = fetchedProducts;
+        _categories = updatedCategories;
+        _isLoading = false;
+        _isRetrying = false;
+        _errorMessage = null;
+        _hasLoadedOnce = true;
+        _lastProductKey = result.lastKey;
+        _hasMore = result.hasMore;
+        _isRefreshing = false;
+      });
+    } catch (error) {
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal memuat data produk.',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        if (isRefresh) {
+          _isRefreshing = false;
+        } else {
+          _isLoading = false;
+          _isRetrying = false;
+        }
+        _errorMessage = message;
+      });
+    }
+  }
+
+  Future<void> _initializeConnectivity() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      _handleConnectivityChange(results, emitSetState: false);
+    } catch (_) {
+      // Ignore initial connectivity errors
+    }
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+  }
+
+  void _handleConnectivityChange(
+    List<ConnectivityResult> results, {
+    bool emitSetState = true,
+  }) {
+    final isOffline = results.isEmpty || results.every((result) => result == ConnectivityResult.none);
+    if (!mounted) return;
+
+    if (emitSetState) {
+      setState(() {
+        _isOffline = isOffline;
+      });
+    } else {
+      _isOffline = isOffline;
+    }
+
+    if (!isOffline && _errorMessage != null && !_isRetrying) {
+      _retryLoadProducts();
+    }
+  }
+
+  Future<void> _retryLoadProducts() async {
+    if (_isRetrying) return;
     setState(() {
-      _isLoading = true;
+      _isRetrying = true;
+      _errorMessage = null;
+    });
+    await _loadInitialProducts();
+  }
+
+  Future<void> _refreshProducts() async {
+    await _loadInitialProducts(isRefresh: true);
+  }
+
+  Future<void> _loadMoreProducts() async {
+    if (!_hasMore || _isPaginating || _isLoading || _isRefreshing) return;
+    if (_lastProductKey == null && _hasLoadedOnce && _products.isNotEmpty) return;
+
+    setState(() {
+      _isPaginating = true;
     });
 
     try {
-      _databaseService.getProductsStream().listen((productsData) {
+      final result = await _databaseService.fetchProductsPage(
+        limit: _pageSize,
+        startAfterKey: _lastProductKey,
+      );
+      final fetchedProducts = result.items.map(Product.fromFirebase).toList();
+
+      if (!mounted) return;
+
+      if (fetchedProducts.isEmpty) {
         setState(() {
-          _products = productsData.map((data) => Product.fromFirebase(data)).toList();
-          _isLoading = false;
+          _hasMore = false;
+          _isPaginating = false;
         });
-        _loadCategories(); // Update categories when products change
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading products: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        return;
       }
+
+      setState(() {
+        final existingIds = _products.map((product) => product.id).toSet();
+        final newProducts = fetchedProducts.where((product) => !existingIds.contains(product.id)).toList();
+        if (newProducts.isNotEmpty) {
+          _products = [..._products, ...newProducts];
+          _categories = _buildCategoriesFromProducts(_products);
+        }
+        _lastProductKey = result.lastKey ?? _lastProductKey;
+        _hasMore = result.hasMore;
+        _isPaginating = false;
+      });
+    } catch (error) {
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal memuat data produk tambahan.',
+      );
+      if (!mounted) return;
+      setState(() {
+        _isPaginating = false;
+        _errorMessage ??= message;
+      });
     }
   }
 
-  Future<void> _loadCategories() async {
-    try {
-      final categories = await _databaseService.getCategories();
-      setState(() {
-        _categories = ['Semua', ...categories];
-      });
-    } catch (e) {
-      // Handle error silently
+  void _onScroll() {
+    if (!_scrollController.hasClients || _isPaginating || !_hasMore) return;
+    final position = _scrollController.position;
+    if (!position.hasPixels || position.maxScrollExtent <= 0) return;
+    final threshold = position.maxScrollExtent - position.pixels;
+    if (threshold <= 320) {
+      _loadMoreProducts();
     }
   }
 
-  List<Product> get _filteredProducts {
-    return _products.where((product) {
-      // Category filter
-      if (_selectedCategory != 'Semua' && product.category != _selectedCategory) {
-        return false;
+  List<String> _buildCategoriesFromProducts(List<Product> products) {
+    final categories = <String>{};
+    for (final product in products) {
+      final category = product.category.trim();
+      if (category.isNotEmpty) {
+        categories.add(category);
       }
-      
-      // Stock filter
-      switch (_selectedFilter) {
-        case 'Stok Rendah':
-          return product.isLowStock && !product.isOutOfStock;
-        case 'Habis':
-          return product.isOutOfStock;
-        case 'Tersedia':
-          return !product.isLowStock && !product.isOutOfStock;
-        default:
-          break;
-      }
-      
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        return product.name.toLowerCase().contains(query) ||
-               product.supplier.toLowerCase().contains(query) ||
-               product.barcode.toLowerCase().contains(query) ||
-               product.category.toLowerCase().contains(query);
-      }
-      
-      return true;
-    }).toList();
+    }
+
+    final sorted = categories.toList()..sort();
+    return ['Semua', ...sorted];
   }
 
-  int get _lowStockCount {
-    return _products.where((product) => product.isLowStock && !product.isOutOfStock).length;
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() {
+        _searchQuery = value;
+      });
+    });
   }
 
-  int get _outOfStockCount {
-    return _products.where((product) => product.isOutOfStock).length;
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    if (!mounted) return;
+    setState(() {
+      _searchQuery = '';
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+  Widget _buildStatusBanner({
+    required MaterialColor color,
+    required IconData icon,
+    required String message,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
         ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.inventory_2_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: color.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
-            const SizedBox(width: 12),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      key: const ValueKey('products-error'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: Color(0xFFDC2626),
+            ),
+            const SizedBox(height: 16),
             Text(
-              "Produk & Stok",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+              'Tidak dapat memuat data produk',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1F2937),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            if (_errorMessage != null)
+              Text(
+                _errorMessage!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            if (_isOffline) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Periksa koneksi internet Anda sebelum mencoba lagi.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[500],
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _isRetrying ? null : _retryLoadProducts,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: _isRetrying
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                  child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(
+                _isRetrying ? 'Mencoba lagi...' : 'Coba Lagi',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
             ),
           ],
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showScanDialog();
-              },
-              icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
-              tooltip: 'Scan Barcode',
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showAddProductDialog();
-              },
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
-              tooltip: 'Tambah Produk',
-            ),
-          ),
-        ],
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+    );
+  }
+
+  Widget _buildContent() {
+    return RefreshIndicator(
+      onRefresh: _refreshProducts,
+      color: const Color(0xFF6366F1),
+      displacement: 48,
+      child: SingleChildScrollView(
+        key: const ValueKey('products-content'),
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          if (_isOffline)
+            _buildStatusBanner(
+              color: Colors.orange,
+              icon: Icons.wifi_off_rounded,
+              message: 'Anda sedang offline. Beberapa data mungkin tidak terbaru.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadProducts,
+                child: Text(
+                  'Segarkan',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          if (_showInlineErrorBanner)
+            _buildStatusBanner(
+              color: Colors.red,
+              icon: Icons.error_outline_rounded,
+              message: _errorMessage ?? 'Terjadi kesalahan.',
+              trailing: TextButton(
+                onPressed: _isRetrying ? null : _retryLoadProducts,
+                child: Text(
+                  'Coba Lagi',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.red[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ),
+          if (_isRetrying && _hasLoadedOnce)
+            _buildStatusBanner(
+              color: Colors.blue,
+              icon: Icons.sync_rounded,
+              message: 'Menyegarkan data produk...',
+              trailing: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                ),
+              ),
+            ),
                       // Search and Filter Section
                       Container(
                         padding: const EdgeInsets.all(20),
@@ -265,14 +494,17 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                             // Search Bar
                             TextField(
                               controller: _searchController,
-                              onChanged: (value) {
-                                setState(() {
-                                  _searchQuery = value;
-                                });
-                              },
+                              onChanged: _onSearchChanged,
                               decoration: InputDecoration(
                                 hintText: 'Cari produk, supplier, atau barcode...',
                                 prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1)),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        onPressed: _clearSearch,
+                                        tooltip: 'Bersihkan pencarian',
+                                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF6366F1)),
+                                      )
+                                    : null,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
@@ -398,9 +630,9 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
                         children: [
                           Expanded(
                             child: _buildSummaryCard(
-                              title: "Habis",
+                  title: "Stok Habis",
                               value: _outOfStockCount.toDouble(),
-                              icon: Icons.error_rounded,
+                  icon: Icons.inventory_rounded,
                               color: const Color(0xFFEF4444),
                               isCurrency: false,
                             ),
@@ -420,124 +652,287 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
 
                       const SizedBox(height: 24),
 
-                      // Product List
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+          // Additional existing content continues...
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Daftar Produk (${_filteredProducts.length})",
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F2937),
+                          ),
+                    ),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _showBulkStockUpdateDialog();
+                          },
+                          icon: const Icon(Icons.inventory_2_rounded, size: 18),
+                          label: const Text('Update Bulk'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF10B981),
+                            backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  "Daftar Produk (${_filteredProducts.length})",
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1F2937),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _showAddProductDialog();
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Tambah Produk'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF6366F1),
+                            backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _filteredProducts.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _products.isEmpty
+                                    ? "Belum ada produk"
+                                    : "Tidak ada produk yang cocok",
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (_products.isEmpty) ...[
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  onPressed: _showAddProductDialog,
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: const Text('Tambah Produk Pertama'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6366F1),
+                                    foregroundColor: Colors.white,
                                   ),
                                 ),
-                                Row(
-                                  children: [
-                                    TextButton.icon(
+                              ],
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        cacheExtent: 540,
+                        itemCount: _filteredProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = _filteredProducts[index];
+                          return ProductCard(
+                            key: ValueKey('product-${product.id}'),
+                            product: product,
+                            onTap: () => _showProductDetail(product),
+                            onEdit: () => _showEditProductDialog(product),
+                            onDelete: () => _showDeleteConfirmDialog(product),
+                            onEditStock: () => _showEditStockDialog(product),
+                          );
+                        },
+                      ),
+                if (_isPaginating)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (!_hasMore && _filteredProducts.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text(
+                        'Semua data sudah ditampilkan',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[500],
+                            ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    ),
+  );
+  }
+
+  List<Product> get _filteredProducts {
+    return _products.where((product) {
+      // Category filter
+      if (_selectedCategory != 'Semua' && product.category != _selectedCategory) {
+        return false;
+      }
+      
+      // Stock filter
+      switch (_selectedFilter) {
+        case 'Stok Rendah':
+          return product.isLowStock && !product.isOutOfStock;
+        case 'Habis':
+          return product.isOutOfStock;
+        case 'Tersedia':
+          return !product.isLowStock && !product.isOutOfStock;
+        default:
+          break;
+      }
+      
+      // Search filter
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        return product.name.toLowerCase().contains(query) ||
+               product.supplier.toLowerCase().contains(query) ||
+               product.barcode.toLowerCase().contains(query) ||
+               product.category.toLowerCase().contains(query);
+      }
+      
+      return true;
+    }).toList();
+  }
+
+  int get _lowStockCount {
+    return _products.where((product) => product.isLowStock && !product.isOutOfStock).length;
+  }
+
+  int get _outOfStockCount {
+    return _products.where((product) => product.isOutOfStock).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: Row(
+          children: [
+                      Container(
+              padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.inventory_2_rounded,
+                          color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+                                Text(
+              "Produk & Stok",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
                                       onPressed: () {
                                         HapticFeedback.lightImpact();
-                                        _showBulkStockUpdateDialog();
-                                      },
-                                      icon: const Icon(Icons.inventory_2_rounded, size: 18),
-                                      label: const Text('Update Bulk'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF10B981),
-                                        backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    TextButton.icon(
+                _showScanDialog();
+              },
+              icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
+              tooltip: 'Scan Barcode',
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
                                       onPressed: () {
                                         HapticFeedback.lightImpact();
                                         _showAddProductDialog();
                                       },
-                                      icon: const Icon(Icons.add_rounded, size: 18),
-                                      label: const Text('Tambah Produk'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF6366F1),
-                                        backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              tooltip: 'Tambah Produk',
                                       ),
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _filteredProducts.isEmpty
-                                ? Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(32.0),
-                                      child: Column(
-                                        children: [
-                                          Icon(
-                                            Icons.inventory_2_outlined,
-                                            size: 64,
-                                            color: Colors.grey[400],
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            _products.isEmpty
-                                                ? "Belum ada produk"
-                                                : "Tidak ada produk yang cocok",
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              color: Colors.grey[600],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          if (_products.isEmpty) ...[
-                                            const SizedBox(height: 8),
-                                            ElevatedButton.icon(
-                                              onPressed: _showAddProductDialog,
-                                              icon: const Icon(Icons.add_rounded),
-                                              label: const Text('Tambah Produk Pertama'),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF6366F1),
-                                                foregroundColor: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _filteredProducts.length,
-                                    itemBuilder: (context, index) {
-                                      final product = _filteredProducts[index];
-                                      return ProductCard(
-                                        product: product,
-                                        onTap: () => _showProductDetail(product),
-                                        onEdit: () => _showEditProductDialog(product),
-                                        onDelete: () => _showDeleteConfirmDialog(product),
-                                        onEditStock: () => _showEditStockDialog(product),
-                                      );
-                                    },
-                                  ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _showInitialLoader
+              ? const Center(
+                    key: ValueKey('products-loader'),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
                   ),
-                ),
+                )
+                : _showFullErrorState
+                    ? _buildErrorState()
+                    : _buildContent(),
+          ),
         ),
       ),
     );
@@ -660,6 +1055,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         products: _products,
         databaseService: _databaseService,
         onSaved: () {
+          _refreshProducts();
           HapticFeedback.lightImpact();
         },
       ),
@@ -671,7 +1067,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
       context: context,
       builder: (context) => AddEditProductDialog(
         onSaved: () {
-          _loadCategories();
+          _refreshProducts();
           HapticFeedback.lightImpact();
         },
       ),
@@ -684,6 +1080,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
       builder: (context) => AddEditProductDialog(
         product: product,
         onSaved: () {
+          _refreshProducts();
           HapticFeedback.lightImpact();
         },
       ),
@@ -696,6 +1093,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
       builder: (context) => EditStockDialog(
         product: product,
         onSaved: () {
+          _refreshProducts();
           HapticFeedback.lightImpact();
         },
       ),
@@ -828,17 +1226,25 @@ class ProductCard extends StatelessWidget {
               child: product.imageUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        product.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: product.imageUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Text(
-                              product.image.isNotEmpty ? product.image : '📦',
-                              style: const TextStyle(fontSize: 32),
-                            ),
-                          );
-                        },
+                        memCacheHeight: 220,
+                        memCacheWidth: 220,
+                        fadeInDuration: const Duration(milliseconds: 200),
+                        placeholder: (context, url) => const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Center(
+                          child: Text(
+                            product.image.isNotEmpty ? product.image : '📦',
+                            style: const TextStyle(fontSize: 32),
+                          ),
+                        ),
                       ),
                     )
                   : Center(
@@ -1058,17 +1464,25 @@ class ProductDetailModal extends StatelessWidget {
             child: product.imageUrl.isNotEmpty
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(18),
-                    child: Image.network(
-                      product.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: product.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Center(
-                          child: Text(
-                            product.image.isNotEmpty ? product.image : '📦',
-                            style: const TextStyle(fontSize: 64),
-                          ),
-                        );
-                      },
+                      memCacheHeight: 320,
+                      memCacheWidth: 320,
+                      fadeInDuration: const Duration(milliseconds: 200),
+                      placeholder: (context, url) => const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Center(
+                        child: Text(
+                          product.image.isNotEmpty ? product.image : '📦',
+                          style: const TextStyle(fontSize: 64),
+                        ),
+                      ),
                     ),
                   )
                 : Center(
@@ -1388,8 +1802,19 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
       // Delete from Firebase Storage
       try {
         await StorageService.deleteProductImage(_imageUrl!);
-      } catch (e) {
-        print('Error deleting image: $e');
+      } catch (error) {
+        if (mounted) {
+          final message = getFriendlyErrorMessage(
+            error,
+            fallbackMessage: 'Gagal menghapus gambar produk.',
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     }
     
@@ -1431,11 +1856,15 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
             imageFile: _selectedImageFile!,
             productId: productId,
           );
-        } catch (e) {
+        } catch (error) {
           if (mounted) {
+            final message = getFriendlyErrorMessage(
+              error,
+              fallbackMessage: 'Gagal mengunggah gambar produk.',
+            );
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error uploading image: $e'),
+                content: Text(message),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -1477,8 +1906,19 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
               productId: productId,
             );
             await _databaseService.updateProduct(productId, {'imageUrl': finalImageUrl});
-          } catch (e) {
-            print('Error re-uploading image: $e');
+          } catch (error) {
+            if (mounted) {
+              final message = getFriendlyErrorMessage(
+                error,
+                fallbackMessage: 'Gagal memperbarui gambar produk.',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
           }
         }
       }
@@ -1495,11 +1935,15 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
           ),
         );
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
+        final message = getFriendlyErrorMessage(
+          error,
+          fallbackMessage: 'Gagal menyimpan data produk.',
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(message),
             backgroundColor: Colors.red,
           ),
         );
@@ -1603,17 +2047,25 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                         : _imageUrl != null && _imageUrl!.isNotEmpty
                                             ? ClipRRect(
                                                 borderRadius: BorderRadius.circular(14),
-                                                child: Image.network(
-                                                  _imageUrl!,
+                                                child: CachedNetworkImage(
+                                                  imageUrl: _imageUrl!,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Center(
-                                                      child: Text(
-                                                        _selectedEmoji,
-                                                        style: const TextStyle(fontSize: 48),
-                                                      ),
-                                                    );
-                                                  },
+                                                  memCacheHeight: 320,
+                                                  memCacheWidth: 320,
+                                                  fadeInDuration: const Duration(milliseconds: 200),
+                                                  placeholder: (context, url) => const Center(
+                                                    child: SizedBox(
+                                                      width: 24,
+                                                      height: 24,
+                                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                                    ),
+                                                  ),
+                                                  errorWidget: (context, url, error) => Center(
+                                                    child: Text(
+                                                      _selectedEmoji,
+                                                      style: const TextStyle(fontSize: 48),
+                                                    ),
+                                                  ),
                                                 ),
                                               )
                                             : Center(

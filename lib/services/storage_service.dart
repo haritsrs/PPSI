@@ -1,8 +1,12 @@
 import 'dart:io';
+
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+
+import '../utils/app_exception.dart';
+import '../utils/error_helper.dart';
 
 class StorageService {
   static final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -40,8 +44,11 @@ class StorageService {
       }
       
       return downloadUrl;
-    } catch (e) {
-      throw Exception('Error uploading image: $e');
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal mengunggah gambar.',
+      );
     }
   }
 
@@ -50,10 +57,16 @@ class StorageService {
     try {
       // Extract file path from URL
       final ref = _storage.refFromURL(imageUrl);
+      if (imageUrl.isEmpty) {
+        return;
+      }
+      
       await ref.delete();
-    } catch (e) {
-      // Ignore errors if file doesn't exist
-      print('Error deleting image: $e');
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menghapus gambar produk.',
+      );
     }
   }
 
