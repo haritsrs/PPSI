@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
+import '../widgets/responsive_page.dart';
 
 class LogoutPage extends StatefulWidget {
   const LogoutPage({super.key});
@@ -141,12 +142,10 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          child: ResponsivePage(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                   // Icon
                   Container(
                     width: 120,
@@ -291,8 +290,7 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import 'register_page.dart';
+import '../widgets/responsive_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -137,11 +138,11 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: ResponsivePage(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   const SizedBox(height: 40),
                   
                   // Logo and Welcome
@@ -458,7 +459,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

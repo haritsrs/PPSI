@@ -13,6 +13,7 @@ import '../utils/error_helper.dart';
 import '../utils/security_utils.dart';
 import '../widgets/loading_skeletons.dart';
 import 'produk_page_dialogs.dart';
+import '../widgets/responsive_page.dart';
 
 class ProdukPage extends StatefulWidget {
   const ProdukPage({super.key});
@@ -448,7 +449,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         key: const ValueKey('products-content'),
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.all(20),
+        // padding is handled by ResponsivePage
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -994,16 +995,17 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
           position: _slideAnimation,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
-            child: _showInitialLoader
-          ? const SingleChildScrollView(
-              key: ValueKey('products-loader'),
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.all(20),
-              child: ProductListSkeleton(),
-            )
-                : _showFullErrorState
-                    ? _buildErrorState()
-                    : _buildContent(),
+        child: ResponsivePage(
+          child: _showInitialLoader
+              ? const SingleChildScrollView(
+                  key: ValueKey('products-loader'),
+                  physics: AlwaysScrollableScrollPhysics(),
+                  child: ProductListSkeleton(),
+                )
+              : _showFullErrorState
+                  ? _buildErrorState()
+                  : _buildContent(),
+        ),
           ),
         ),
       ),

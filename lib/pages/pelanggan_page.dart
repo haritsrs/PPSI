@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/customer_model.dart';
 import '../services/database_service.dart';
+import '../widgets/responsive_page.dart';
 
 class PelangganPage extends StatefulWidget {
   const PelangganPage({super.key});
@@ -175,11 +176,11 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ResponsivePage(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Search Section
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -440,7 +441,8 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 20),
-              ],
+                ],
+              ),
             ),
           ),
         ),

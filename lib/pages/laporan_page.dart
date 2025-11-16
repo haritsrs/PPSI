@@ -17,6 +17,7 @@ import '../widgets/print_receipt_dialog.dart';
 import '../utils/error_helper.dart';
 import '../utils/security_utils.dart';
 import '../widgets/loading_skeletons.dart';
+import '../widgets/responsive_page.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -495,16 +496,17 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           position: _slideAnimation,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
-            child: _showInitialLoader
+        child: ResponsivePage(
+          child: _showInitialLoader
               ? const SingleChildScrollView(
                   key: ValueKey('reports-loader'),
                   physics: AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(20),
                   child: ReportListSkeleton(),
                 )
-                : _showFullErrorState
-                    ? _buildErrorState()
-                    : _buildContent(),
+              : _showFullErrorState
+                  ? _buildErrorState()
+                  : _buildContent(),
+        ),
           ),
         ),
       ),
@@ -519,7 +521,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
       child: SingleChildScrollView(
         key: const ValueKey('reports-content'),
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.all(20),
+      // padding is handled by ResponsivePage
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

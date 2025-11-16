@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../services/auth_service.dart';
 import '../utils/responsive_helper.dart';
+import '../widgets/responsive_page.dart';
 
 class BeritaPage extends StatefulWidget {
   const BeritaPage({super.key});
@@ -154,11 +155,11 @@ class _BeritaPageState extends State<BeritaPage> with SingleTickerProviderStateM
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(20 * paddingScale),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ResponsivePage(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Welcome Header with Release Date
                 Container(
                   width: double.infinity,
@@ -216,7 +217,8 @@ class _BeritaPageState extends State<BeritaPage> with SingleTickerProviderStateM
                 _buildNewsCard(context, _newsItem, iconScale, paddingScale, fontScale),
                 
                 SizedBox(height: 20 * paddingScale),
-              ],
+                ],
+              ),
             ),
           ),
         ),

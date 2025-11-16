@@ -449,9 +449,11 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final showHomeChrome = _selectedIndex == 0;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
+    final isWidePortraitTablet = mq.orientation == Orientation.portrait && mq.size.width >= 840;
 
-    if (isLandscape) {
+    if (isLandscape || isWidePortraitTablet) {
       return _buildLandscapeLayout(context);
     }
 

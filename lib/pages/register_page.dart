@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
+import '../widgets/responsive_page.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -159,11 +160,11 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: ResponsivePage(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   const SizedBox(height: 20),
                   
                   // Header
@@ -566,7 +567,8 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -716,11 +716,17 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
-    final isTablet = screenWidth >= 768 && screenWidth < 1024;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
     
     // Responsive grid columns
-    final crossAxisCount = isMobile ? 2 : (isTablet ? 3 : 4);
+    final crossAxisCount = screenWidth >= 1600
+        ? 6
+        : screenWidth >= 1280
+            ? 5
+            : isMobile
+                ? 2
+                : (isTablet ? 3 : 4);
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
     
@@ -882,7 +888,10 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   }
 
   Widget _buildMobileLayout(BuildContext context, int crossAxisCount, double paddingScale, double iconScale) {
-    return Column(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
       children: [
         // Search and Category Section
         Container(
@@ -1056,6 +1065,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -1067,7 +1078,10 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         // Left side - Products
         Expanded(
           flex: 2,
-          child: Column(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Column(
             children: [
               // Search and Category Section
               Container(
@@ -1246,6 +1260,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
               ),
             ],
+              ),
+            ),
           ),
         ),
         

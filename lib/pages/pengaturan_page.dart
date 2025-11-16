@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
+import '../widgets/responsive_page.dart';
 
 class PengaturanPage extends StatefulWidget {
   const PengaturanPage({super.key});
@@ -253,11 +254,11 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ResponsivePage(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Profile Section
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -665,7 +666,8 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                 ),
 
                 const SizedBox(height: 20),
-              ],
+                ],
+              ),
             ),
           ),
         ),

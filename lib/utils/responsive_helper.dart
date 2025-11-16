@@ -129,6 +129,8 @@ class ResponsiveHelper {
       return 1.3; // 30% larger for 16:9
     } else if (aspectRatio >= 1.5) {
       return 1.15; // 15% larger for 16:10
+    } else if (aspectRatio < 0.5) {
+      return 0.95; // Slightly smaller on very tall phones to fit content
     } else {
       return 1.0; // Normal size for 4:3
     }
@@ -141,6 +143,8 @@ class ResponsiveHelper {
       return 1.2;
     } else if (aspectRatio >= 1.5) {
       return 1.1;
+    } else if (aspectRatio < 0.5) {
+      return 0.95; // Slightly reduce to prevent overflow on extra-tall phones
     } else {
       return 1.0;
     }
@@ -153,6 +157,8 @@ class ResponsiveHelper {
       return 1.25;
     } else if (aspectRatio >= 1.5) {
       return 1.15;
+    } else if (aspectRatio < 0.5) {
+      return 0.9; // Tighten padding on very tall phones to avoid clipping
     } else {
       return 1.0;
     }

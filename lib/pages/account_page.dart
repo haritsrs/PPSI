@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
 import 'logout_page.dart';
+import '../widgets/responsive_page.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -325,11 +326,11 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ResponsivePage(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Profile Header
                 Container(
                   width: double.infinity,
@@ -678,7 +679,8 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                 ),
 
                 const SizedBox(height: 20),
-              ],
+                ],
+              ),
             ),
           ),
         ),
