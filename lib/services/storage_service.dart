@@ -2,10 +2,8 @@ import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-import '../utils/app_exception.dart';
 import '../utils/error_helper.dart';
 
 class StorageService {
@@ -23,8 +21,8 @@ class StorageService {
       
       // Create unique filename
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = path.extension(imageFile.path);
-      final fileName = 'products/$productId/${timestamp}$extension';
+      final extension = imageFile.path.split('.').last;
+      final fileName = 'products/$productId/${timestamp}.$extension';
       
       // Upload to Firebase Storage
       final ref = _storage.ref().child(fileName);
