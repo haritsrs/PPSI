@@ -164,6 +164,20 @@ class AuthService {
     }
   }
   
+  // Get user display name
+  static String getUserDisplayName(User? user) {
+    if (user == null) {
+      return 'Pengguna';
+    }
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    if (user.email != null) {
+      return user.email!.split('@')[0];
+    }
+    return 'Pengguna';
+  }
+  
   // Handle Firebase Auth exceptions
   static String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {

@@ -22,6 +22,22 @@ String getGreeting() {
   }
 }
 
+/// Formats a date as relative time in Indonesian (e.g., "2 hari yang lalu")
+String formatRelativeDate(DateTime date) {
+  final now = DateTime.now();
+  final difference = now.difference(date);
+  
+  if (difference.inDays > 0) {
+    return '${difference.inDays} hari yang lalu';
+  } else if (difference.inHours > 0) {
+    return '${difference.inHours} jam yang lalu';
+  } else if (difference.inMinutes > 0) {
+    return '${difference.inMinutes} menit yang lalu';
+  } else {
+    return 'Baru saja';
+  }
+}
+
 /// Shows a "Coming Soon" dialog
 void showComingSoonDialog(BuildContext context, String feature) {
   showDialog(
