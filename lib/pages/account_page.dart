@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../controllers/account_controller.dart';
 import '../widgets/responsive_page.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../widgets/account/profile_header_section.dart';
 import '../widgets/account/account_info_form.dart';
 import '../widgets/account/account_actions_section.dart';
@@ -64,40 +65,54 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
 
   void _showSnackBar(String message, {bool isError = false, Duration? duration}) {
     if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Colors.red : Colors.green,
-            behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.floating,
         duration: duration ?? const Duration(seconds: 3),
-          ),
-        );
+      ),
+    );
+  }
+
+  Future<void> _handleAsyncOperation(
+    Future<void> Function() operation, {
+    required String successMessage,
+    required String errorPrefix,
+    Duration? successDuration,
+  }) async {
+    try {
+      await operation();
+      if (successMessage.isNotEmpty) {
+        _showSnackBar(successMessage, duration: successDuration);
       }
+    } catch (e) {
+      _showSnackBar('$errorPrefix: $e', isError: true);
+    }
+  }
 
   Future<void> _handleSaveProfile() async {
-    try {
-      await _controller.saveProfile();
-      _showSnackBar('Profil berhasil diperbarui');
-    } catch (e) {
-      _showSnackBar('Gagal memperbarui profil: $e', isError: true);
-    }
+    await _handleAsyncOperation(
+      () => _controller.saveProfile(),
+      successMessage: 'Profil berhasil diperbarui',
+      errorPrefix: 'Gagal memperbarui profil',
+    );
   }
 
   Future<void> _handlePickImage(ImageSource source) async {
-    try {
-      await _controller.pickImage(source);
-    } catch (e) {
-      _showSnackBar('Gagal memilih gambar: $e', isError: true);
-    }
+    await _handleAsyncOperation(
+      () => _controller.pickImage(source),
+      successMessage: '',
+      errorPrefix: 'Gagal memilih gambar',
+    );
   }
-  
+
   Future<void> _handleDeleteProfilePicture() async {
-    try {
-      await _controller.deleteProfilePicture();
-      _showSnackBar('Foto profil berhasil dihapus');
-    } catch (e) {
-      _showSnackBar('Gagal menghapus foto: $e', isError: true);
-    }
+    await _handleAsyncOperation(
+      () => _controller.deleteProfilePicture(),
+      successMessage: 'Foto profil berhasil dihapus',
+      errorPrefix: 'Gagal menghapus foto',
+    );
   }
   
   void _showImagePickerDialog() {
@@ -129,15 +144,12 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
   }
 
   Future<void> _handleSendVerificationEmail() async {
-    try {
-      await _controller.sendVerificationEmail();
-      _showSnackBar(
-        'Email verifikasi telah dikirim. Silakan cek inbox Anda dan klik tautan verifikasi.',
-        duration: const Duration(seconds: 4),
-      );
-    } catch (e) {
-      _showSnackBar('Gagal mengirim email verifikasi: $e', isError: true);
-    }
+    await _handleAsyncOperation(
+      () => _controller.sendVerificationEmail(),
+      successMessage: 'Email verifikasi telah dikirim. Silakan cek inbox Anda dan klik tautan verifikasi.',
+      errorPrefix: 'Gagal mengirim email verifikasi',
+      successDuration: const Duration(seconds: 4),
+    );
   }
 
   Future<void> _handleCheckEmailVerification() async {
@@ -170,47 +182,10 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.person_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Akun Saya",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+      appBar: GradientAppBar(
+        title: "Akun Saya",
+        icon: Icons.person_rounded,
+        automaticallyImplyLeading: false,
         actions: [
           if (!_controller.isEditing)
             Container(
@@ -244,7 +219,7 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                     isUploadingPhoto: _controller.isUploadingPhoto,
                     onImageTap: _showImagePickerDialog,
                   ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   AccountInfoForm(
                     formKey: _controller.formKey,
                     nameController: _controller.nameController,
@@ -254,8 +229,8 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                     isLoading: _controller.isLoading,
                     onCancel: _controller.cancelEdit,
                     onSave: _handleSaveProfile,
-                        ),
-                        const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 24),
                   AccountActionsSection(
                     currentUser: _controller.currentUser,
                     onChangePassword: _showChangePasswordDialog,
@@ -266,7 +241,7 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                       MaterialPageRoute(builder: (_) => const LogoutPage()),
                     ),
                   ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
