@@ -15,9 +15,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../services/database_service.dart';
 import '../widgets/print_receipt_dialog.dart';
 import '../utils/error_helper.dart';
-import '../utils/security_utils.dart';
+import '../utils/home_utils.dart';
 import '../widgets/loading_skeletons.dart';
 import '../widgets/responsive_page.dart';
+import '../widgets/status_banner.dart';
+import '../widgets/summary_card.dart';
+import '../widgets/transaction_card.dart';
+import '../widgets/transaction_detail_modal.dart';
+import '../models/transaction_model.dart';
 
 class LaporanPage extends StatefulWidget {
   const LaporanPage({super.key});
@@ -26,10 +31,7 @@ class LaporanPage extends StatefulWidget {
   State<LaporanPage> createState() => _LaporanPageState();
 }
 
-class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _LaporanPageState extends State<LaporanPage> {
   
   String _selectedPeriod = 'Hari';
   String _selectedFilter = 'Semua';
@@ -68,28 +70,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    
-    _animationController.forward();
     _initializeConnectivity();
     _initializeLocale();
     _loadTransactions();
@@ -214,7 +194,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
   void dispose() {
     _transactionsSubscription?.cancel();
     _connectivitySubscription?.cancel();
-    _animationController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -287,40 +266,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     return _filteredTransactions.length;
   }
 
-  Widget _buildStatusBanner({
-    required MaterialColor color,
-    required IconData icon,
-    required String message,
-    Widget? trailing,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: color.shade700,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-          ),
-          if (trailing != null) trailing,
-        ],
-      ),
-    );
-  }
 
   Widget _buildTransactionDismissBackground({
     required Color color,
@@ -490,12 +435,8 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           ),
         ],
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
         child: ResponsivePage(
           child: _showInitialLoader
               ? const SingleChildScrollView(
@@ -506,8 +447,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
               : _showFullErrorState
                   ? _buildErrorState()
                   : _buildContent(),
-        ),
-          ),
         ),
       ),
     );
@@ -526,51 +465,51 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (_isOffline)
-            _buildStatusBanner(
-              color: Colors.orange,
-              icon: Icons.wifi_off_rounded,
-              message: 'Anda sedang offline. Data dapat tidak terbaru.',
-              trailing: TextButton(
-                onPressed: _isRetrying ? null : _retryLoadTransactions,
-                child: Text(
-                  'Segarkan',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
+              StatusBanner(
+                color: Colors.orange,
+                icon: Icons.wifi_off_rounded,
+                message: 'Anda sedang offline. Data dapat tidak terbaru.',
+                trailing: TextButton(
+                  onPressed: _isRetrying ? null : _retryLoadTransactions,
+                  child: Text(
+                    'Segarkan',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
                 ),
               ),
-            ),
             if (_showInlineErrorBanner)
-            _buildStatusBanner(
-              color: Colors.red,
-              icon: Icons.error_outline_rounded,
-              message: _errorMessage ?? 'Terjadi kesalahan.',
-              trailing: TextButton(
-                onPressed: _isRetrying ? null : _retryLoadTransactions,
-                child: Text(
-                  'Coba Lagi',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.red[600],
-                        fontWeight: FontWeight.w600,
-                      ),
+              StatusBanner(
+                color: Colors.red,
+                icon: Icons.error_outline_rounded,
+                message: _errorMessage ?? 'Terjadi kesalahan.',
+                trailing: TextButton(
+                  onPressed: _isRetrying ? null : _retryLoadTransactions,
+                  child: Text(
+                    'Coba Lagi',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Colors.red[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
                 ),
               ),
-            ),
             if (_isRetrying && _hasLoadedOnce)
-            _buildStatusBanner(
-              color: Colors.blue,
-              icon: Icons.sync_rounded,
-              message: 'Menyegarkan data transaksi...',
-              trailing: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+              StatusBanner(
+                color: Colors.blue,
+                icon: Icons.sync_rounded,
+                message: 'Menyegarkan data transaksi...',
+                trailing: const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                  ),
                 ),
               ),
-            ),
             if (_isRefreshing && !_showInitialLoader)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
@@ -663,7 +602,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                 Row(
                   children: [
                     Expanded(
-                      child: _buildSummaryCard(
+                      child: SummaryCard(
                         title: "Total Penghasilan",
                         value: _totalRevenue,
                         icon: Icons.trending_up_rounded,
@@ -673,7 +612,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildSummaryCard(
+                      child: SummaryCard(
                         title: "Total Transaksi",
                         value: _totalTransactions.toDouble(),
                         icon: Icons.receipt_long_rounded,
@@ -968,77 +907,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildSummaryCard({
-    required String title,
-    required double value,
-    required IconData icon,
-    required Color color,
-    required bool isCurrency,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-        border: Border.all(
-          color: color.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 24,
-                ),
-              ),
-              Icon(
-                Icons.trending_up_rounded,
-                color: Colors.green[600],
-                size: 20,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isCurrency 
-                ? 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}'
-                : value.toStringAsFixed(0),
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildChart() {
     final chartData = _calculateChartData(_filteredTransactions);
@@ -1066,30 +934,26 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
 
       if (!mounted) return;
 
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        builder: (context) => TransactionDetailModal(
-          transaction: transaction,
-          fullTransactionData: fullTransactionData,
-          databaseService: _databaseService,
-          onPrint: fullTransactionData != null
-              ? () {
-                  Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (context) => PrintReceiptDialog(
-                      transactionId: transaction.id,
-                      transactionData: fullTransactionData,
-                    ),
-                  );
-                }
-              : null,
-          onCancelled: () {
-            _loadTransactions();
-          },
-        ),
+      TransactionDetailModal.show(
+        context,
+        transaction: transaction,
+        fullTransactionData: fullTransactionData,
+        databaseService: _databaseService,
+        onPrint: fullTransactionData != null
+            ? () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (context) => PrintReceiptDialog(
+                    transactionId: transaction.id,
+                    transactionData: fullTransactionData,
+                  ),
+                );
+              }
+            : null,
+        onCancelled: () {
+          _loadTransactions();
+        },
       );
     } catch (error) {
       if (!mounted) return;
@@ -1356,7 +1220,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
                         _buildTableCell(dateTimeFormat.format(transaction.date)),
                         _buildTableCell(transaction.customerName),
                         _buildTableCell('${transaction.items}'),
-                        _buildTableCell('Rp ${_formatCurrency(transaction.total)}'),
+                        _buildTableCell('Rp ${formatCurrency(transaction.total)}'),
                       ],
                     );
                   }).toList(),
@@ -1552,7 +1416,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
       
       // Summary
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 4)).value = 'Total Penghasilan:';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4)).value = 'Rp ${_formatCurrency(_totalRevenue)}';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4)).value = 'Rp ${formatCurrency(_totalRevenue)}';
       
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 5)).value = 'Total Transaksi:';
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 5)).value = _totalTransactions;
@@ -1792,7 +1656,7 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            isCurrency ? 'Rp ${_formatCurrency(value)}' : value.toStringAsFixed(0),
+            isCurrency ? 'Rp ${formatCurrency(value)}' : formatCurrency(value),
             style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
           ),
         ],
@@ -1813,12 +1677,6 @@ class _LaporanPageState extends State<LaporanPage> with TickerProviderStateMixin
     );
   }
 
-  String _formatCurrency(double value) {
-    return value.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
-  }
 
   void _showDownloadSuccessDialog({
     required BuildContext context,
@@ -1947,479 +1805,4 @@ class ChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-
-class TransactionCard extends StatelessWidget {
-  final Transaction transaction;
-  final VoidCallback onTap;
-
-  const TransactionCard({
-    super.key,
-    required this.transaction,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.receipt_rounded,
-                color: Color(0xFF6366F1),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    transaction.id,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${transaction.customerName} • ${transaction.items} item(s)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDateTime(transaction.date),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'Rp ${transaction.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF6366F1),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    transaction.status,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.green[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays} hari lalu';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} jam lalu';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} menit lalu';
-    } else {
-      return 'Baru saja';
-    }
-  }
-}
-
-class TransactionDetailModal extends StatefulWidget {
-  final Transaction transaction;
-  final Map<String, dynamic>? fullTransactionData;
-  final VoidCallback? onPrint;
-  final DatabaseService databaseService;
-  final VoidCallback? onCancelled;
-
-  const TransactionDetailModal({
-    super.key,
-    required this.transaction,
-    this.fullTransactionData,
-    this.onPrint,
-    required this.databaseService,
-    this.onCancelled,
-  });
-
-  @override
-  State<TransactionDetailModal> createState() => _TransactionDetailModalState();
-}
-
-class _TransactionDetailModalState extends State<TransactionDetailModal> {
-  bool _isLoading = false;
-  String _currentStatus = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _currentStatus = widget.transaction.status;
-  }
-
-  Future<void> _cancelTransaction() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_rounded, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Batalkan Transaksi'),
-          ],
-        ),
-        content: const Text('Apakah Anda yakin ingin membatalkan transaksi ini? Stok produk akan dikembalikan.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Ya, Batalkan'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await widget.databaseService.cancelTransaction(widget.transaction.id);
-      if (mounted) {
-        setState(() {
-          _currentStatus = 'Dibatalkan';
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaksi berhasil dibatalkan'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        widget.onCancelled?.call();
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final canCancel = _currentStatus != 'Dibatalkan' && _currentStatus != 'Dikembalikan';
-    
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Detail Transaksi",
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1F2937),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.grey,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Transaction Details
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow("ID Transaksi", widget.transaction.id),
-                  _buildDetailRow("Tanggal", _formatDateTime(widget.transaction.date)),
-                  _buildDetailRow("Pelanggan", widget.transaction.customerName),
-                  _buildDetailRow("Jumlah Item", "${widget.transaction.items} item"),
-                  _buildDetailRow("Metode Pembayaran", widget.transaction.paymentMethod),
-                  _buildDetailRow("Status", _currentStatus),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Total Transaksi",
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Rp ${widget.transaction.total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Action Buttons
-                  Row(
-                    children: [
-                      if (widget.onPrint != null)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: widget.onPrint,
-                            icon: const Icon(Icons.print_rounded),
-                            label: const Text('Cetak'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (canCancel && widget.onPrint != null) const SizedBox(width: 12),
-                      if (canCancel)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoading ? null : _cancelTransaction,
-                            icon: _isLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : const Icon(Icons.cancel_rounded),
-                            label: const Text('Batalkan'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF1F2937),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    return "${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
-  }
-}
-
-// Data Models
-class Transaction {
-  final String id;
-  final DateTime date;
-  final String customerName;
-  final int items;
-  final double total;
-  final String paymentMethod;
-  final String status;
-
-  Transaction({
-    required this.id,
-    required this.date,
-    required this.customerName,
-    required this.items,
-    required this.total,
-    required this.paymentMethod,
-    required this.status,
-  });
-
-  factory Transaction.fromFirebase(Map<String, dynamic> data) {
-    // Parse date from ISO string or timestamp
-    DateTime date;
-    if (data['createdAt'] != null) {
-      try {
-        date = DateTime.parse(data['createdAt'] as String);
-      } catch (e) {
-        date = DateTime.now();
-      }
-    } else {
-      date = DateTime.now();
-    }
-
-    // Get items count
-    final itemsList = data['items'] as List<dynamic>? ?? [];
-    final itemsCount = itemsList.length;
-
-    // Get customer name (if available, otherwise use default)
-    final encryptionHelper = EncryptionHelper();
-    String customerName = 'Pelanggan';
-    if (data['customerName'] is String) {
-      final rawName = data['customerName'] as String;
-      if (data['customerNameEncrypted'] == true) {
-        customerName = encryptionHelper.decryptIfPossible(rawName) ?? 'Pelanggan';
-      } else {
-        customerName = SecurityUtils.sanitizeInput(rawName);
-      }
-    }
-
-    // Get payment method
-    final paymentMethod = SecurityUtils.sanitizeInput(data['paymentMethod'] as String? ?? 'Cash');
-
-    // Get total
-    final total = (data['total'] as num?)?.toDouble() ?? 0.0;
-
-    return Transaction(
-      id: data['id'] as String? ?? data['key'] as String? ?? '',
-      date: date,
-      customerName: customerName,
-      items: itemsCount,
-      total: total,
-      paymentMethod: paymentMethod,
-      status: 'Selesai', // Default status
-    );
-  }
 }

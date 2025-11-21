@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 /// Utility functions for home page
 
 /// Formats a number as Indonesian currency format
-String formatCurrency(int amount) {
-  return amount.toString().replaceAllMapped(
+String formatCurrency(num amount) {
+  return amount.toStringAsFixed(0).replaceAllMapped(
     RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
     (Match m) => '${m[1]}.',
   );
@@ -36,6 +36,11 @@ String formatRelativeDate(DateTime date) {
   } else {
     return 'Baru saja';
   }
+}
+
+/// Formats a DateTime to "dd/MM/yyyy HH:mm" format
+String formatDateTime(DateTime dateTime) {
+  return "${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
 }
 
 /// Shows a "Coming Soon" dialog
