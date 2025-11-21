@@ -321,14 +321,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildProductGridContent({
-    required int crossAxisCount,
+  Widget _buildProductListContent({
     required double paddingScale,
     required double iconScale,
-    required EdgeInsetsGeometry gridPadding,
-    required double crossAxisSpacing,
-    required double mainAxisSpacing,
-    required double childAspectRatio,
   }) {
     if (_filteredProducts.isEmpty) {
       return Center(
@@ -372,20 +367,16 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       );
     }
 
-    return GridView.builder(
-      padding: gridPadding,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: crossAxisSpacing,
-        mainAxisSpacing: mainAxisSpacing,
-        childAspectRatio: childAspectRatio,
-      ),
+    return ListView.builder(
+      padding: EdgeInsets.all(16 * paddingScale),
       itemCount: _filteredProducts.length,
       itemBuilder: (context, index) {
         final product = _filteredProducts[index];
-        return ProductCard(
+        return ProductListItem(
           product: product,
           onAddToCart: () => _addToCart(product),
+          paddingScale: paddingScale,
+          iconScale: iconScale,
         );
       },
     );
@@ -735,6 +726,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: 56, // Fixed height to prevent overflow
         systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
@@ -750,26 +742,28 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
         ),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(8 * paddingScale),
+              padding: EdgeInsets.all(6 * paddingScale),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.point_of_sale_rounded,
                 color: Colors.white,
-                size: 24 * iconScale,
+                size: 20 * iconScale,
               ),
             ),
-            SizedBox(width: 12 * paddingScale),
+            SizedBox(width: 10 * paddingScale),
             Flexible(
               child: Text(
                 "Kasir",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -777,49 +771,43 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ],
         ),
         actions: [
-          Container(
-            margin: EdgeInsets.only(right: 8 * paddingScale),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showBarcodeScannerInstructions();
-              },
-              icon: Icon(Icons.help_outline_rounded, color: Colors.white, size: 24 * iconScale),
-              tooltip: 'Cara Menggunakan Barcode Scanner',
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.only(right: 8 * paddingScale),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showAddProductDialog();
-              },
-              icon: Icon(Icons.add_rounded, color: Colors.white, size: 24 * iconScale),
-              tooltip: 'Tambah Produk',
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.only(right: 16 * paddingScale),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showPaymentModal();
-              },
-              icon: Icon(Icons.payment_rounded, color: Colors.white, size: 24 * iconScale),
-              tooltip: 'Pembayaran',
+          // Grouped action buttons with better spacing
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4 * paddingScale),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _showBarcodeScannerInstructions();
+                  },
+                  icon: Icon(Icons.help_outline_rounded, color: Colors.white, size: 22 * iconScale),
+                  tooltip: 'Cara Menggunakan Barcode Scanner',
+                  padding: EdgeInsets.all(8 * paddingScale),
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _showAddProductDialog();
+                  },
+                  icon: Icon(Icons.add_rounded, color: Colors.white, size: 22 * iconScale),
+                  tooltip: 'Tambah Produk',
+                  padding: EdgeInsets.all(8 * paddingScale),
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _showPaymentModal();
+                  },
+                  icon: Icon(Icons.payment_rounded, color: Colors.white, size: 22 * iconScale),
+                  tooltip: 'Pembayaran',
+                  padding: EdgeInsets.all(8 * paddingScale),
+                  constraints: const BoxConstraints(),
+                ),
+              ],
             ),
           ),
         ],
@@ -834,45 +822,42 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
             opacity: _fadeAnimation,
             child: SlideTransition(
               position: _slideAnimation,
-              child: isMobile
-                  ? _buildMobileLayout(context, crossAxisCount, paddingScale, iconScale)
-                  : _buildDesktopLayout(context, crossAxisCount, paddingScale, iconScale, screenWidth),
+              child: _buildDesktopLayout(context, crossAxisCount, paddingScale, iconScale, screenWidth),
             ),
           ),
         ),
       ),
-      floatingActionButton: isMobile && _cartItems.isNotEmpty
+      floatingActionButton: _cartItems.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: _showCartBottomSheet,
               backgroundColor: const Color(0xFF6366F1),
               icon: Stack(
                 children: [
                   const Icon(Icons.shopping_cart_rounded, color: Colors.white),
-                  if (_cartItems.isNotEmpty)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '${_cartItems.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '${_cartItems.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
+                  ),
                 ],
               ),
               label: Text(
@@ -887,26 +872,27 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context, int crossAxisCount, double paddingScale, double iconScale) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
-        child: Column(
+  Widget _buildDesktopLayout(BuildContext context, int crossAxisCount, double paddingScale, double iconScale, double screenWidth) {
+    // Desktop now uses full width with floating cart button, cart opens as bottom sheet
+    return Column(
       children: [
         // Search and Category Section
         Container(
-          padding: EdgeInsets.all(16 * paddingScale),
+          padding: EdgeInsets.symmetric(
+            horizontal: 16 * paddingScale,
+            vertical: 12 * paddingScale,
+          ),
           child: Column(
             children: [
               // Search Bar
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ],
@@ -922,11 +908,12 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                     hintText: 'Cari produk...',
                     hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[500],
+                      fontSize: 14,
                     ),
                     prefixIcon: Icon(
                       Icons.search_rounded,
                       color: const Color(0xFF6366F1),
-                      size: 24 * iconScale,
+                      size: 20 * iconScale,
                     ),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(
@@ -940,7 +927,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
               
               // Category Tabs
               SizedBox(
-                height: 40 * paddingScale,
+                height: 36 * paddingScale,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: _categories.length,
@@ -956,7 +943,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: isSelected ? Colors.white : const Color(0xFF6366F1),
                             fontWeight: FontWeight.w600,
-                            fontSize: 12 * ResponsiveHelper.getFontScale(context),
+                            fontSize: 13,
                           ),
                         ),
                         selected: isSelected,
@@ -971,10 +958,14 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                         checkmarkColor: Colors.white,
                         side: BorderSide(
                           color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
-                          width: 1,
+                          width: 1.5,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12 * paddingScale,
+                          vertical: 4 * paddingScale,
                         ),
                       ),
                     );
@@ -984,203 +975,14 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        if (_isOffline)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
-            child: _buildStatusBanner(
-              color: Colors.orange,
-              icon: Icons.wifi_off_rounded,
-              message: 'Anda sedang offline. Data produk mungkin tidak terbaru.',
-              trailing: TextButton(
-                onPressed: _isRetrying ? null : _retryLoadProducts,
-                child: Text(
-                  'Segarkan',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.orange[700],
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-            ),
-          ),
-        if (_showInlineErrorBanner)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
-            child: _buildStatusBanner(
-              color: Colors.red,
-              icon: Icons.error_outline_rounded,
-              message: _errorMessage ?? 'Terjadi kesalahan.',
-              trailing: TextButton(
-                onPressed: _isRetrying ? null : _retryLoadProducts,
-                child: Text(
-                  'Coba Lagi',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.red[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-            ),
-          ),
-        if (_isRetrying && _hasLoadedOnce)
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
-            child: _buildStatusBanner(
-              color: Colors.blue,
-              icon: Icons.sync_rounded,
-              message: 'Menyegarkan data produk...',
-              trailing: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
-                ),
-              ),
-            ),
-          ),
         
-        // Products Grid
+        // Products List
         Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _showInitialLoader
-                ? const Center(
-                    key: ValueKey('kasir-products-loader'),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                    ),
-                  )
-                : _showFullErrorState
-                    ? _buildErrorState()
-                    : _buildProductGridContent(
-                        crossAxisCount: crossAxisCount,
-                        paddingScale: paddingScale,
-                        iconScale: iconScale,
-                        gridPadding: EdgeInsets.all(16 * paddingScale),
-                        crossAxisSpacing: 12 * paddingScale,
-                        mainAxisSpacing: 12 * paddingScale,
-                        childAspectRatio: 0.75,
-                      ),
-          ),
-        ),
-      ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(BuildContext context, int crossAxisCount, double paddingScale, double iconScale, double screenWidth) {
-    final cartWidth = screenWidth > 1400 ? 450.0 : 400.0;
-    
-    return Row(
-      children: [
-        // Left side - Products
-        Expanded(
-          flex: 2,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Column(
-            children: [
-              // Search and Category Section
-              Container(
-                padding: EdgeInsets.all(20 * paddingScale),
-                child: Column(
-                  children: [
-                    // Search Bar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Cari produk...',
-                          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: const Color(0xFF6366F1),
-                            size: 24 * iconScale,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 20 * paddingScale,
-                            vertical: 16 * paddingScale,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 16 * paddingScale),
-                    
-                    // Category Tabs
-                    SizedBox(
-                      height: 40 * paddingScale,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _categories.length,
-                        itemBuilder: (context, index) {
-                          final category = _categories[index];
-                          final isSelected = _selectedCategory == category;
-                          
-                          return Container(
-                            margin: EdgeInsets.only(right: 12 * paddingScale),
-                            child: FilterChip(
-                              label: Text(
-                                category,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: isSelected ? Colors.white : const Color(0xFF6366F1),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _selectedCategory = category;
-                                });
-                                HapticFeedback.lightImpact();
-                              },
-                              backgroundColor: Colors.white,
-                              selectedColor: const Color(0xFF6366F1),
-                              checkmarkColor: Colors.white,
-                              side: BorderSide(
-                                color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
-                                width: 1,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Products Grid
-              Expanded(
           child: Column(
             children: [
               if (_isOffline)
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
                   child: _buildStatusBanner(
                     color: Colors.orange,
                     icon: Icons.wifi_off_rounded,
@@ -1199,7 +1001,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 ),
               if (_showInlineErrorBanner)
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
                   child: _buildStatusBanner(
                     color: Colors.red,
                     icon: Icons.error_outline_rounded,
@@ -1218,7 +1020,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 ),
               if (_isRetrying && _hasLoadedOnce)
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
+                  padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
                   child: _buildStatusBanner(
                     color: Colors.blue,
                     icon: Icons.sync_rounded,
@@ -1245,48 +1047,13 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                         )
                       : _showFullErrorState
                           ? _buildErrorState()
-                          : _buildProductGridContent(
-                              crossAxisCount: crossAxisCount,
+                          : _buildProductListContent(
                               paddingScale: paddingScale,
                               iconScale: iconScale,
-                              gridPadding: EdgeInsets.symmetric(horizontal: 20 * paddingScale),
-                              crossAxisSpacing: 16 * paddingScale,
-                              mainAxisSpacing: 16 * paddingScale,
-                              childAspectRatio: 0.8,
                             ),
                 ),
               ),
             ],
-          ),
-              ),
-            ],
-              ),
-            ),
-          ),
-        ),
-        
-        // Right side - Cart
-        Container(
-          width: cartWidth,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(-5, 0),
-              ),
-            ],
-          ),
-          child: CartPanel(
-            cartItems: _cartItems,
-            subtotal: _subtotal,
-            tax: _tax,
-            total: _total,
-            onRemoveItem: _removeFromCart,
-            onUpdateQuantity: _updateQuantity,
-            onClearCart: _clearCart,
-            onCheckout: _showPaymentModal,
           ),
         ),
       ],
@@ -1404,12 +1171,12 @@ class _ProductCardState extends State<ProductCard>
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16), // Consistent with other elements
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
               border: Border.all(
@@ -1423,17 +1190,20 @@ class _ProductCardState extends State<ProductCard>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Product Image/Emoji
-                Expanded(
+                // Product Image/Emoji - Larger for POS use
+                Flexible(
                   flex: 3,
                   child: Container(
                     width: double.infinity,
-                    constraints: const BoxConstraints(minHeight: 80),
+                    constraints: BoxConstraints(
+                      minHeight: isMobile ? 100 : 120,
+                      maxHeight: isMobile ? 140 : 160,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
                       ),
                     ),
                     child: Center(
@@ -1441,34 +1211,33 @@ class _ProductCardState extends State<ProductCard>
                         widget.product.image.isNotEmpty 
                             ? widget.product.image 
                             : '📦',
-                        style: TextStyle(fontSize: isMobile ? 36 : 48),
+                        style: TextStyle(fontSize: isMobile ? 48 : 64),
                       ),
                     ),
                   ),
                 ),
                 
-                // Product Info
-                Expanded(
+                // Product Info - Better spacing and larger fonts for POS
+                Flexible(
                   flex: 2,
                   child: Padding(
-                    padding: EdgeInsets.all(8 * paddingScale),
+                    padding: EdgeInsets.all(10 * paddingScale),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            widget.product.name,
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1F2937),
-                              fontSize: (Theme.of(context).textTheme.titleSmall?.fontSize ?? 14) * fontSize,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          widget.product.name,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F2937),
+                            fontSize: (isMobile ? 13 : 15) * fontSize,
+                            height: 1.2,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4 * paddingScale),
+                        SizedBox(height: 6 * paddingScale),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
@@ -1477,53 +1246,50 @@ class _ProductCardState extends State<ProductCard>
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: const Color(0xFF6366F1),
-                              fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * fontSize,
+                              fontSize: (isMobile ? 16 : 18) * fontSize,
                             ),
                           ),
                         ),
-                        const Spacer(),
+                        SizedBox(height: 6 * paddingScale),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Flexible(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 6 * paddingScale,
-                                    vertical: 3 * paddingScale,
-                                  ),
-                                  decoration: BoxDecoration(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8 * paddingScale,
+                                  vertical: 4 * paddingScale,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isOutOfStock
+                                      ? Colors.red.withOpacity(0.1)
+                                      : widget.product.stock > 10 
+                                          ? Colors.green.withOpacity(0.1)
+                                          : Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  isOutOfStock 
+                                      ? 'Habis'
+                                      : 'Stok: ${widget.product.stock}',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: isOutOfStock
-                                        ? Colors.red.withOpacity(0.1)
+                                        ? Colors.red[700]
                                         : widget.product.stock > 10 
-                                            ? Colors.green.withOpacity(0.1)
-                                            : Colors.orange.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
+                                            ? Colors.green[700]
+                                            : Colors.orange[700],
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: (isMobile ? 11 : 12) * fontSize,
                                   ),
-                                  child: Text(
-                                    isOutOfStock 
-                                        ? 'Habis'
-                                        : 'Stok: ${widget.product.stock}',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: isOutOfStock
-                                          ? Colors.red[700]
-                                          : widget.product.stock > 10 
-                                              ? Colors.green[700]
-                                              : Colors.orange[700],
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * fontSize,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
                             if (!isOutOfStock)
                               Container(
-                                padding: EdgeInsets.all(4 * paddingScale),
+                                padding: EdgeInsets.all(6 * paddingScale),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF6366F1).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
@@ -1531,7 +1297,202 @@ class _ProductCardState extends State<ProductCard>
                                 child: Icon(
                                   Icons.add_rounded,
                                   color: const Color(0xFF6366F1),
-                                  size: 14 * paddingScale,
+                                  size: 16 * paddingScale,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ProductListItem extends StatefulWidget {
+  final Product product;
+  final VoidCallback onAddToCart;
+  final double paddingScale;
+  final double iconScale;
+
+  const ProductListItem({
+    super.key,
+    required this.product,
+    required this.onAddToCart,
+    required this.paddingScale,
+    required this.iconScale,
+  });
+
+  @override
+  State<ProductListItem> createState() => _ProductListItemState();
+}
+
+class _ProductListItemState extends State<ProductListItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.98,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOutOfStock = widget.product.stock <= 0;
+    final fontSize = ResponsiveHelper.getFontScale(context);
+    
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) => _controller.reverse(),
+      onTapCancel: () => _controller.reverse(),
+      onTap: isOutOfStock ? null : widget.onAddToCart,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Opacity(
+          opacity: isOutOfStock ? 0.6 : 1.0,
+          child: Container(
+            margin: EdgeInsets.only(bottom: 12 * widget.paddingScale),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+              border: Border.all(
+                color: isOutOfStock 
+                    ? Colors.red.withOpacity(0.2)
+                    : Colors.grey.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Product Image/Emoji - Large and prominent
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.product.image.isNotEmpty 
+                          ? widget.product.image 
+                          : '📦',
+                      style: const TextStyle(fontSize: 64),
+                    ),
+                  ),
+                ),
+                
+                // Product Info - Takes remaining space
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(16 * widget.paddingScale),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Product Name
+                        Text(
+                          widget.product.name,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F2937),
+                            fontSize: 16 * fontSize,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 8 * widget.paddingScale),
+                        
+                        // Price
+                        Text(
+                          'Rp ${widget.product.price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF6366F1),
+                            fontSize: 20 * fontSize,
+                          ),
+                        ),
+                        SizedBox(height: 8 * widget.paddingScale),
+                        
+                        // Stock Badge and Add Button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10 * widget.paddingScale,
+                                vertical: 6 * widget.paddingScale,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isOutOfStock
+                                    ? Colors.red.withOpacity(0.1)
+                                    : widget.product.stock > 10 
+                                        ? Colors.green.withOpacity(0.1)
+                                        : Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isOutOfStock 
+                                    ? 'Habis'
+                                    : 'Stok: ${widget.product.stock}',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: isOutOfStock
+                                      ? Colors.red[700]
+                                      : widget.product.stock > 10 
+                                          ? Colors.green[700]
+                                          : Colors.orange[700],
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13 * fontSize,
+                                ),
+                              ),
+                            ),
+                            if (!isOutOfStock)
+                              Container(
+                                padding: EdgeInsets.all(10 * widget.paddingScale),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  color: Colors.white,
+                                  size: 24 * widget.iconScale,
                                 ),
                               ),
                           ],
@@ -1578,9 +1539,12 @@ class CartPanel extends StatelessWidget {
     
     return Column(
       children: [
-        // Cart Header
+        // Cart Header - Aligned with "Produk" title
         Container(
-          padding: EdgeInsets.all(16 * paddingScale),
+          padding: EdgeInsets.symmetric(
+            horizontal: 16 * paddingScale,
+            vertical: 12 * paddingScale,
+          ),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
@@ -1597,6 +1561,7 @@ class CartPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
+                    fontSize: 20, // Match "Produk" title size
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1621,26 +1586,34 @@ class CartPanel extends StatelessWidget {
           ),
         ),
         
-        // Cart Items
-        Expanded(
+        // Cart Items - Use Flexible instead of Expanded for empty state
+        Flexible(
           child: cartItems.isEmpty
-              ? Center(
+              ? SingleChildScrollView(
                   child: Padding(
-                    padding: EdgeInsets.all(16 * paddingScale),
+                    padding: EdgeInsets.all(24 * paddingScale),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.shopping_cart_outlined,
-                          size: 64 * iconScale,
-                          color: Colors.grey[400],
+                        Container(
+                          padding: EdgeInsets.all(24 * paddingScale),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.shopping_cart_outlined,
+                            size: 72 * iconScale,
+                            color: Colors.grey[600], // Better contrast
+                          ),
                         ),
-                        SizedBox(height: 16 * paddingScale),
+                        SizedBox(height: 20 * paddingScale),
                         Text(
                           "Keranjang kosong",
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.grey[800], // Better contrast
+                            fontWeight: FontWeight.w600,
+                            fontSize: 18,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -1648,7 +1621,8 @@ class CartPanel extends StatelessWidget {
                         Text(
                           "Tambahkan produk untuk memulai transaksi",
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
+                            color: Colors.grey[600], // Better contrast
+                            fontSize: 14,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
@@ -1805,15 +1779,15 @@ class CartItemCard extends StatelessWidget {
       padding: EdgeInsets.all(12 * paddingScale),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12), // Consistent border radius
         border: Border.all(
           color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -2042,6 +2016,72 @@ class _PaymentModalState extends State<PaymentModal> {
       _cashAmount = double.tryParse(_cashController.text) ?? 0.0;
       _change = _cashAmount - _finalTotal;
     });
+  }
+
+  Widget _buildPaymentMethodButton({
+    required PaymentMethod method,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 70,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
+              width: isSelected ? 2.5 : 1.5,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                method.icon,
+                color: isSelected ? Colors.white : const Color(0xFF6366F1),
+                size: 28,
+              ),
+              const SizedBox(height: 6),
+              Flexible(
+                child: Text(
+                  method.name,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isSelected ? Colors.white : const Color(0xFF1F2937),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _processPayment() async {
@@ -2291,54 +2331,134 @@ class _PaymentModalState extends State<PaymentModal> {
             ),
           ),
           
-          // Total Amount
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
+          // Total Amount and Payment Methods - Fixed at top
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Total Pembayaran",
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
-                          ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Total Pembayaran",
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Rp ${_finalTotal.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (_discount > 0) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'Rp ${_finalTotal.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                          'Diskon: Rp ${_discount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white70,
                           ),
                         ),
-                        if (_discount > 0) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Diskon: Rp ${_discount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white70,
+                      ],
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Payment Methods - Fixed and always visible
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Metode Pembayaran",
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1F2937),
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Payment method buttons in a more visible layout
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildPaymentMethodButton(
+                              method: _paymentMethods[0], // Cash/Tunai
+                              isSelected: _selectedPaymentMethod == _paymentMethods[0].id,
+                              onTap: () {
+                                setState(() {
+                                  _selectedPaymentMethod = _paymentMethods[0].id;
+                                  _calculateChange();
+                                });
+                                HapticFeedback.lightImpact();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildPaymentMethodButton(
+                              method: _paymentMethods[1], // QRIS
+                              isSelected: _selectedPaymentMethod == _paymentMethods[1].id,
+                              onTap: () {
+                                setState(() {
+                                  _selectedPaymentMethod = _paymentMethods[1].id;
+                                });
+                                HapticFeedback.lightImpact();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildPaymentMethodButton(
+                              method: _paymentMethods[2], // Virtual Account
+                              isSelected: _selectedPaymentMethod == _paymentMethods[2].id,
+                              onTap: () {
+                                setState(() {
+                                  _selectedPaymentMethod = _paymentMethods[2].id;
+                                });
+                                HapticFeedback.lightImpact();
+                              },
                             ),
                           ),
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  
-                  const SizedBox(height: 24),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Scrollable content below payment methods
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   
                   // Customer Selection
                   Text(
@@ -2411,73 +2531,6 @@ class _PaymentModalState extends State<PaymentModal> {
                       fillColor: const Color(0xFFF8FAFC),
                     ),
                     keyboardType: TextInputType.number,
-                  ),
-                  
-                  const SizedBox(height: 24),
-          
-                  // Payment Methods
-                  Text(
-                    "Metode Pembayaran",
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 3,
-                    ),
-                    itemCount: _paymentMethods.length,
-                    itemBuilder: (context, index) {
-                      final method = _paymentMethods[index];
-                      final isSelected = _selectedPaymentMethod == method.id;
-                      
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedPaymentMethod = method.id;
-                            if (method.id == 'Cash') {
-                              _calculateChange();
-                            }
-                          });
-                          HapticFeedback.lightImpact();
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF6366F1) : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFF6366F1) : Colors.grey[300]!,
-                              width: 2,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                method.icon,
-                                color: isSelected ? Colors.white : const Color(0xFF6366F1),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                method.name,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: isSelected ? Colors.white : const Color(0xFF1F2937),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
                   ),
                   
                   // Cash Input (if Cash selected)
@@ -2577,12 +2630,11 @@ class _PaymentModalState extends State<PaymentModal> {
             ),
           ],
           
-          const Spacer(),
-          
           // Pay Button
           if (!_isProcessingPayment)
-            Padding(
-              padding: const EdgeInsets.all(24),
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              color: Colors.white,
               child: SizedBox(
                 width: double.infinity,
                 height: 56,

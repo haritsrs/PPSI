@@ -21,15 +21,21 @@ class _BannerCarouselState extends State<BannerCarousel> {
   Widget build(BuildContext context) {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    final isHorizontal = ResponsiveHelper.isHorizontal(context);
     final homePadding = 20 * paddingScale; // Match home view padding
     final itemMargin = 4 * paddingScale; // Carousel item margin
     final availableWidth = screenWidth - (homePadding * 2);
+    
     // Calculate height based on 2.7:1 aspect ratio (width:height)
     // viewportFraction = 0.9, so visible banner width = availableWidth * 0.9
     // Each item has margin, so image width = (availableWidth * 0.9) - (itemMargin * 2)
     // height = image width / 2.7
     final bannerImageWidth = (availableWidth * 0.9) - (itemMargin * 2);
     final bannerHeight = bannerImageWidth / 2.7;
+    
+    // In horizontal view, ensure full banner is shown (like vertical)
+    // Use contain fit to show entire image without cropping
+    final imageFit = isHorizontal ? BoxFit.contain : BoxFit.cover;
     
     if (widget.bannerImages.isEmpty) {
       // Show placeholder if no banners
@@ -97,7 +103,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   aspectRatio: 2.7,
                   child: Image.asset(
                     widget.bannerImages[index],
-                    fit: BoxFit.cover,
+                    fit: imageFit,
                     width: double.infinity,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(

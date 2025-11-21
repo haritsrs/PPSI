@@ -364,6 +364,27 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   Widget _buildLandscapeLayout(BuildContext context) {
     final showHomeChrome = _selectedIndex == 0;
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
+    final iconScale = ResponsiveHelper.getIconScale(context);
+    final fontScale = ResponsiveHelper.getFontScale(context);
+    final isWideScreen = ResponsiveHelper.isWideScreen(context);
+    final isHorizontal = ResponsiveHelper.isHorizontal(context);
+    
+    // Dynamic scaling based on screen width percentage
+    final screenWidth = MediaQuery.of(context).size.width;
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+    
+    // Use percentage-based sizing instead of fixed pixels
+    final baseIconSize = 24.0 * iconScale; // Smaller base, scales with iconScale
+    final iconSize = baseIconSize * 1.15; // Selected icons slightly larger
+    final unselectedIconSize = baseIconSize;
+    
+    // Dynamic width: ~8-10% of screen width, but with reasonable min/max
+    final extendedWidth = (screenWidth * 0.10).clamp(120.0, 160.0);
+    final minWidth = (shortestSide * 0.12).clamp(72.0, 88.0);
+    
+    // Reduced padding - less margin on left
+    final horizontalMargin = 8 * paddingScale;
+    final verticalMargin = 12 * paddingScale;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -374,8 +395,8 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           children: [
             Container(
               margin: EdgeInsets.symmetric(
-                horizontal: 12 * paddingScale,
-                vertical: 16 * paddingScale,
+                horizontal: horizontalMargin,
+                vertical: verticalMargin,
               ),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -391,55 +412,99 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
               child: NavigationRail(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: _onItemTapped,
-                extended: ResponsiveHelper.isWideScreen(context),
-                labelType: ResponsiveHelper.isWideScreen(context)
-                    ? NavigationRailLabelType.none
-                    : NavigationRailLabelType.selected,
-                selectedIconTheme: const IconThemeData(
-                  color: Color(0xFF6366F1),
-                  size: 28,
+                extended: isWideScreen || isHorizontal,
+                minWidth: isWideScreen || isHorizontal ? extendedWidth : minWidth,
+                labelType: NavigationRailLabelType.none,
+                selectedIconTheme: IconThemeData(
+                  color: const Color(0xFF6366F1),
+                  size: iconSize,
                 ),
-                unselectedIconTheme: const IconThemeData(
-                  color: Color(0xFF9CA3AF),
-                  size: 24,
+                unselectedIconTheme: IconThemeData(
+                  color: const Color(0xFF9CA3AF),
+                  size: unselectedIconSize,
                 ),
-                selectedLabelTextStyle: const TextStyle(
-                  color: Color(0xFF6366F1),
+                selectedLabelTextStyle: TextStyle(
+                  color: const Color(0xFF6366F1),
                   fontWeight: FontWeight.w700,
+                  fontSize: 13 * fontScale,
                 ),
-                unselectedLabelTextStyle: const TextStyle(
-                  color: Color(0xFF9CA3AF),
+                unselectedLabelTextStyle: TextStyle(
+                  color: const Color(0xFF9CA3AF),
                   fontWeight: FontWeight.w500,
+                  fontSize: 13 * fontScale,
                 ),
                 indicatorColor: const Color(0xFFEEF2FF),
-                destinations: const [
+                backgroundColor: Colors.transparent,
+                useIndicator: true,
+                groupAlignment: -1.0,
+                destinations: [
                   NavigationRailDestination(
-                    icon: Icon(Icons.home_rounded),
-                    label: Text('Beranda'),
+                    icon: Icon(Icons.home_rounded, size: unselectedIconSize),
+                    selectedIcon: Icon(Icons.home_rounded, size: iconSize),
+                    label: Text(
+                      'Beranda',
+                      style: TextStyle(
+                        fontSize: 12 * fontScale,
+                      ),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10 * paddingScale,
+                      horizontal: 10 * paddingScale,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: Icon(Icons.store_rounded),
-                    label: Text('Produk'),
+                    icon: Icon(Icons.store_rounded, size: unselectedIconSize),
+                    selectedIcon: Icon(Icons.store_rounded, size: iconSize),
+                    label: Text(
+                      'Produk',
+                      style: TextStyle(
+                        fontSize: 12 * fontScale,
+                      ),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10 * paddingScale,
+                      horizontal: 10 * paddingScale,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: Icon(Icons.point_of_sale_rounded),
-                    label: Text('Kasir'),
+                    icon: Icon(Icons.point_of_sale_rounded, size: unselectedIconSize),
+                    selectedIcon: Icon(Icons.point_of_sale_rounded, size: iconSize),
+                    label: Text(
+                      'Kasir',
+                      style: TextStyle(
+                        fontSize: 12 * fontScale,
+                      ),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10 * paddingScale,
+                      horizontal: 10 * paddingScale,
+                    ),
                   ),
                   NavigationRailDestination(
-                    icon: Icon(Icons.analytics_rounded),
-                    label: Text('Laporan'),
+                    icon: Icon(Icons.analytics_rounded, size: unselectedIconSize),
+                    selectedIcon: Icon(Icons.analytics_rounded, size: iconSize),
+                    label: Text(
+                      'Laporan',
+                      style: TextStyle(
+                        fontSize: 12 * fontScale,
+                      ),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10 * paddingScale,
+                      horizontal: 10 * paddingScale,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 8 * paddingScale),
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: _buildPageStack(context),
               ),
             ),
-            SizedBox(width: 16 * paddingScale),
+            SizedBox(width: 12 * paddingScale),
           ],
         ),
       ),
