@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/register_controller.dart';
 import '../utils/validation_utils.dart';
+import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/auth/login_header.dart';
 import '../widgets/auth/auth_form_container.dart';
@@ -9,6 +10,7 @@ import '../widgets/auth/terms_and_conditions_checkbox.dart';
 import '../widgets/auth/auth_button.dart';
 import '../widgets/auth/auth_divider.dart';
 import '../widgets/auth/auth_footer.dart';
+import '../widgets/auth/back_button_app_bar.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -72,27 +74,16 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
     try {
       await _controller.register();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Akun berhasil dibuat!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        SnackbarHelper.showSuccess(context, 'Akun berhasil dibuat!');
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        final backgroundColor = e.toString().contains('syarat dan ketentuan')
-            ? Colors.orange
-            : Colors.red;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: backgroundColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (e.toString().contains('syarat dan ketentuan')) {
+          SnackbarHelper.showInfo(context, e.toString());
+        } else {
+          SnackbarHelper.showError(context, e.toString());
+        }
       }
     }
   }
@@ -101,32 +92,7 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Color(0xFF6366F1),
-              size: 20,
-            ),
-          ),
-        ),
-      ),
+      appBar: const BackButtonAppBar(),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,

@@ -17,11 +17,6 @@ class _LaporanPageState extends State<LaporanPage> {
   late final LaporanController _controller;
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
-  final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Rentang Tanggal'];
-  final List<String> _paymentMethods = ['Semua', 'Cash', 'QRIS', 'VirtualAccount'];
-  String _selectedPeriod = 'Hari';
-
   @override
   void initState() {
     super.initState();
@@ -62,15 +57,6 @@ class _LaporanPageState extends State<LaporanPage> {
                   ? ReportErrorState(controller: _controller)
                   : ReportContent(
                       controller: _controller,
-                      periods: _periods,
-                      filters: _filters,
-                      paymentMethods: _paymentMethods,
-                      selectedPeriod: _selectedPeriod,
-                      onPeriodChanged: (period) {
-                        setState(() {
-                          _selectedPeriod = period;
-                        });
-                      },
                       searchController: _searchController,
                       onDateRangePicker: () => _controller.openDateRangePicker(context),
                     ),

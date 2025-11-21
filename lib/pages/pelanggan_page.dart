@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/customer_controller.dart';
+import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/customers/customer_app_bar.dart';
 import '../widgets/customers/customer_search_filter_section.dart';
@@ -139,12 +140,7 @@ class _PelangganPageState extends State<PelangganPage> with TickerProviderStateM
     // Handle error messages
     if (_controller.errorMessage != null && !_controller.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_controller.errorMessage!),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showError(context, _controller.errorMessage!);
       });
     }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../controllers/account_controller.dart';
+import '../utils/snackbar_helper.dart';
+import '../utils/haptic_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/account/profile_header_section.dart';
@@ -63,56 +65,41 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
     super.dispose();
   }
 
-  void _showSnackBar(String message, {bool isError = false, Duration? duration}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: duration ?? const Duration(seconds: 3),
-      ),
-    );
-  }
 
-  Future<void> _handleAsyncOperation(
-    Future<void> Function() operation, {
-    required String successMessage,
-    required String errorPrefix,
-    Duration? successDuration,
-  }) async {
+  Future<void> _handleSaveProfile() async {
     try {
-      await operation();
-      if (successMessage.isNotEmpty) {
-        _showSnackBar(successMessage, duration: successDuration);
+      await _controller.saveProfile();
+      if (mounted) {
+        SnackbarHelper.showSuccess(context, 'Profil berhasil diperbarui');
       }
     } catch (e) {
-      _showSnackBar('$errorPrefix: $e', isError: true);
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Gagal memperbarui profil: $e');
+      }
     }
   }
 
-  Future<void> _handleSaveProfile() async {
-    await _handleAsyncOperation(
-      () => _controller.saveProfile(),
-      successMessage: 'Profil berhasil diperbarui',
-      errorPrefix: 'Gagal memperbarui profil',
-    );
-  }
-
   Future<void> _handlePickImage(ImageSource source) async {
-    await _handleAsyncOperation(
-      () => _controller.pickImage(source),
-      successMessage: '',
-      errorPrefix: 'Gagal memilih gambar',
-    );
+    try {
+      await _controller.pickImage(source);
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Gagal memilih gambar: $e');
+      }
+    }
   }
 
   Future<void> _handleDeleteProfilePicture() async {
-    await _handleAsyncOperation(
-      () => _controller.deleteProfilePicture(),
-      successMessage: 'Foto profil berhasil dihapus',
-      errorPrefix: 'Gagal menghapus foto',
-    );
+    try {
+      await _controller.deleteProfilePicture();
+      if (mounted) {
+        SnackbarHelper.showSuccess(context, 'Foto profil berhasil dihapus');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Gagal menghapus foto: $e');
+      }
+    }
   }
   
   void _showImagePickerDialog() {
@@ -144,26 +131,40 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
   }
 
   Future<void> _handleSendVerificationEmail() async {
-    await _handleAsyncOperation(
-      () => _controller.sendVerificationEmail(),
-      successMessage: 'Email verifikasi telah dikirim. Silakan cek inbox Anda dan klik tautan verifikasi.',
-      errorPrefix: 'Gagal mengirim email verifikasi',
-      successDuration: const Duration(seconds: 4),
-    );
+    try {
+      await _controller.sendVerificationEmail();
+      if (mounted) {
+        SnackbarHelper.showSuccess(
+          context,
+          'Email verifikasi telah dikirim. Silakan cek inbox Anda dan klik tautan verifikasi.',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Gagal mengirim email verifikasi: $e');
+      }
+    }
   }
 
   Future<void> _handleCheckEmailVerification() async {
     try {
       await _controller.checkEmailVerification();
-      final isVerified = _controller.currentUser?.emailVerified ?? false;
-      _showSnackBar(
-        isVerified
-            ? 'Email berhasil diverifikasi!'
-            : 'Email belum diverifikasi. Silakan cek email Anda dan klik tautan verifikasi.',
-        isError: !isVerified,
-      );
+      if (mounted) {
+        final isVerified = _controller.currentUser?.emailVerified ?? false;
+        if (isVerified) {
+          SnackbarHelper.showSuccess(context, 'Email berhasil diverifikasi!');
+        } else {
+          SnackbarHelper.showInfo(
+            context,
+            'Email belum diverifikasi. Silakan cek email Anda dan klik tautan verifikasi.',
+          );
+        }
+      }
     } catch (e) {
-      _showSnackBar('Gagal memeriksa status verifikasi: $e', isError: true);
+      if (mounted) {
+        SnackbarHelper.showError(context, 'Gagal memeriksa status verifikasi: $e');
+      }
     }
   }
 
@@ -196,7 +197,7 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
               ),
               child: IconButton(
                 onPressed: () {
-                  HapticFeedback.lightImpact();
+                  HapticHelper.lightImpact();
                   _controller.setEditing(true);
                 },
                 icon: const Icon(Icons.edit_rounded, color: Colors.white),

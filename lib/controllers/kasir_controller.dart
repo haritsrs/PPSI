@@ -222,6 +222,10 @@ class KasirController extends ChangeNotifier {
     _total = _subtotal + _tax;
   }
 
+  // Barcode scanning result
+  String? _lastBarcodeNotFound;
+  String? get lastBarcodeNotFound => _lastBarcodeNotFound;
+
   Product? findProductByBarcode(String barcode) {
     final normalizedCode = barcode.trim().toLowerCase();
     if (normalizedCode.isEmpty) return null;
@@ -235,7 +239,10 @@ class KasirController extends ChangeNotifier {
     return null;
   }
 
-  void handleBarcodeCharacter(String character) {
+  /// Process a barcode character input
+  /// Returns true if a product was found and added to cart
+  bool handleBarcodeCharacter(String character) {
+    _lastBarcodeNotFound = null;
     _barcodeBuffer += character;
     _barcodeResetTimer?.cancel();
     _barcodeResetTimer = Timer(const Duration(milliseconds: 120), () {
@@ -245,21 +252,50 @@ class KasirController extends ChangeNotifier {
         final product = findProductByBarcode(bufferedCode);
         if (product != null) {
           addToCart(product);
+        } else {
+          _lastBarcodeNotFound = bufferedCode;
+          notifyListeners();
         }
       }
     });
     notifyListeners();
+    return false; // Will be processed by timer
   }
 
+  /// Check if current barcode buffer matches a product
+  /// Used for delayed checking after character input
+  bool checkBarcodeBuffer() {
+    final bufferedCode = _barcodeBuffer.trim();
+    if (bufferedCode.isEmpty) return false;
+    
+    final product = findProductByBarcode(bufferedCode);
+    if (product != null) {
+      addToCart(product);
+      _barcodeBuffer = '';
+      _lastBarcodeNotFound = null;
+      notifyListeners();
+      return true;
+    } else {
+      _lastBarcodeNotFound = bufferedCode;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Handle Enter key press - process current barcode buffer
+  /// Returns the found product, or null if not found
   Product? handleBarcodeEnter() {
     _barcodeResetTimer?.cancel();
     final code = _barcodeBuffer.trim();
     _barcodeBuffer = '';
+    _lastBarcodeNotFound = null;
     Product? foundProduct;
     if (code.isNotEmpty) {
       foundProduct = findProductByBarcode(code);
       if (foundProduct != null) {
         addToCart(foundProduct);
+      } else {
+        _lastBarcodeNotFound = code;
       }
     }
     notifyListeners();
@@ -267,6 +303,7 @@ class KasirController extends ChangeNotifier {
   }
 
   void handleBarcodeBackspace() {
+    _lastBarcodeNotFound = null;
     if (_barcodeBuffer.isNotEmpty) {
       _barcodeBuffer = _barcodeBuffer.substring(0, _barcodeBuffer.length - 1);
       notifyListeners();
@@ -275,6 +312,7 @@ class KasirController extends ChangeNotifier {
 
   void clearBarcodeBuffer() {
     _barcodeBuffer = '';
+    _lastBarcodeNotFound = null;
     _barcodeResetTimer?.cancel();
     notifyListeners();
   }

@@ -32,6 +32,12 @@ class LaporanController extends ChangeNotifier {
   DateTime? _startDate;
   DateTime? _endDate;
   bool _useDateRange = false;
+  
+  // Filter options
+  final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
+  final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Rentang Tanggal'];
+  final List<String> _paymentMethods = ['Semua', 'Cash', 'QRIS', 'VirtualAccount'];
+  String _selectedPeriod = 'Hari';
 
   // Subscriptions
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -51,6 +57,10 @@ class LaporanController extends ChangeNotifier {
   DateTime? get startDate => _startDate;
   DateTime? get endDate => _endDate;
   bool get useDateRange => _useDateRange;
+  List<String> get periods => _periods;
+  List<String> get filters => _filters;
+  List<String> get paymentMethods => _paymentMethods;
+  String get selectedPeriod => _selectedPeriod;
 
   bool get showInitialLoader => _isLoading && !_hasLoadedOnce;
   bool get showFullErrorState => _errorMessage != null && !_hasLoadedOnce;
@@ -229,6 +239,11 @@ class LaporanController extends ChangeNotifier {
 
   void setSelectedPaymentMethod(String method) {
     _selectedPaymentMethod = method;
+    notifyListeners();
+  }
+
+  void setSelectedPeriod(String period) {
+    _selectedPeriod = period;
     notifyListeners();
   }
 

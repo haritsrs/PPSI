@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../controllers/notification_controller.dart';
+import '../utils/snackbar_helper.dart';
+import '../utils/haptic_helper.dart';
 import '../widgets/notifications/notification_app_bar.dart';
 import '../widgets/notifications/notification_filter_section.dart';
 import '../widgets/notifications/notification_card.dart';
@@ -48,7 +50,7 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
     ));
     
     _animationController.forward();
-    _loadNotifications();
+    _controller.initialize();
   }
 
   @override
@@ -65,33 +67,13 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
     }
   }
 
-  Future<void> _loadNotifications() async {
-    try {
-      await _controller.loadNotifications();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading notifications: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _handleMarkAsRead(notification) async {
     try {
       await _controller.markAsRead(notification);
-      HapticFeedback.lightImpact();
+      HapticHelper.lightImpact();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showError(context, 'Error: $e');
       }
     }
   }
@@ -99,23 +81,13 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
   Future<void> _handleMarkAllAsRead() async {
     try {
       await _controller.markAllAsRead();
-      HapticFeedback.mediumImpact();
+      HapticHelper.mediumImpact();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Semua notifikasi ditandai sebagai dibaca'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackbarHelper.showSuccess(context, 'Semua notifikasi ditandai sebagai dibaca');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showError(context, 'Error: $e');
       }
     }
   }
@@ -123,15 +95,10 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
   Future<void> _handleDeleteNotification(notification) async {
     try {
       await _controller.deleteNotification(notification);
-      HapticFeedback.lightImpact();
+      HapticHelper.lightImpact();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showError(context, 'Error: $e');
       }
     }
   }
@@ -142,23 +109,13 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
     if (confirmed == true) {
       try {
         await _controller.deleteAllNotifications();
-        HapticFeedback.mediumImpact();
+        HapticHelper.mediumImpact();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Semua notifikasi dihapus'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackbarHelper.showSuccess(context, 'Semua notifikasi dihapus');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackbarHelper.showError(context, 'Error: $e');
         }
       }
     }
@@ -201,7 +158,7 @@ class _NotificationPageState extends State<NotificationPage> with TickerProvider
                               hasNotifications: _controller.notifications.isNotEmpty,
                             )
                           : RefreshIndicator(
-                              onRefresh: _loadNotifications,
+                              onRefresh: () => _controller.loadNotifications(),
                               child: ListView.builder(
                                 padding: const EdgeInsets.symmetric(horizontal: 20),
                                 itemCount: _controller.filteredNotifications.length,

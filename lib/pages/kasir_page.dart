@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../controllers/kasir_controller.dart';
 import '../utils/error_helper.dart';
+import '../utils/snackbar_helper.dart';
+import '../utils/haptic_helper.dart';
 import '../widgets/pattern_background.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -64,7 +66,21 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   }
 
   void _onControllerChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      // Handle barcode not found message
+      if (_controller.lastBarcodeNotFound != null) {
+        final barcode = _controller.lastBarcodeNotFound!;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            SnackbarHelper.showError(
+              context,
+              'Produk dengan barcode "$barcode" tidak ditemukan',
+            );
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -123,12 +139,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     if (logicalKey == LogicalKeyboardKey.enter || logicalKey == LogicalKeyboardKey.numpadEnter) {
       final product = _controller.handleBarcodeEnter();
       if (product != null) {
-        HapticFeedback.lightImpact();
-      } else {
-        final code = _controller.barcodeBuffer.trim();
-        if (code.isNotEmpty) {
-          _showBarcodeNotFound(code);
-        }
+        HapticHelper.lightImpact();
       }
       _refocusScanner();
       return;
@@ -144,31 +155,17 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       final codeUnit = character.codeUnitAt(0);
       if (codeUnit >= 32 && codeUnit != 127) {
         _controller.handleBarcodeCharacter(character);
+        // Check barcode buffer after a short delay
         Future.delayed(const Duration(milliseconds: 150), () {
-          final bufferedCode = _controller.barcodeBuffer.trim();
-          if (bufferedCode.isNotEmpty) {
-            final product = _controller.findProductByBarcode(bufferedCode);
-            if (product != null) {
-              HapticFeedback.lightImpact();
-            } else {
-              _showBarcodeNotFound(bufferedCode);
+          if (mounted) {
+            final found = _controller.checkBarcodeBuffer();
+            if (found) {
+              HapticHelper.lightImpact();
             }
+            _refocusScanner();
           }
-          _refocusScanner();
         });
       }
-    }
-  }
-
-  void _showBarcodeNotFound(String barcode) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Produk dengan barcode "$barcode" tidak ditemukan'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -177,7 +174,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       context: context,
       builder: (context) => AddProductDialog(
         onProductAdded: () {
-          HapticFeedback.lightImpact();
+          HapticHelper.lightImpact();
         },
       ),
     ).then((_) => _refocusScanner());
@@ -192,11 +189,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
 
   void _showPaymentModal() {
     if (_controller.cartItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Keranjang kosong! Tambahkan produk terlebih dahulu.'),
-          backgroundColor: Colors.orange,
-        ),
+      SnackbarHelper.showInfo(
+        context,
+        'Keranjang kosong! Tambahkan produk terlebih dahulu.',
       );
       return;
     }
@@ -253,12 +248,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         error,
         fallbackMessage: 'Gagal memproses pembayaran.',
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackbarHelper.showError(context, message);
     }
   }
 
@@ -282,7 +272,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
               children: [
                 IconButton(
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    HapticHelper.lightImpact();
                     _showBarcodeScannerInstructions();
                   },
                   icon: Icon(Icons.help_outline_rounded, color: Colors.white, size: 22 * iconScale),
@@ -292,7 +282,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 ),
                 IconButton(
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    HapticHelper.lightImpact();
                     _showAddProductDialog();
                   },
                   icon: Icon(Icons.add_rounded, color: Colors.white, size: 22 * iconScale),
@@ -302,7 +292,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 ),
                 IconButton(
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    HapticHelper.lightImpact();
                     _showPaymentModal();
                   },
                   icon: Icon(Icons.payment_rounded, color: Colors.white, size: 22 * iconScale),
@@ -468,7 +458,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                   onUpdateQuantity: _controller.updateQuantity,
                   onClearCart: () {
                     _controller.clearCart();
-                    HapticFeedback.lightImpact();
+                    HapticHelper.lightImpact();
                   },
                   onCheckout: () {
                     Navigator.pop(context);

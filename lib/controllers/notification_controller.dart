@@ -33,6 +33,10 @@ class NotificationController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> initialize() async {
+    await loadNotifications();
+  }
+
   Future<void> loadNotifications() async {
     _isLoading = true;
     notifyListeners();

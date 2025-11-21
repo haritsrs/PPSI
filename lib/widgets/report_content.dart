@@ -9,22 +9,12 @@ import 'report_transaction_list.dart';
 
 class ReportContent extends StatelessWidget {
   final LaporanController controller;
-  final List<String> periods;
-  final List<String> filters;
-  final List<String> paymentMethods;
-  final String selectedPeriod;
-  final ValueChanged<String> onPeriodChanged;
   final TextEditingController searchController;
   final VoidCallback onDateRangePicker;
 
   const ReportContent({
     super.key,
     required this.controller,
-    required this.periods,
-    required this.filters,
-    required this.paymentMethods,
-    required this.selectedPeriod,
-    required this.onPeriodChanged,
     required this.searchController,
     required this.onDateRangePicker,
   });
@@ -98,9 +88,9 @@ class ReportContent extends StatelessWidget {
               ),
             // Period Toggle
             PeriodToggle(
-              selectedPeriod: selectedPeriod,
-              periods: periods,
-              onPeriodChanged: onPeriodChanged,
+              selectedPeriod: controller.selectedPeriod,
+              periods: controller.periods,
+              onPeriodChanged: controller.setSelectedPeriod,
             ),
             const SizedBox(height: 24),
             // Summary Cards
@@ -147,10 +137,10 @@ class ReportContent extends StatelessWidget {
               ),
               child: ReportFilters(
                 selectedFilter: controller.selectedFilter,
-                filters: filters,
+                filters: controller.filters,
                 searchQuery: controller.searchQuery,
                 selectedPaymentMethod: controller.selectedPaymentMethod,
-                paymentMethods: paymentMethods,
+                paymentMethods: controller.paymentMethods,
                 useDateRange: controller.useDateRange,
                 startDate: controller.startDate,
                 endDate: controller.endDate,

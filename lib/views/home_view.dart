@@ -314,6 +314,54 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildNavRailActionButton(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required double iconScale,
+    required double paddingScale,
+  }) {
+    final isWideScreen = ResponsiveHelper.isWideScreen(context);
+    final isHorizontal = ResponsiveHelper.isHorizontal(context);
+    final baseIconSize = 24.0 * iconScale;
+    
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            vertical: 10 * paddingScale,
+            horizontal: 10 * paddingScale,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: const Color(0xFF9CA3AF),
+                size: baseIconSize,
+              ),
+              if (isWideScreen || isHorizontal) ...[
+                SizedBox(width: 12 * iconScale),
+                Text(
+                  tooltip,
+                  style: TextStyle(
+                    color: const Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13 * ResponsiveHelper.getFontScale(context),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHomeContent(BuildContext context) {
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -497,6 +545,94 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                     ),
                   ),
                 ],
+                trailing: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildNavRailActionButton(
+                      context,
+                      icon: Icons.person_rounded,
+                      tooltip: 'Akun',
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AccountPage()),
+                        );
+                      },
+                      iconScale: iconScale,
+                      paddingScale: paddingScale,
+                    ),
+                    SizedBox(height: 8 * paddingScale),
+                    StreamBuilder<int>(
+                      stream: _databaseService.getUnreadNotificationsCount(),
+                      builder: (context, snapshot) {
+                        final unreadCount = snapshot.data ?? 0;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            _buildNavRailActionButton(
+                              context,
+                              icon: Icons.notifications_rounded,
+                              tooltip: 'Notifikasi',
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const NotificationPage(),
+                                  ),
+                                );
+                              },
+                              iconScale: iconScale,
+                              paddingScale: paddingScale,
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: isWideScreen || isHorizontal ? 8 * iconScale : 4 * iconScale,
+                                top: 8 * iconScale,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    SizedBox(height: 8 * paddingScale),
+                    _buildNavRailActionButton(
+                      context,
+                      icon: Icons.settings_rounded,
+                      tooltip: 'Pengaturan',
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PengaturanPage()),
+                        );
+                      },
+                      iconScale: iconScale,
+                      paddingScale: paddingScale,
+                    ),
+                    SizedBox(height: 16 * paddingScale),
+                  ],
+                ),
               ),
             ),
             SizedBox(width: 8 * paddingScale),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/logout_controller.dart';
+import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/auth/confirmation_content.dart';
@@ -71,13 +72,7 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal keluar: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        SnackbarHelper.showError(context, 'Gagal keluar: $e');
       }
     }
   }

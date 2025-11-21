@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/login_controller.dart';
 import '../utils/validation_utils.dart';
+import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/auth/login_header.dart';
 import '../widgets/auth/auth_form_container.dart';
@@ -73,13 +74,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       await _controller.signIn();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        SnackbarHelper.showError(context, e.toString());
       }
     }
   }
@@ -88,26 +83,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     try {
       await _controller.forgotPassword();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email reset password telah dikirim'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        SnackbarHelper.showSuccess(context, 'Email reset password telah dikirim');
       }
     } catch (e) {
       if (mounted) {
-        final backgroundColor = e.toString().contains('Masukkan email')
-            ? Colors.orange
-            : Colors.red;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: backgroundColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (e.toString().contains('Masukkan email')) {
+          SnackbarHelper.showInfo(context, e.toString());
+        } else {
+          SnackbarHelper.showError(context, e.toString());
+        }
       }
     }
   }

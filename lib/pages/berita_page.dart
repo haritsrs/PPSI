@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import '../services/auth_service.dart';
-import '../services/news_service.dart';
+import '../controllers/berita_controller.dart';
 import '../utils/responsive_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/news_card.dart';
@@ -17,23 +15,24 @@ class BeritaPage extends StatefulWidget {
 }
 
 class _BeritaPageState extends State<BeritaPage> {
-  Timer? _timer;
-  final Map<String, dynamic> _newsItem = NewsService.getDefaultNews();
+  late BeritaController _controller;
 
   @override
   void initState() {
     super.initState();
-    // Update every minute to refresh the time display
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    _controller = BeritaController()
+      ..addListener(_onControllerChanged)
+      ..initialize();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _controller.removeListener(_onControllerChanged);
+    _controller.dispose();
     super.dispose();
   }
 
@@ -41,7 +40,23 @@ class _BeritaPageState extends State<BeritaPage> {
   Widget build(BuildContext context) {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final fontScale = ResponsiveHelper.getFontScale(context);
-    final userDisplayName = AuthService.getUserDisplayName(AuthService.currentUser);
+    final newsItem = _controller.newsItem;
+    final userDisplayName = _controller.userDisplayName ?? 'Pengguna';
+
+    if (newsItem == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: GradientAppBar(
+          title: "Berita",
+          icon: Icons.newspaper_rounded,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -69,8 +84,8 @@ class _BeritaPageState extends State<BeritaPage> {
               SizedBox(height: 16 * paddingScale),
 
               NewsCard(
-                news: _newsItem,
-                onTap: () => NewsDetailModal.show(context, _newsItem),
+                news: newsItem,
+                onTap: () => NewsDetailModal.show(context, newsItem),
               ),
 
               SizedBox(height: 20 * paddingScale),

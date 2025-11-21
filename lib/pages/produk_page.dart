@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../controllers/product_controller.dart';
 import '../models/product_model.dart';
+import '../utils/snackbar_helper.dart';
+import '../utils/haptic_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/loading_skeletons.dart';
 import '../widgets/products/product_app_bar.dart';
@@ -13,6 +15,7 @@ import '../widgets/products/dialogs/stock_history_dialog.dart';
 import '../widgets/products/dialogs/bulk_stock_update_dialog.dart';
 import '../widgets/products/dialogs/add_edit_product_dialog.dart';
 import '../widgets/products/dialogs/edit_stock_dialog.dart';
+import '../widgets/products/scan_barcode_dialog.dart';
 
 class ProdukPage extends StatefulWidget {
   const ProdukPage({super.key});
@@ -92,12 +95,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     // Handle error messages
     if (_controller.errorMessage != null && !_controller.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_controller.errorMessage!),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showError(context, _controller.errorMessage!);
       });
     }
 
@@ -180,7 +178,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         databaseService: _controller.databaseService,
         onSaved: () {
           _controller.refreshProducts();
-          HapticFeedback.lightImpact();
+          HapticHelper.lightImpact();
         },
       ),
     );
@@ -192,7 +190,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
       builder: (context) => AddEditProductDialog(
         onSaved: () {
           _controller.refreshProducts();
-          HapticFeedback.lightImpact();
+          HapticHelper.lightImpact();
         },
       ),
     );
@@ -205,7 +203,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         product: product,
         onSaved: () {
           _controller.refreshProducts();
-          HapticFeedback.lightImpact();
+          HapticHelper.lightImpact();
         },
       ),
     );
@@ -218,7 +216,7 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
         product: product,
         onSaved: () {
           _controller.refreshProducts();
-          HapticFeedback.lightImpact();
+          HapticHelper.lightImpact();
         },
       ),
     );
@@ -229,25 +227,6 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
   }
 
   void _showScanDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.qr_code_scanner_rounded, color: Colors.purple[600]),
-            const SizedBox(width: 8),
-            const Text('Scan Barcode'),
-          ],
-        ),
-        content: const Text('Fitur scan barcode akan segera hadir!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    ScanBarcodeDialog.show(context);
   }
 }
