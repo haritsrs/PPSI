@@ -92,6 +92,8 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     setState(() {
       _bannerImages = [
         'assets/banners/banner1.png',
+        'assets/banners/banner2.png',
+        'assets/banners/banner3.png',
       ];
     });
   }
