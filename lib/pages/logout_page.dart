@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../services/auth_service.dart';
+import '../controllers/logout_controller.dart';
 import '../widgets/responsive_page.dart';
+import '../widgets/gradient_app_bar.dart';
+import '../widgets/auth/confirmation_content.dart';
+import '../widgets/auth/auth_button.dart';
+import '../widgets/auth/info_card.dart';
 
 class LogoutPage extends StatefulWidget {
   const LogoutPage({super.key});
@@ -14,12 +17,14 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
-  bool _isLoggingOut = false;
+  late LogoutController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = LogoutController();
+    _controller.addListener(_handleControllerChange);
+    
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -47,25 +52,25 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _animationController.dispose();
+    _controller.removeListener(_handleControllerChange);
+    _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogout() async {
-    setState(() {
-      _isLoggingOut = true;
-    });
+  void _handleControllerChange() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
+  Future<void> _handleLogout() async {
     try {
-      await AuthService.signOut();
-      // AuthWrapper will automatically navigate to LoginPage
+      await _controller.logout();
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoggingOut = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal keluar: $e'),
@@ -81,216 +86,46 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.logout_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Keluar",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+      appBar: const GradientAppBar(
+        title: "Keluar",
+        icon: Icons.logout_rounded,
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
           child: ResponsivePage(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                  // Icon
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.logout_rounded,
-                      size: 60,
-                      color: Color(0xFFEF4444),
-                    ),
+            child: ConfirmationContent(
+              icon: Icons.logout_rounded,
+              iconColor: const Color(0xFFEF4444),
+              iconBackgroundColor: const Color(0xFFEF4444),
+              title: "Keluar dari Akun?",
+              description:
+                  "Anda akan keluar dari aplikasi. Anda perlu login kembali untuk mengakses akun Anda.",
+              additionalContent: Column(
+                children: [
+                  AuthButton(
+                    text: 'Ya, Keluar',
+                    icon: Icons.logout_rounded,
+                    onPressed: _handleLogout,
+                    isLoading: _controller.isLoggingOut,
+                    backgroundColor: const Color(0xFFEF4444),
                   ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Title
-                  Text(
-                    "Keluar dari Akun?",
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1F2937),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  
                   const SizedBox(height: 16),
-                  
-                  // Description
-                  Text(
-                    "Anda akan keluar dari aplikasi. Anda perlu login kembali untuk mengakses akun Anda.",
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                    textAlign: TextAlign.center,
+                  AuthButton(
+                    text: 'Batal',
+                    icon: Icons.cancel_rounded,
+                    isOutlined: true,
+                    onPressed: _controller.isLoggingOut
+                        ? null
+                        : () => Navigator.pop(context),
                   ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // Logout Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoggingOut ? null : _handleLogout,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: _isLoggingOut
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.logout_rounded, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Ya, Keluar',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Cancel Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoggingOut ? null : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF6366F1), width: 2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.cancel_rounded, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Batal',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFF6366F1),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
                   const SizedBox(height: 32),
-                  
-                  // Info Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFFCD34D),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_rounded,
-                          color: Color(0xFFF59E0B),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            "Data Anda aman dan tersimpan di cloud",
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF92400E),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  const InfoCard(
+                    message: "Data Anda aman dan tersimpan di cloud",
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
