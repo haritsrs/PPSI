@@ -9,9 +9,9 @@ import 'logout_page.dart';
 import 'pengaturan_page.dart';
 import 'notification_page.dart';
 import '../utils/responsive_helper.dart';
+import '../utils/home_utils.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
-import '../utils/home_utils.dart';
 import '../components/profile_header.dart';
 import '../components/banner_carousel.dart';
 import '../components/business_menu.dart';
@@ -34,6 +34,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   User? _currentUser;
   List<String> _bannerImages = [];
   final DatabaseService _databaseService = DatabaseService();
+  final ScrollController _homeScrollController = ScrollController();
 
   @override
   void initState() {
@@ -101,6 +102,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   @override
   void dispose() {
     _animationController.dispose();
+    _homeScrollController.dispose();
     super.dispose();
   }
 
@@ -129,7 +131,14 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     }
 
     if (_selectedIndex == index) {
-      // TODO: Optionally scroll to top for the current tab.
+      // Scroll to top for the current tab
+      if (index == 0 && _homeScrollController.hasClients) {
+        _homeScrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
       return;
     }
 
@@ -342,6 +351,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
       child: SlideTransition(
         position: _slideAnimation,
         child: SingleChildScrollView(
+          controller: _homeScrollController,
           padding: EdgeInsets.all(20 * ResponsiveHelper.getPaddingScale(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

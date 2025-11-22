@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../utils/responsive_helper.dart';
-import '../pages/produk_page.dart';
 import '../pages/pelanggan_page.dart';
 import '../widgets/home_feature.dart';
 import '../widgets/contact_us_modal.dart';
+import '../services/database_service.dart';
+import '../widgets/withdrawal_dialog.dart';
 
 class BusinessMenu extends StatelessWidget {
   final Function(BuildContext, String) onShowComingSoon;
@@ -20,20 +21,6 @@ class BusinessMenu extends StatelessWidget {
     
     final menuItems = [
       {
-        'icon': Icons.contact_support_rounded,
-        'label': 'Hubungi Kami',
-        'color': const Color(0xFF3B82F6),
-        'onTap': () {
-          ContactUsModal.show(context);
-        },
-      },
-      {
-        'icon': Icons.language_rounded,
-        'label': 'Website',
-        'color': const Color(0xFF8B5CF6),
-        'onTap': () => onShowComingSoon(context, 'Website'),
-      },
-      {
         'icon': Icons.people_rounded,
         'label': 'Pelanggan',
         'color': const Color(0xFFEF4444),
@@ -45,16 +32,32 @@ class BusinessMenu extends StatelessWidget {
         },
       },
       {
+        'icon': Icons.account_balance_wallet_rounded,
+        'label': 'Pengeluaran',
+        'color': const Color(0xFF10B981),
+        'onTap': () {
+          _showWithdrawalDialog(context);
+        },
+      },
+      {
         'icon': Icons.local_offer_rounded,
         'label': 'Promo',
         'color': const Color(0xFFF59E0B),
         'onTap': () => onShowComingSoon(context, 'Promo'),
       },
       {
-        'icon': Icons.payment_rounded,
-        'label': 'Pembayaran',
-        'color': const Color(0xFF10B981),
-        'onTap': () => onShowComingSoon(context, 'Pembayaran'),
+        'icon': Icons.language_rounded,
+        'label': 'Website',
+        'color': const Color(0xFF8B5CF6),
+        'onTap': () => onShowComingSoon(context, 'Website'),
+      },
+      {
+        'icon': Icons.contact_support_rounded,
+        'label': 'Hubungi Kami',
+        'color': const Color(0xFF3B82F6),
+        'onTap': () {
+          ContactUsModal.show(context);
+        },
       },
       {
         'icon': Icons.more_horiz_rounded,
@@ -144,6 +147,34 @@ class BusinessMenu extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _showWithdrawalDialog(BuildContext context) {
+    final databaseService = DatabaseService();
+    
+    // Get current balance and show dialog
+    databaseService.getStoreBalanceStream().first.then((balance) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) => WithdrawalDialog(
+            currentBalance: balance,
+            databaseService: databaseService,
+          ),
+        );
+      }
+    }).catchError((error) {
+      // If there's an error getting balance, show dialog with 0 balance
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) => WithdrawalDialog(
+            currentBalance: 0.0,
+            databaseService: databaseService,
+          ),
+        );
+      }
+    });
   }
 }
 
