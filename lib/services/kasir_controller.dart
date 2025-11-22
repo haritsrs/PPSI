@@ -262,15 +262,19 @@ class KasirController extends ChangeNotifier {
     _barcodeResetTimer?.cancel();
     _barcodeResetTimer = Timer(const Duration(milliseconds: 120), () {
       final bufferedCode = _barcodeBuffer.trim();
+      // Clear buffer immediately to allow next scan
       _barcodeBuffer = '';
       if (bufferedCode.isNotEmpty) {
         final product = findProductByBarcode(bufferedCode);
         if (product != null) {
           addToCart(product);
+          // Ensure buffer is cleared after successful scan
+          _barcodeBuffer = '';
+          _lastBarcodeNotFound = null;
         } else {
           _lastBarcodeNotFound = bufferedCode;
-          notifyListeners();
         }
+        notifyListeners();
       }
     });
     notifyListeners();
@@ -286,8 +290,11 @@ class KasirController extends ChangeNotifier {
     final product = findProductByBarcode(bufferedCode);
     if (product != null) {
       addToCart(product);
+      // Clear buffer immediately to allow next scan
       _barcodeBuffer = '';
       _lastBarcodeNotFound = null;
+      // Cancel any pending timer
+      _barcodeResetTimer?.cancel();
       notifyListeners();
       return true;
     } else {
@@ -302,6 +309,7 @@ class KasirController extends ChangeNotifier {
   Product? handleBarcodeEnter() {
     _barcodeResetTimer?.cancel();
     final code = _barcodeBuffer.trim();
+    // Clear buffer immediately to allow next scan
     _barcodeBuffer = '';
     _lastBarcodeNotFound = null;
     Product? foundProduct;
@@ -309,6 +317,8 @@ class KasirController extends ChangeNotifier {
       foundProduct = findProductByBarcode(code);
       if (foundProduct != null) {
         addToCart(foundProduct);
+        // Ensure buffer stays cleared after successful scan
+        _barcodeBuffer = '';
       } else {
         _lastBarcodeNotFound = code;
       }

@@ -89,8 +89,12 @@ dependencies:
   
   # Receipt printing (PDF printing and preview)
   printing: ^5.13.3
-  # Note: Thermal printer support will be added later with compatible package
-  # esc_pos_printer and esc_pos_utils conflict with pdf/printing packages
+  
+  # Thermal printer support (ESC/POS compatible)
+  # ESC/POS commands are implemented directly in printer_commands.dart
+  flutter_blue_plus: ^1.32.8
+  usb_serial: ^0.5.0
+  permission_handler: ^11.3.1
   
   # URL launcher for email and WhatsApp
   url_launcher: ^6.3.1

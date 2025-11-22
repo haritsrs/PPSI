@@ -2,6 +2,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
+import 'receipt_builder.dart';
 
 class ReceiptService {
   // Generate PDF receipt for preview and printing
@@ -237,9 +238,6 @@ class ReceiptService {
   }
 
   // Generate ESC/POS receipt for thermal printers
-  // Note: Thermal printer support requires esc_pos_printer package
-  // which conflicts with pdf/printing packages. This will be implemented
-  // with a compatible alternative package in the future.
   static Future<List<int>> generateESCPOSReceipt({
     required String transactionId,
     required DateTime date,
@@ -254,12 +252,50 @@ class ReceiptService {
     String? storeName,
     String? storeAddress,
     String? storePhone,
+    String? qrCodeData,
   }) async {
-    // TODO: Implement with compatible thermal printer package
-    throw UnimplementedError(
-      'Thermal printer support is not yet available due to package conflicts. '
-      'Please use PDF printing mode for now. Thermal printer support will be added in a future update.',
+    final builder = ReceiptBuilder();
+
+    // Header
+    builder.addHeader(
+      storeName: storeName ?? 'Toko Saya',
+      address: storeAddress,
+      phone: storePhone,
     );
+
+    // Transaction info
+    builder.addTransactionInfo(
+      transactionId: transactionId,
+      date: date,
+      customerName: customerName,
+    );
+
+    // Items
+    builder.addItems(items);
+
+    // Totals
+    builder.addTotals(
+      subtotal: subtotal,
+      tax: tax,
+      total: total,
+    );
+
+    // Payment info
+    builder.addPaymentInfo(
+      paymentMethod: paymentMethod,
+      cashAmount: cashAmount,
+      change: change,
+    );
+
+    // QR code (if provided)
+    if (qrCodeData != null && qrCodeData.isNotEmpty) {
+      builder.addQRCode(qrCodeData, label: 'ID Transaksi');
+    }
+
+    // Footer
+    builder.addFooter();
+
+    return builder.build();
   }
 
   // Print PDF receipt (for preview and general printing)
@@ -269,28 +305,9 @@ class ReceiptService {
     );
   }
 
-  // Print to thermal printer via network
-  // Note: This requires a compatible thermal printer package
-  static Future<void> printToThermalPrinter({
-    required String printerIP,
-    required int port,
-    required List<int> bytes,
-  }) async {
-    throw UnimplementedError(
-      'Thermal printer support is not yet available. '
-      'Please use PDF printing mode which works with any printer.',
-    );
-  }
-
-  // Print to thermal printer via Bluetooth (Android/iOS)
-  static Future<void> printToBluetoothPrinter({
-    required String printerAddress,
-    required List<int> bytes,
-  }) async {
-    throw UnimplementedError(
-      'Bluetooth thermal printer support is not yet available. '
-      'Please use PDF printing mode which works with any printer.',
-    );
-  }
+  // Print to thermal printer using PrinterService
+  // This method should be called with an instance of PrinterService
+  // Example: await printerService.printBytes(bytes);
+  // The PrinterService handles both USB and Bluetooth connections
 }
 
