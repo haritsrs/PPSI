@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
+import 'storage_service.dart';
+
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -92,7 +94,7 @@ class AuthService {
     }
   }
   
-  // Upload profile picture to Firebase Storage
+  // Upload profile picture to Firebase Storage with automatic optimization
   static Future<String> uploadProfilePicture(File imageFile) async {
     try {
       final user = _auth.currentUser;
@@ -100,14 +102,25 @@ class AuthService {
         throw Exception('User not logged in');
       }
       
+      // Optimize image (converts to JPEG, resizes to max 800px width, quality 80)
+      final optimizedFile = await StorageService.optimizeImage(imageFile);
+      
       // Create a reference to the location you want to upload to in Firebase Storage
+      // Always use .jpg extension since we convert to JPEG
       final ref = _storage.ref().child('profile_pictures/${user.uid}.jpg');
       
-      // Upload the file to Firebase Storage
-      await ref.putFile(imageFile);
+      // Upload the optimized file to Firebase Storage
+      await ref.putFile(optimizedFile);
       
       // Get the download URL
       final downloadURL = await ref.getDownloadURL();
+      
+      // Clean up optimized file
+      try {
+        await optimizedFile.delete();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
       
       return downloadURL;
     } catch (e) {

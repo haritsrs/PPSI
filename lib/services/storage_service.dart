@@ -9,24 +9,23 @@ import '../utils/error_helper.dart';
 class StorageService {
   static final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Upload product image to Firebase Storage with compression
+  /// Upload product image to Firebase Storage with automatic optimization
   /// Returns the download URL
   static Future<String> uploadProductImage({
     required File imageFile,
     required String productId,
   }) async {
     try {
-      // Compress image
-      final compressedFile = await _compressImage(imageFile);
+      // Optimize image (converts to JPEG, resizes to max 800px width, quality 80)
+      final optimizedFile = await optimizeImage(imageFile);
       
-      // Create unique filename
+      // Create unique filename (always .jpg since we convert to JPEG)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = imageFile.path.split('.').last;
-      final fileName = 'products/$productId/${timestamp}.$extension';
+      final fileName = 'products/$productId/${timestamp}.jpg';
       
       // Upload to Firebase Storage
       final ref = _storage.ref().child(fileName);
-      final uploadTask = ref.putFile(compressedFile);
+      final uploadTask = ref.putFile(optimizedFile);
       
       // Wait for upload to complete
       final snapshot = await uploadTask;
@@ -34,9 +33,9 @@ class StorageService {
       // Get download URL
       final downloadUrl = await snapshot.ref.getDownloadURL();
       
-      // Clean up compressed file
+      // Clean up optimized file
       try {
-        await compressedFile.delete();
+        await optimizedFile.delete();
       } catch (e) {
         // Ignore cleanup errors
       }
@@ -68,32 +67,81 @@ class StorageService {
     }
   }
 
-  /// Compress image to reduce file size
-  static Future<File> _compressImage(File imageFile) async {
+  /// Optimize image for Firebase Storage upload
+  /// 
+  /// This function:
+  /// - Accepts JPEG, PNG, and HEIC images
+  /// - Converts all images to JPEG format
+  /// - Resizes to maximum width of 800px while preserving aspect ratio
+  /// - Applies compression with quality 80
+  /// - Returns optimized JPEG file
+  /// - Handles processing errors gracefully
+  /// 
+  /// Returns the optimized image file as JPEG
+  static Future<File> optimizeImage(File imageFile) async {
     try {
-      // Get temporary directory
+      // Validate file exists
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist');
+      }
+
+      // Get temporary directory for output
       final tempDir = await getTemporaryDirectory();
-      final targetPath = '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final targetPath = '${tempDir.path}/optimized_${timestamp}.jpg';
       
-      // Compress image
+      // Compress and optimize image
+      // minWidth: 800 means resize to max 800px width (preserves aspect ratio)
+      // minHeight: 0 means no height constraint (aspect ratio preserved)
+      // format: jpeg converts all formats (JPEG, PNG, HEIC) to JPEG
       final compressedFile = await FlutterImageCompress.compressAndGetFile(
         imageFile.absolute.path,
         targetPath,
-        quality: 85, // Quality 0-100, 85 is a good balance
-        minWidth: 1024, // Max width
-        minHeight: 1024, // Max height
-        format: CompressFormat.jpeg,
+        quality: 80, // Quality 80 as specified
+        minWidth: 800, // Maximum width 800px
+        minHeight: 0, // No height constraint, preserves aspect ratio
+        format: CompressFormat.jpeg, // Always convert to JPEG
+        keepExif: false, // Remove EXIF data to reduce file size
       );
       
       if (compressedFile == null) {
-        throw Exception('Image compression failed');
+        throw Exception('Image optimization failed: compression returned null');
       }
       
-      return File(compressedFile.path);
+      final optimizedFile = File(compressedFile.path);
+      
+      // Validate optimized file exists
+      if (!await optimizedFile.exists()) {
+        throw Exception('Optimized image file was not created');
+      }
+      
+      return optimizedFile;
     } catch (e) {
-      // If compression fails, return original file
-      print('Compression error: $e, using original file');
-      return imageFile;
+      // Log error for debugging
+      print('Image optimization error: $e');
+      
+      // If optimization fails, try to convert original to JPEG as fallback
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fallbackPath = '${tempDir.path}/fallback_${timestamp}.jpg';
+        
+        final fallbackFile = await FlutterImageCompress.compressAndGetFile(
+          imageFile.absolute.path,
+          fallbackPath,
+          quality: 80,
+          format: CompressFormat.jpeg,
+        );
+        
+        if (fallbackFile != null) {
+          return File(fallbackFile.path);
+        }
+      } catch (fallbackError) {
+        print('Fallback conversion also failed: $fallbackError');
+      }
+      
+      // If all else fails, throw the original error
+      throw Exception('Failed to optimize image: $e');
     }
   }
 
