@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../controllers/product_controller.dart';
+import '../../services/product_controller.dart';
 
 class ProductSearchFilterSection extends StatefulWidget {
   final ProductController controller;

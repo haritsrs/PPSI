@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../controllers/product_controller.dart';
+import '../../services/product_controller.dart';
 import '../../models/product_model.dart';
 import 'product_card.dart';
 import 'product_dismissible_background.dart';

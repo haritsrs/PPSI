@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/berita_controller.dart';
+import '../services/berita_controller.dart';
 import '../utils/responsive_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/news_card.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controllers/customer_controller.dart';
+import '../../services/customer_controller.dart';
 
 class CustomerSearchFilterSection extends StatelessWidget {
   final CustomerController controller;

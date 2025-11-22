@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../controllers/notification_controller.dart';
+import '../services/notification_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/haptic_helper.dart';
 import '../widgets/notifications/notification_app_bar.dart';

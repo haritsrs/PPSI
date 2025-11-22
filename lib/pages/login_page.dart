@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/login_controller.dart';
+import '../services/login_controller.dart';
 import '../utils/validation_utils.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';

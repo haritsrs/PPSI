@@ -26,9 +26,18 @@ class DatabaseService {
   // Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
 
+  // Helper method to get user-scoped reference
+  DatabaseReference _getUserRef(String path) {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User must be logged in to access $path');
+    }
+    return _database.child('users').child(userId).child(path);
+  }
+
   // Products operations
-  DatabaseReference get productsRef => _database.child('products');
-  DatabaseReference get auditLogsRef => _database.child('auditLogs');
+  DatabaseReference get productsRef => _getUserRef('products');
+  DatabaseReference get auditLogsRef => _getUserRef('auditLogs');
   
   Future<void> _logAuditEvent(String action, Map<String, dynamic> payload) async {
     try {
@@ -244,7 +253,7 @@ class DatabaseService {
       });
       
       // Record stock history
-      final stockHistoryRef = _database.child('stockHistory').child(productId).push();
+      final stockHistoryRef = _getUserRef('stockHistory').child(productId).push();
       await stockHistoryRef.set({
         'productId': productId,
         'productName': productData['name'] as String? ?? '',
@@ -331,7 +340,7 @@ class DatabaseService {
       });
       
       // Record stock history
-      final stockHistoryRef = _database.child('stockHistory').child(productId).push();
+      final stockHistoryRef = _getUserRef('stockHistory').child(productId).push();
       await stockHistoryRef.set({
         'productId': productId,
         'productName': productData['name'] as String? ?? '',
@@ -396,7 +405,7 @@ class DatabaseService {
 
   // Get stock history for a product
   Stream<List<Map<String, dynamic>>> getStockHistoryStream(String productId) {
-    return _database.child('stockHistory').child(productId)
+    return _getUserRef('stockHistory').child(productId)
         .orderByChild('createdAt')
         .onValue
         .map((event) {
@@ -422,7 +431,7 @@ class DatabaseService {
 
   // Get all stock history
   Stream<List<Map<String, dynamic>>> getAllStockHistoryStream() {
-    return _database.child('stockHistory')
+    return _getUserRef('stockHistory')
         .orderByChild('createdAt')
         .onValue
         .map((event) {
@@ -456,6 +465,11 @@ class DatabaseService {
       if (!RateLimiter.allow('bulk_update_stock', interval: const Duration(seconds: 1))) {
         throw const RateLimitException('Bulk update terlalu sering. Coba lagi sesaat lagi.');
       }
+      final userId = currentUserId;
+      if (userId == null) {
+        throw Exception('User must be logged in to update stock');
+      }
+      
       final batch = <String, dynamic>{};
       final historyBatch = <String, dynamic>{};
       final sanitizedUpdates = updates
@@ -482,11 +496,11 @@ class DatabaseService {
           final oldStock = (productData['stock'] as num?)?.toInt() ?? 0;
           final minStock = (productData['minStock'] as num?)?.toInt() ?? 10;
           
-          // Prepare stock update
+          // Prepare stock update (productsRef is already user-scoped)
           batch['products/$productId/stock'] = newStock;
           batch['products/$productId/updatedAt'] = DateTime.now().toIso8601String();
           
-          // Prepare history entry
+          // Prepare history entry (stockHistory is already user-scoped via _getUserRef)
           final historyKey = 'stockHistory/$productId/${DateTime.now().millisecondsSinceEpoch}';
           historyBatch[historyKey] = {
             'productId': productId,
@@ -497,7 +511,7 @@ class DatabaseService {
             'reason': reason,
             'notes': notes,
             'createdAt': DateTime.now().toIso8601String(),
-            'createdBy': currentUserId ?? 'unknown',
+            'createdBy': userId,
           };
           
           // Check for low stock notifications
@@ -521,14 +535,22 @@ class DatabaseService {
         }
       }
       
-      // Execute batch update
+      // Execute batch update using user-scoped references
       if (batch.isNotEmpty) {
-        await _database.update(batch);
+        final userScopedBatch = <String, dynamic>{};
+        batch.forEach((key, value) {
+          userScopedBatch['users/$userId/$key'] = value;
+        });
+        await _database.update(userScopedBatch);
       }
       
-      // Add history entries
+      // Add history entries using user-scoped references
       if (historyBatch.isNotEmpty) {
-        await _database.update(historyBatch);
+        final userScopedHistoryBatch = <String, dynamic>{};
+        historyBatch.forEach((key, value) {
+          userScopedHistoryBatch['users/$userId/$key'] = value;
+        });
+        await _database.update(userScopedHistoryBatch);
       }
 
       if (sanitizedUpdates.isNotEmpty) {
@@ -547,10 +569,10 @@ class DatabaseService {
   }
 
   // Transactions operations
-  DatabaseReference get transactionsRef => _database.child('transactions');
+  DatabaseReference get transactionsRef => _getUserRef('transactions');
   
   // Withdrawals operations
-  DatabaseReference get withdrawalsRef => _database.child('withdrawals');
+  DatabaseReference get withdrawalsRef => _getUserRef('withdrawals');
   
   // Add a new transaction
   Future<String> addTransaction({
@@ -878,13 +900,7 @@ class DatabaseService {
   }
 
   // Notifications operations
-  DatabaseReference get notificationsRef {
-    final userId = currentUserId;
-    if (userId == null) {
-      throw Exception('User must be logged in to access notifications');
-    }
-    return _database.child('notifications').child(userId);
-  }
+  DatabaseReference get notificationsRef => _getUserRef('notifications');
 
   // Get notifications stream for current user
   Stream<List<Map<String, dynamic>>> getNotificationsStream() {
@@ -1026,7 +1042,7 @@ class DatabaseService {
   }
 
   // Customers operations
-  DatabaseReference get customersRef => _database.child('customers');
+  DatabaseReference get customersRef => _getUserRef('customers');
   
   // Stream of all customers
   Stream<List<Map<String, dynamic>>> getCustomersStream() {

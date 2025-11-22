@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/laporan_controller.dart';
+import '../services/laporan_controller.dart';
 import '../widgets/loading_skeletons.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/report_app_bar.dart';

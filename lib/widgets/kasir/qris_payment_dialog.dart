@@ -77,11 +77,18 @@ class _QRISPaymentDialogState extends State<QRISPaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Container(
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          widget.onCancel();
+        }
+      },
+      child: Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Container(
         padding: const EdgeInsets.all(24),
         constraints: const BoxConstraints(maxWidth: 400),
         child: Column(
@@ -164,7 +171,10 @@ class _QRISPaymentDialogState extends State<QRISPaymentDialog> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: widget.onCancel,
+                    onPressed: () {
+                      widget.onCancel();
+                      Navigator.pop(context);
+                    },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.grey),
                       shape: RoundedRectangleBorder(
@@ -194,6 +204,7 @@ class _QRISPaymentDialogState extends State<QRISPaymentDialog> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

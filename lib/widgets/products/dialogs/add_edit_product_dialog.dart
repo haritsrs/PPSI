@@ -8,6 +8,7 @@ import '../../../services/database_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/security_utils.dart';
 import '../../../utils/error_helper.dart';
+import '../../../utils/currency_input_formatter.dart';
 
 class AddEditProductDialog extends StatefulWidget {
   final Product? product;
@@ -60,7 +61,9 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
     if (widget.product != null) {
       _nameController.text = widget.product!.name;
       _descriptionController.text = widget.product!.description;
-      _priceController.text = widget.product!.price.toStringAsFixed(0);
+      // Format price with periods
+      final priceStr = widget.product!.price.toStringAsFixed(0);
+      _priceController.text = priceStr.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
       _stockController.text = widget.product!.stock.toString();
       _minStockController.text = widget.product!.minStock.toString();
       _supplierController.text = widget.product!.supplier;
@@ -197,10 +200,9 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
   }
 
   double? _tryParsePrice(String value) {
-    final sanitized = SecurityUtils.sanitizeNumber(value);
-    if (sanitized.isEmpty) return null;
-    final normalized = sanitized.replaceAll('.', '').replaceAll(',', '.');
-    return double.tryParse(normalized);
+    if (value.isEmpty) return null;
+    // Use CurrencyInputFormatter to parse formatted currency
+    return CurrencyInputFormatter.parseFormattedCurrency(value);
   }
 
   double _parsePrice(String value) => _tryParsePrice(value) ?? 0;
@@ -635,6 +637,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                           Expanded(
                             child: TextFormField(
                               controller: _priceController,
+                              inputFormatters: [CurrencyInputFormatter()],
                               decoration: InputDecoration(
                                 labelText: 'Harga *',
                                 hintText: '0',

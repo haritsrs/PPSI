@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import '../controllers/account_controller.dart';
+import '../services/account_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/haptic_helper.dart';
 import '../widgets/responsive_page.dart';
@@ -186,7 +186,7 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
       appBar: GradientAppBar(
         title: "Akun Saya",
         icon: Icons.person_rounded,
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: true,
         actions: [
           if (!_controller.isEditing)
             Container(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
-import '../views/home_view.dart';
+import 'home_view.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});

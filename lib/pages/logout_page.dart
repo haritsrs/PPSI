@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/logout_controller.dart';
+import '../services/logout_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/gradient_app_bar.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/settings_controller.dart';
+import '../services/settings_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/settings/settings_app_bar.dart';

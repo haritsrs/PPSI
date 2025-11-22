@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../utils/responsive_helper.dart';
 import '../pages/produk_page.dart';
 import '../pages/pelanggan_page.dart';
-import 'home_feature.dart';
+import '../widgets/home_feature.dart';
+import '../widgets/contact_us_modal.dart';
 
 class BusinessMenu extends StatelessWidget {
   final Function(BuildContext, String) onShowComingSoon;
@@ -19,14 +20,11 @@ class BusinessMenu extends StatelessWidget {
     
     final menuItems = [
       {
-        'icon': Icons.inventory_2_rounded,
-        'label': 'Stok',
+        'icon': Icons.contact_support_rounded,
+        'label': 'Hubungi Kami',
         'color': const Color(0xFF3B82F6),
         'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ProdukPage()),
-          );
+          ContactUsModal.show(context);
         },
       },
       {
@@ -85,7 +83,7 @@ class BusinessMenu extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Menu Bisnis / Kelola Usaha Kamu",
+            "Kelola Usahamu",
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: const Color(0xFF1F2937),
               fontWeight: FontWeight.w700,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controllers/kasir_controller.dart';
+import '../../services/kasir_controller.dart';
 
 class ErrorStateWidget extends StatelessWidget {
   final KasirController controller;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../controllers/laporan_controller.dart';
+import '../services/laporan_controller.dart';
 import 'export_dialog.dart';
 
 class ReportAppBar extends StatelessWidget implements PreferredSizeWidget {

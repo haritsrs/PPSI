@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/customer_controller.dart';
+import '../services/customer_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/customers/customer_app_bar.dart';

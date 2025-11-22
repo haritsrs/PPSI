@@ -5,6 +5,7 @@ import '../../models/payment_method_model.dart';
 import '../../services/database_service.dart';
 import '../../services/xendit_service.dart';
 import '../../utils/error_helper.dart';
+import '../../utils/currency_input_formatter.dart';
 import 'qris_payment_dialog.dart';
 import 'virtual_account_bank_selection_dialog.dart';
 import 'virtual_account_payment_dialog.dart';
@@ -77,10 +78,11 @@ class _PaymentModalState extends State<PaymentModal> {
 
   void _calculateDiscount() {
     setState(() {
-      _discount = double.tryParse(_discountController.text) ?? 0.0;
+      _discount = CurrencyInputFormatter.parseFormattedCurrency(_discountController.text) ?? 0.0;
       if (_discount > widget.total) {
         _discount = widget.total;
-        _discountController.text = widget.total.toStringAsFixed(0);
+        final formatted = widget.total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+        _discountController.text = formatted;
       }
       if (_selectedPaymentMethod == 'Cash') {
         _calculateChange();
@@ -102,7 +104,7 @@ class _PaymentModalState extends State<PaymentModal> {
 
   void _calculateChange() {
     setState(() {
-      _cashAmount = double.tryParse(_cashController.text) ?? 0.0;
+      _cashAmount = CurrencyInputFormatter.parseFormattedCurrency(_cashController.text) ?? 0.0;
       _change = _cashAmount - _finalTotal;
     });
   }
@@ -615,6 +617,7 @@ class _PaymentModalState extends State<PaymentModal> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _cashController,
+                      inputFormatters: [CurrencyInputFormatter()],
                       onChanged: (_) => _calculateChange(),
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(

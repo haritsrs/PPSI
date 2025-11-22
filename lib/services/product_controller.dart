@@ -33,6 +33,7 @@ class ProductController extends ChangeNotifier {
 
   // Subscriptions
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _productsSubscription;
 
   // Getters
   List<Product> get products => _products;
@@ -95,6 +96,41 @@ class ProductController extends ChangeNotifier {
   Future<void> initialize() async {
     await _initializeConnectivity();
     await loadInitialProducts();
+    _startProductsStream();
+  }
+
+  void _startProductsStream() {
+    _productsSubscription?.cancel();
+    _productsSubscription = _databaseService.getProductsStream().listen(
+      (productsData) {
+        // Only update if we have loaded products (avoid updates during initial load)
+        if (!_hasLoadedOnce) return;
+        
+        // Update existing products with new data from stream
+        final streamProducts = productsData.map(Product.fromFirebase).toList();
+        final streamProductsMap = {for (var p in streamProducts) p.id: p};
+        
+        bool hasChanges = false;
+        // Update existing products in _products list
+        for (int i = 0; i < _products.length; i++) {
+          final updatedProduct = streamProductsMap[_products[i].id];
+          if (updatedProduct != null && _products[i].stock != updatedProduct.stock) {
+            _products[i] = updatedProduct;
+            hasChanges = true;
+          }
+        }
+        
+        // Only notify if there were actual changes
+        if (hasChanges) {
+          _categories = _buildCategoriesFromProducts(_products);
+          notifyListeners();
+        }
+      },
+      onError: (error) {
+        // Silently handle stream errors - don't log to avoid console spam
+      },
+      cancelOnError: false,
+    );
   }
 
   Future<void> loadInitialProducts({bool isRefresh = false}) async {
@@ -276,6 +312,7 @@ class ProductController extends ChangeNotifier {
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _productsSubscription?.cancel();
     super.dispose();
   }
 }

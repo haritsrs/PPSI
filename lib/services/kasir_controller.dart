@@ -84,12 +84,24 @@ class KasirController extends ChangeNotifier {
 
     _productsSubscription = _databaseService.getProductsStream().listen(
       (productsData) {
-        _products = productsData.map(Product.fromFirebase).toList();
-        _isLoading = false;
-        _isRetrying = false;
-        _errorMessage = null;
-        _hasLoadedOnce = true;
-        notifyListeners();
+        final newProducts = productsData.map(Product.fromFirebase).toList();
+        // Only update if products actually changed
+        if (_products.length != newProducts.length ||
+            !_products.every((p) => newProducts.any((np) => np.id == p.id && np.stock == p.stock && np.price == p.price))) {
+          _products = newProducts;
+          _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = null;
+          _hasLoadedOnce = true;
+          notifyListeners();
+        } else if (!_hasLoadedOnce) {
+          // Still mark as loaded even if no changes
+          _isLoading = false;
+          _isRetrying = false;
+          _errorMessage = null;
+          _hasLoadedOnce = true;
+          notifyListeners();
+        }
       },
       onError: (error) {
         final message = getFriendlyErrorMessage(
@@ -101,6 +113,7 @@ class KasirController extends ChangeNotifier {
         _errorMessage = message;
         notifyListeners();
       },
+      cancelOnError: false,
     );
   }
 

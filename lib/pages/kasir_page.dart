@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../controllers/kasir_controller.dart';
+import '../services/kasir_controller.dart';
 import '../utils/error_helper.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/haptic_helper.dart';
@@ -183,8 +183,14 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   void _showBarcodeScannerInstructions() {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (context) => const BarcodeScannerInstructionsDialog(),
-    ).then((_) => _refocusScanner());
+    ).then((_) {
+      // Only refocus if dialog was closed normally (not due to error)
+      if (mounted) {
+        _refocusScanner();
+      }
+    });
   }
 
   void _showPaymentModal() {
@@ -430,43 +436,46 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         initialChildSize: 0.7,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+        builder: (context, scrollController) => AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              // Cart Panel
-              Expanded(
-                child: CartPanel(
-                  cartItems: _controller.cartItems,
-                  subtotal: _controller.subtotal,
-                  tax: _controller.tax,
-                  total: _controller.total,
-                  onRemoveItem: _controller.removeFromCart,
-                  onUpdateQuantity: _controller.updateQuantity,
-                  onClearCart: () {
-                    _controller.clearCart();
-                    HapticHelper.lightImpact();
-                  },
-                  onCheckout: () {
-                    Navigator.pop(context);
-                    _showPaymentModal();
-                  },
+                // Cart Panel
+                Expanded(
+                  child: CartPanel(
+                    cartItems: _controller.cartItems,
+                    subtotal: _controller.subtotal,
+                    tax: _controller.tax,
+                    total: _controller.total,
+                    onRemoveItem: _controller.removeFromCart,
+                    onUpdateQuantity: _controller.updateQuantity,
+                    onClearCart: () {
+                      _controller.clearCart();
+                      HapticHelper.lightImpact();
+                    },
+                    onCheckout: () {
+                      Navigator.pop(context);
+                      _showPaymentModal();
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

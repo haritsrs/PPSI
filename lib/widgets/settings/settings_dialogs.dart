@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controllers/settings_controller.dart';
+import '../../services/settings_controller.dart';
 
 class LanguageDialog extends StatelessWidget {
   final SettingsController controller;

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../pages/kasir_page.dart';
-import '../pages/laporan_page.dart';
-import '../pages/produk_page.dart';
-import '../pages/account_page.dart';
-import '../pages/logout_page.dart';
-import '../pages/pengaturan_page.dart';
-import '../pages/notification_page.dart';
+import 'kasir_page.dart';
+import 'laporan_page.dart';
+import 'produk_page.dart';
+import 'account_page.dart';
+import 'logout_page.dart';
+import 'pengaturan_page.dart';
+import 'notification_page.dart';
 import '../utils/responsive_helper.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -106,6 +106,27 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
 
   void _onItemTapped(int index) {
     HapticFeedback.lightImpact();
+
+    // Handle navigation to separate pages (Akun, Notifikasi, Pengaturan)
+    if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AccountPage()),
+      );
+      return;
+    } else if (index == 5) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NotificationPage()),
+      );
+      return;
+    } else if (index == 6) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PengaturanPage()),
+      );
+      return;
+    }
 
     if (_selectedIndex == index) {
       // TODO: Optionally scroll to top for the current tab.
@@ -314,53 +335,6 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildNavRailActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-    required double iconScale,
-    required double paddingScale,
-  }) {
-    final isWideScreen = ResponsiveHelper.isWideScreen(context);
-    final isHorizontal = ResponsiveHelper.isHorizontal(context);
-    final baseIconSize = 24.0 * iconScale;
-    
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            vertical: 10 * paddingScale,
-            horizontal: 10 * paddingScale,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: const Color(0xFF9CA3AF),
-                size: baseIconSize,
-              ),
-              if (isWideScreen || isHorizontal) ...[
-                SizedBox(width: 12 * iconScale),
-                Text(
-                  tooltip,
-                  style: TextStyle(
-                    color: const Color(0xFF9CA3AF),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13 * ResponsiveHelper.getFontScale(context),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildHomeContent(BuildContext context) {
     return FadeTransition(
@@ -408,6 +382,89 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
         const KasirPage(),
         const LaporanPage(),
       ],
+    );
+  }
+
+  NavigationRailDestination _buildNotificationDestination({
+    required int unreadCount,
+    required double unselectedIconSize,
+    required double iconSize,
+    required double fontScale,
+    required double paddingScale,
+  }) {
+    return NavigationRailDestination(
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(Icons.notifications_rounded, size: unselectedIconSize),
+          if (unreadCount > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  unreadCount > 9 ? '9+' : unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+      selectedIcon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(Icons.notifications_rounded, size: iconSize),
+          if (unreadCount > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  unreadCount > 9 ? '9+' : unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+      label: Text(
+        'Notifikasi',
+        style: TextStyle(
+          fontSize: 12 * fontScale,
+        ),
+      ),
+      padding: EdgeInsets.symmetric(
+        vertical: 10 * paddingScale,
+        horizontal: 10 * paddingScale,
+      ),
     );
   }
 
@@ -459,180 +516,133 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              child: NavigationRail(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: _onItemTapped,
-                extended: isWideScreen || isHorizontal,
-                minWidth: isWideScreen || isHorizontal ? extendedWidth : minWidth,
-                labelType: NavigationRailLabelType.none,
-                selectedIconTheme: IconThemeData(
-                  color: const Color(0xFF6366F1),
-                  size: iconSize,
-                ),
-                unselectedIconTheme: IconThemeData(
-                  color: const Color(0xFF9CA3AF),
-                  size: unselectedIconSize,
-                ),
-                selectedLabelTextStyle: TextStyle(
-                  color: const Color(0xFF6366F1),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13 * fontScale,
-                ),
-                unselectedLabelTextStyle: TextStyle(
-                  color: const Color(0xFF9CA3AF),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13 * fontScale,
-                ),
-                indicatorColor: const Color(0xFFEEF2FF),
-                backgroundColor: Colors.transparent,
-                useIndicator: true,
-                groupAlignment: -1.0,
-                destinations: [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.home_rounded, size: unselectedIconSize),
-                    selectedIcon: Icon(Icons.home_rounded, size: iconSize),
-                    label: Text(
-                      'Beranda',
-                      style: TextStyle(
-                        fontSize: 12 * fontScale,
+              child: StreamBuilder<int>(
+                stream: _databaseService.getUnreadNotificationsCount(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  return NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _onItemTapped,
+                    extended: isWideScreen || isHorizontal,
+                    minWidth: isWideScreen || isHorizontal ? extendedWidth : minWidth,
+                    labelType: NavigationRailLabelType.none,
+                    selectedIconTheme: IconThemeData(
+                      color: const Color(0xFF6366F1),
+                      size: iconSize,
+                    ),
+                    unselectedIconTheme: IconThemeData(
+                      color: const Color(0xFF9CA3AF),
+                      size: unselectedIconSize,
+                    ),
+                    selectedLabelTextStyle: TextStyle(
+                      color: const Color(0xFF6366F1),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13 * fontScale,
+                    ),
+                    unselectedLabelTextStyle: TextStyle(
+                      color: const Color(0xFF9CA3AF),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13 * fontScale,
+                    ),
+                    indicatorColor: const Color(0xFFEEF2FF),
+                    backgroundColor: Colors.transparent,
+                    useIndicator: true,
+                    groupAlignment: -1.0,
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.home_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.home_rounded, size: iconSize),
+                        label: Text(
+                          'Beranda',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
                       ),
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10 * paddingScale,
-                      horizontal: 10 * paddingScale,
-                    ),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.store_rounded, size: unselectedIconSize),
-                    selectedIcon: Icon(Icons.store_rounded, size: iconSize),
-                    label: Text(
-                      'Produk',
-                      style: TextStyle(
-                        fontSize: 12 * fontScale,
+                      NavigationRailDestination(
+                        icon: Icon(Icons.store_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.store_rounded, size: iconSize),
+                        label: Text(
+                          'Produk',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
                       ),
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10 * paddingScale,
-                      horizontal: 10 * paddingScale,
-                    ),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.point_of_sale_rounded, size: unselectedIconSize),
-                    selectedIcon: Icon(Icons.point_of_sale_rounded, size: iconSize),
-                    label: Text(
-                      'Kasir',
-                      style: TextStyle(
-                        fontSize: 12 * fontScale,
+                      NavigationRailDestination(
+                        icon: Icon(Icons.point_of_sale_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.point_of_sale_rounded, size: iconSize),
+                        label: Text(
+                          'Kasir',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
                       ),
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10 * paddingScale,
-                      horizontal: 10 * paddingScale,
-                    ),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.analytics_rounded, size: unselectedIconSize),
-                    selectedIcon: Icon(Icons.analytics_rounded, size: iconSize),
-                    label: Text(
-                      'Laporan',
-                      style: TextStyle(
-                        fontSize: 12 * fontScale,
+                      NavigationRailDestination(
+                        icon: Icon(Icons.analytics_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.analytics_rounded, size: iconSize),
+                        label: Text(
+                          'Laporan',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
                       ),
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10 * paddingScale,
-                      horizontal: 10 * paddingScale,
-                    ),
-                  ),
-                ],
-                trailing: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildNavRailActionButton(
-                      context,
-                      icon: Icons.person_rounded,
-                      tooltip: 'Akun',
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AccountPage()),
-                        );
-                      },
-                      iconScale: iconScale,
-                      paddingScale: paddingScale,
-                    ),
-                    SizedBox(height: 8 * paddingScale),
-                    StreamBuilder<int>(
-                      stream: _databaseService.getUnreadNotificationsCount(),
-                      builder: (context, snapshot) {
-                        final unreadCount = snapshot.data ?? 0;
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            _buildNavRailActionButton(
-                              context,
-                              icon: Icons.notifications_rounded,
-                              tooltip: 'Notifikasi',
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const NotificationPage(),
-                                  ),
-                                );
-                              },
-                              iconScale: iconScale,
-                              paddingScale: paddingScale,
-                            ),
-                            if (unreadCount > 0)
-                              Positioned(
-                                right: isWideScreen || isHorizontal ? 8 * iconScale : 4 * iconScale,
-                                top: 8 * iconScale,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 16,
-                                    minHeight: 16,
-                                  ),
-                                  child: Text(
-                                    unreadCount > 9 ? '9+' : unreadCount.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                    SizedBox(height: 8 * paddingScale),
-                    _buildNavRailActionButton(
-                      context,
-                      icon: Icons.settings_rounded,
-                      tooltip: 'Pengaturan',
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PengaturanPage()),
-                        );
-                      },
-                      iconScale: iconScale,
-                      paddingScale: paddingScale,
-                    ),
-                    SizedBox(height: 16 * paddingScale),
-                  ],
-                ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.person_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.person_rounded, size: iconSize),
+                        label: Text(
+                          'Akun',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
+                      ),
+                      _buildNotificationDestination(
+                        unreadCount: unreadCount,
+                        unselectedIconSize: unselectedIconSize,
+                        iconSize: iconSize,
+                        fontScale: fontScale,
+                        paddingScale: paddingScale,
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.settings_rounded, size: unselectedIconSize),
+                        selectedIcon: Icon(Icons.settings_rounded, size: iconSize),
+                        label: Text(
+                          'Pengaturan',
+                          style: TextStyle(
+                            fontSize: 12 * fontScale,
+                          ),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 10 * paddingScale,
+                          horizontal: 10 * paddingScale,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             SizedBox(width: 8 * paddingScale),

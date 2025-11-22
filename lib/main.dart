@@ -7,8 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'pages/auth_wrapper.dart';
 import 'pages/onboarding_page.dart';
-import 'views/home_view.dart';
-import 'theme/app_theme.dart';
+import 'pages/home_view.dart';
+import 'themes/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

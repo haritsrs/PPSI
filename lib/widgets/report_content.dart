@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../controllers/laporan_controller.dart';
+import '../services/laporan_controller.dart';
 import 'status_banner.dart';
 import 'summary_card.dart';
 import 'period_toggle.dart';

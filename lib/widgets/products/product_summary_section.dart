@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controllers/product_controller.dart';
+import '../../services/product_controller.dart';
 import '../summary_card.dart';
 
 class ProductSummarySection extends StatelessWidget {

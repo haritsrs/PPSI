@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../controllers/customer_controller.dart';
+import '../../services/customer_controller.dart';
 import '../../models/customer_model.dart';
 import 'customer_card.dart';
 
