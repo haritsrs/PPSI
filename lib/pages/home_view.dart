@@ -18,6 +18,7 @@ import '../components/business_menu.dart';
 import '../components/news_section.dart';
 import '../components/custom_app_bar.dart';
 import '../components/bottom_nav_bar.dart';
+import '../widgets/gradient_app_bar.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -384,13 +385,18 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   }
 
   Widget _buildPageStack(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
+    final isWidePortraitTablet = mq.orientation == Orientation.portrait && mq.size.width >= 840;
+    final hideAppBars = isLandscape || isWidePortraitTablet;
+    
     return IndexedStack(
       index: _selectedIndex,
       children: [
         _buildHomeContent(context),
-        const ProdukPage(),
-        const KasirPage(),
-        const LaporanPage(),
+        ProdukPage(hideAppBar: hideAppBars),
+        KasirPage(hideAppBar: hideAppBars),
+        LaporanPage(hideAppBar: hideAppBars),
       ],
     );
   }
@@ -478,6 +484,34 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     );
   }
 
+  PreferredSizeWidget? _buildLandscapeAppBar() {
+    switch (_selectedIndex) {
+      case 0:
+        return CustomAppBar(databaseService: _databaseService);
+      case 1:
+        // For Produk page, we'll use a simple gradient app bar
+        return const GradientAppBar(
+          title: "Produk & Stok",
+          icon: Icons.inventory_2_rounded,
+          automaticallyImplyLeading: false,
+        );
+      case 2:
+        return const GradientAppBar(
+          title: "Kasir",
+          icon: Icons.point_of_sale_rounded,
+          automaticallyImplyLeading: false,
+        );
+      case 3:
+        return const GradientAppBar(
+          title: "Laporan",
+          icon: Icons.analytics_rounded,
+          automaticallyImplyLeading: false,
+        );
+      default:
+        return null;
+    }
+  }
+
   Widget _buildLandscapeLayout(BuildContext context) {
     final showHomeChrome = _selectedIndex == 0;
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
@@ -505,7 +539,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: showHomeChrome ? CustomAppBar(databaseService: _databaseService) : null,
+      appBar: _buildLandscapeAppBar(),
       drawer: showHomeChrome ? _buildDrawer(context) : null,
       body: SafeArea(
         child: Row(

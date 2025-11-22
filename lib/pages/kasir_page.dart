@@ -20,7 +20,9 @@ import '../widgets/kasir/search_and_category_section.dart';
 import '../widgets/kasir/cart_fab.dart';
 
 class KasirPage extends StatefulWidget {
-  const KasirPage({super.key});
+  final bool hideAppBar;
+  
+  const KasirPage({super.key, this.hideAppBar = false});
 
   @override
   State<KasirPage> createState() => _KasirPageState();
@@ -268,7 +270,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: GradientAppBar(
+      appBar: widget.hideAppBar ? null : GradientAppBar(
         title: "Kasir",
         icon: Icons.point_of_sale_rounded,
         toolbarHeight: 56,

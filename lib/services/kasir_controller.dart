@@ -93,6 +93,8 @@ class KasirController extends ChangeNotifier {
           _isRetrying = false;
           _errorMessage = null;
           _hasLoadedOnce = true;
+          // Reload categories when products change
+          _loadCategories();
           notifyListeners();
         } else if (!_hasLoadedOnce) {
           // Still mark as loaded even if no changes

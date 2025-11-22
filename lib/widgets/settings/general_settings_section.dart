@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/settings_controller.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
@@ -24,13 +25,17 @@ class GeneralSettingsSection extends StatelessWidget {
           icon: Icons.language_rounded,
           title: "Bahasa",
           subtitle: controller.selectedLanguage,
-          onTap: () => LanguageDialog.show(context, controller),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Fitur bahasa akan segera hadir!');
+          },
         ),
         SettingItem(
           icon: Icons.attach_money_rounded,
           title: "Mata Uang",
           subtitle: controller.selectedCurrency,
-          onTap: () => CurrencyDialog.show(context, controller),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Fitur mata uang akan segera hadir!');
+          },
         ),
         SettingItem(
           icon: Icons.dark_mode_rounded,
@@ -39,8 +44,7 @@ class GeneralSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.darkModeEnabled,
             onChanged: (value) {
-              controller.setDarkModeEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur mode gelap akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),

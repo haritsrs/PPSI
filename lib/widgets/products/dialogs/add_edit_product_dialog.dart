@@ -272,7 +272,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
         'description': SecurityUtils.sanitizeInput(_descriptionController.text),
         'price': _parsePrice(_priceController.text),
         'stock': _parseInt(_stockController.text),
-        'minStock': _parseInt(_minStockController.text),
+        'minStock': _tryParseInt(_minStockController.text) ?? 10,
         'supplier': SecurityUtils.sanitizeInput(_supplierController.text),
         'category': SecurityUtils.sanitizeInput(_categoryController.text),
         'barcode': SecurityUtils.sanitizeInput(_barcodeController.text),
@@ -696,21 +696,21 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                             child: TextFormField(
                               controller: _minStockController,
                               decoration: InputDecoration(
-                                labelText: 'Stok Minimum *',
-                                hintText: '10',
+                                labelText: 'Peringatan Stok Rendah',
+                                hintText: '10 (opsional)',
                                 prefixIcon: const Icon(Icons.warning_amber_rounded),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                helperText: 'Notifikasi akan muncul saat stok mencapai nilai ini',
                               ),
                               keyboardType: TextInputType.number,
                               validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Stok minimum wajib diisi';
-                                }
-                                final parsed = _tryParseInt(value);
-                                if (parsed == null || parsed < 0) {
-                                  return 'Stok minimum tidak valid';
+                                if (value != null && value.trim().isNotEmpty) {
+                                  final parsed = _tryParseInt(value);
+                                  if (parsed == null || parsed < 0) {
+                                    return 'Nilai tidak valid';
+                                  }
                                 }
                                 return null;
                               },

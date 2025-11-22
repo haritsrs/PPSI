@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/settings_controller.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
@@ -24,7 +25,9 @@ class BusinessSettingsSection extends StatelessWidget {
           icon: Icons.print_rounded,
           title: "Printer",
           subtitle: controller.selectedPrinter,
-          onTap: () => PrinterDialog.show(context, controller),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Fitur printer akan segera hadir!');
+          },
         ),
         SettingItem(
           icon: Icons.print_rounded,
@@ -33,8 +36,7 @@ class BusinessSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.printerEnabled,
             onChanged: (value) {
-              controller.setPrinterEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur printer akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),
@@ -46,8 +48,7 @@ class BusinessSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.barcodeScannerEnabled,
             onChanged: (value) {
-              controller.setBarcodeScannerEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur scanner barcode akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),

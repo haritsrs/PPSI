@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/settings_controller.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
@@ -23,7 +24,9 @@ class SupportSettingsSection extends StatelessWidget {
           icon: Icons.help_center_rounded,
           title: "Bantuan",
           subtitle: "Pusat bantuan",
-          onTap: () => HelpDialog.show(context),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Pusat bantuan akan segera hadir!');
+          },
         ),
         SettingItem(
           icon: Icons.info_rounded,

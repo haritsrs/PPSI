@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/settings_controller.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
@@ -101,7 +102,9 @@ class DataSecuritySettingsSection extends StatelessWidget {
           subtitle: "Backup data harian",
           trailing: Switch(
             value: controller.autoBackupEnabled,
-            onChanged: (value) => _handleAutoBackupToggle(context, value),
+            onChanged: (value) {
+              SnackbarHelper.showInfo(context, 'Fitur backup otomatis akan segera hadir!');
+            },
             activeColor: const Color(0xFF6366F1),
           ),
         ),
@@ -111,7 +114,9 @@ class DataSecuritySettingsSection extends StatelessWidget {
           subtitle: "Bekerja tanpa internet",
           trailing: Switch(
             value: controller.offlineModeEnabled,
-            onChanged: (value) => _handleOfflineModeToggle(context, value),
+            onChanged: (value) {
+              SnackbarHelper.showInfo(context, 'Fitur mode offline akan segera hadir!');
+            },
             activeColor: const Color(0xFF6366F1),
           ),
         ),
@@ -119,13 +124,17 @@ class DataSecuritySettingsSection extends StatelessWidget {
           icon: Icons.backup_rounded,
           title: "Backup Sekarang",
           subtitle: "Lakukan backup manual",
-          onTap: () => _handleBackupNow(context),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Fitur backup akan segera hadir!');
+          },
         ),
         SettingItem(
           icon: Icons.lock_rounded,
           title: "Ubah Password",
           subtitle: "Keamanan akun",
-          onTap: () => ChangePasswordDialog.show(context),
+          onTap: () {
+            SnackbarHelper.showInfo(context, 'Fitur ubah password akan segera hadir!');
+          },
         ),
       ],
     );

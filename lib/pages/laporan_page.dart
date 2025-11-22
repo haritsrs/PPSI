@@ -7,7 +7,9 @@ import '../widgets/report_error_state.dart';
 import '../widgets/report_content.dart';
 
 class LaporanPage extends StatefulWidget {
-  const LaporanPage({super.key});
+  final bool hideAppBar;
+  
+  const LaporanPage({super.key, this.hideAppBar = false});
 
   @override
   State<LaporanPage> createState() => _LaporanPageState();
@@ -43,7 +45,7 @@ class _LaporanPageState extends State<LaporanPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: ReportAppBar(controller: _controller),
+      appBar: widget.hideAppBar ? null : ReportAppBar(controller: _controller),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: ResponsivePage(

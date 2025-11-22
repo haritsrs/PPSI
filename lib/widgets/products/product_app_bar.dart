@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class ProductAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback onScan;
   final VoidCallback onAddProduct;
 
   const ProductAppBar({
     super.key,
-    required this.onScan,
     required this.onAddProduct,
   });
 
@@ -54,38 +52,7 @@ class ProductAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onScan();
-            },
-            icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
-            tooltip: 'Scan Barcode',
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onAddProduct();
-            },
-            icon: const Icon(Icons.add_rounded, color: Colors.white),
-            tooltip: 'Tambah Produk',
-          ),
-        ),
-      ],
+      actions: const [],
     );
   }
 

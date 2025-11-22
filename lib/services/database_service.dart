@@ -881,7 +881,7 @@ class DatabaseService {
   Future<List<String>> getCategories() async {
     try {
       final products = await getProducts();
-      final categories = <String>{'Semua'};
+      final categories = <String>{};
       
       for (var product in products) {
         final category = product['category'] as String?;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../utils/snackbar_helper.dart';
 
 class SettingsProfileSection extends StatelessWidget {
   final VoidCallback onEditProfile;
@@ -83,7 +84,7 @@ class SettingsProfileSection extends StatelessWidget {
           IconButton(
             onPressed: () {
               HapticFeedback.lightImpact();
-              onEditProfile();
+              SnackbarHelper.showInfo(context, 'Fitur edit profil akan segera hadir!');
             },
             icon: const Icon(
               Icons.edit_rounded,

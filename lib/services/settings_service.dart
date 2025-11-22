@@ -1,10 +1,15 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class SettingsService {
   static const String _prefsKeyPrefix = 'settings_';
-  static final FirebaseDatabase _database = FirebaseDatabase.instance;
+  static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
+  static final FirebaseDatabase _database = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: databaseURL,
+  );
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Settings keys

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/settings_controller.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 
@@ -26,8 +27,7 @@ class NotificationsSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.notificationsEnabled,
             onChanged: (value) {
-              controller.setNotificationsEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur notifikasi akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),
@@ -39,8 +39,7 @@ class NotificationsSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.soundEnabled,
             onChanged: (value) {
-              controller.setSoundEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur suara akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),
@@ -52,8 +51,7 @@ class NotificationsSettingsSection extends StatelessWidget {
           trailing: Switch(
             value: controller.hapticEnabled,
             onChanged: (value) {
-              controller.setHapticEnabled(value);
-              HapticFeedback.lightImpact();
+              SnackbarHelper.showInfo(context, 'Fitur getar akan segera hadir!');
             },
             activeColor: const Color(0xFF6366F1),
           ),

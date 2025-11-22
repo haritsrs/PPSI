@@ -15,10 +15,11 @@ import '../widgets/products/dialogs/stock_history_dialog.dart';
 import '../widgets/products/dialogs/bulk_stock_update_dialog.dart';
 import '../widgets/products/dialogs/add_edit_product_dialog.dart';
 import '../widgets/products/dialogs/edit_stock_dialog.dart';
-import '../widgets/products/scan_barcode_dialog.dart';
 
 class ProdukPage extends StatefulWidget {
-  const ProdukPage({super.key});
+  final bool hideAppBar;
+  
+  const ProdukPage({super.key, this.hideAppBar = false});
 
   @override
   State<ProdukPage> createState() => _ProdukPageState();
@@ -101,9 +102,20 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: ProductAppBar(
-        onScan: _showScanDialog,
+      appBar: widget.hideAppBar ? null : ProductAppBar(
         onAddProduct: _showAddProductDialog,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          HapticHelper.lightImpact();
+          _showAddProductDialog();
+        },
+        backgroundColor: const Color(0xFF6366F1),
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text(
+          'Tambah Produk',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
@@ -224,9 +236,5 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
 
   void _showDeleteConfirmDialog(Product product) {
     ProductDeleteDialog.show(context, product, _controller);
-  }
-
-  void _showScanDialog() {
-    ScanBarcodeDialog.show(context);
   }
 }
