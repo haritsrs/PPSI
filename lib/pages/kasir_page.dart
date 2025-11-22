@@ -181,14 +181,17 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   }
 
   void _showBarcodeScannerInstructions() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => const BarcodeScannerInstructionsDialog(),
-    ).then((_) {
-      // Only refocus if dialog was closed normally (not due to error)
+    // Unfocus scanner before showing dialog to prevent conflicts
+    _barcodeFocusNode.unfocus();
+    
+    BarcodeScannerInstructionsDialog.show(context).then((_) {
+      // Refocus scanner after dialog closes
       if (mounted) {
-        _refocusScanner();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _refocusScanner();
+          }
+        });
       }
     });
   }
