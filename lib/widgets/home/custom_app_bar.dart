@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/responsive_helper.dart';
-import '../services/database_service.dart';
-import '../pages/account_page.dart';
-import '../pages/logout_page.dart';
-import '../pages/pengaturan_page.dart';
-import '../pages/notification_page.dart';
+import '../../utils/responsive_helper.dart';
+import '../../controllers/home_controller.dart';
+import '../../pages/account_page.dart';
+import '../../pages/logout_page.dart';
+import '../../pages/pengaturan_page.dart';
+import '../../pages/notification_page.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final DatabaseService databaseService;
+  final HomeController controller;
   final VoidCallback? onMenuPressed;
 
   const CustomAppBar({
     super.key,
-    required this.databaseService,
+    required this.controller,
     this.onMenuPressed,
   });
 
@@ -145,7 +145,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: StreamBuilder<int>(
-              stream: databaseService.getUnreadNotificationsCount(),
+              stream: controller.databaseService.getUnreadNotificationsCount(),
               builder: (context, snapshot) {
                 final unreadCount = snapshot.data ?? 0;
                 return Stack(

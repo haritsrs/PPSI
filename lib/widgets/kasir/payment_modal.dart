@@ -636,9 +636,15 @@ class _PaymentModalState extends State<PaymentModal> {
                       keyboardType: TextInputType.number,
                       enabled: !_isProcessingPayment,
                       autofocus: false,
+                      canRequestFocus: true,
                       onTap: () {
                         // Ensure this field can get focus when tapped
-                        _cashFocusNode.requestFocus();
+                        // Request focus after a small delay to ensure it's not stolen
+                        Future.delayed(const Duration(milliseconds: 50), () {
+                          if (mounted && _cashFocusNode.canRequestFocus) {
+                            _cashFocusNode.requestFocus();
+                          }
+                        });
                       },
                       decoration: InputDecoration(
                         hintText: 'Masukkan jumlah uang',

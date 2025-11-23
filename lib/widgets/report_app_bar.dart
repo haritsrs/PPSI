@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/laporan_controller.dart';
+import '../controllers/laporan_controller.dart';
 import 'export_dialog.dart';
 
 class ReportAppBar extends StatelessWidget implements PreferredSizeWidget {
   final LaporanController controller;
+  final VoidCallback? onExportPDF;
+  final VoidCallback? onExportExcel;
 
   const ReportAppBar({
     super.key,
     required this.controller,
+    this.onExportPDF,
+    this.onExportExcel,
   });
 
   @override
@@ -69,8 +73,8 @@ class ReportAppBar extends StatelessWidget implements PreferredSizeWidget {
               HapticFeedback.lightImpact();
               ExportDialog.show(
                 context,
-                onExportPDF: () => controller.exportToPDF(context),
-                onExportExcel: () => controller.exportToExcel(context),
+                onExportPDF: onExportPDF ?? () {},
+                onExportExcel: onExportExcel ?? () {},
               );
             },
             icon: const Icon(Icons.download_rounded, color: Colors.white),

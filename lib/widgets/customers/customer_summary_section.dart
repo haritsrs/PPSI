@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/customer_controller.dart';
+import '../../controllers/customer_controller.dart';
 import '../summary_card.dart';
 import '../../utils/home_utils.dart';
 

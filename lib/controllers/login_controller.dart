@@ -38,7 +38,7 @@ class LoginController extends ChangeNotifier {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      // AuthWrapper will automatically navigate to HomeView when auth state changes
+      // AuthWrapper will automatically navigate to HomePage when auth state changes
     } catch (e) {
       rethrow;
     } finally {

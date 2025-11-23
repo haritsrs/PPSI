@@ -84,19 +84,28 @@ class SettingsService {
   /// Get setting value from Firebase
   static Future<T?> getFirebaseSetting<T>(String key) async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) return null;
+    if (userId == null) {
+      debugPrint('Error getting Firebase setting: User not authenticated [DIAG: user_not_authenticated]');
+      return null;
+    }
 
     try {
       final sanitizedKey = _sanitizeSettingKey(key);
-      final ref = _database.ref('settings/$userId/$sanitizedKey');
+      final ref = _database.ref('users/$userId/settings/$sanitizedKey');
       final snapshot = await ref.get();
       
-      if (!snapshot.exists) return null;
+      if (!snapshot.exists) {
+        // Setting not found is normal - will use default value
+        // Only log in verbose mode if needed
+        return null;
+      }
       
       final value = snapshot.value;
       return value as T?;
     } catch (e) {
-      debugPrint('Error getting Firebase setting: $e');
+      final errorString = e.toString();
+      debugPrint('Error getting Firebase setting "$key": $e [DIAG: ${errorString.contains('permission-denied') ? 'permission_denied' : errorString.contains('network') ? 'network_error' : 'unknown_error'}]');
+      // Don't throw - return null to allow fallback to local storage
       return null;
     }
   }
@@ -104,14 +113,22 @@ class SettingsService {
   /// Set setting value in Firebase
   static Future<void> setFirebaseSetting<T>(String key, T value) async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User must be logged in');
+    if (userId == null) {
+      throw Exception('User must be logged in [DIAG: user_not_authenticated]');
+    }
 
     try {
       final sanitizedKey = _sanitizeSettingKey(key);
-      final ref = _database.ref('settings/$userId/$sanitizedKey');
+      final ref = _database.ref('users/$userId/settings/$sanitizedKey');
       await ref.set(value);
     } catch (e) {
-      throw Exception('Error setting Firebase setting: $e');
+      final errorString = e.toString();
+      final diagCode = errorString.contains('permission-denied') 
+          ? 'permission_denied' 
+          : errorString.contains('network') 
+              ? 'network_error' 
+              : 'unknown_error';
+      throw Exception('Error setting Firebase setting "$key": $e [DIAG: $diagCode]');
     }
   }
 
@@ -165,7 +182,7 @@ class SettingsService {
           final sanitizedKey = _sanitizeSettingKey(settingKey);
           final value = prefs.get(key);
           if (value != null) {
-            updates['settings/$userId/$sanitizedKey'] = value;
+            updates['users/$userId/settings/$sanitizedKey'] = value;
           }
         } catch (e) {
           // Skip invalid keys during sync
@@ -184,16 +201,25 @@ class SettingsService {
   /// Sync Firebase settings to local
   static Future<void> syncFromFirebase() async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
+    if (userId == null) {
+      debugPrint('Cannot sync from Firebase: User not authenticated [DIAG: user_not_authenticated]');
+      return;
+    }
 
     try {
-      final ref = _database.ref('settings/$userId');
+      final ref = _database.ref('users/$userId/settings');
       final snapshot = await ref.get();
 
-      if (!snapshot.exists) return;
+      if (!snapshot.exists) {
+        debugPrint('No Firebase settings found for user [DIAG: no_settings_found]');
+        return;
+      }
 
       final data = snapshot.value as Map<dynamic, dynamic>?;
-      if (data == null) return;
+      if (data == null) {
+        debugPrint('Firebase settings data is null [DIAG: null_settings_data]');
+        return;
+      }
 
       final prefs = await _prefs;
       for (final entry in data.entries) {
@@ -213,11 +239,18 @@ class SettingsService {
           }
         } catch (e) {
           // Skip invalid keys during sync
-          print('Skipping invalid setting key during sync: $key');
+          debugPrint('Skipping invalid setting key during sync: $key [DIAG: invalid_key]');
         }
       }
     } catch (e) {
-      debugPrint('Error syncing from Firebase: $e');
+      final errorString = e.toString();
+      final diagCode = errorString.contains('permission-denied') 
+          ? 'permission_denied' 
+          : errorString.contains('network') 
+              ? 'network_error' 
+              : 'unknown_error';
+      debugPrint('Error syncing from Firebase: $e [DIAG: $diagCode]');
+      // Don't throw - allow app to continue with local settings
     }
   }
 

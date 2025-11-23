@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/laporan_controller.dart';
+import '../controllers/laporan_controller.dart';
 
 class ReportErrorState extends StatelessWidget {
   final LaporanController controller;

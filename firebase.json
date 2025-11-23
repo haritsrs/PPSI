@@ -1,1 +1,23 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"gunadarma-pos-marketplace","appId":"1:410635663253:android:384eb100bef8f64c99a89c","fileOutput":"android/app/google-services.json"}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "database": {
+    "rules": "firebase_database.rules.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "gunadarma-pos-marketplace",
+          "appId": "1:410635663253:android:384eb100bef8f64c99a89c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      }
+    }
+  }
+}

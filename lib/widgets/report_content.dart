@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/laporan_controller.dart';
+import '../controllers/laporan_controller.dart';
+import '../models/transaction_model.dart';
 import 'status_banner.dart';
 import 'summary_card.dart';
 import 'period_toggle.dart';
@@ -11,12 +12,16 @@ class ReportContent extends StatelessWidget {
   final LaporanController controller;
   final TextEditingController searchController;
   final VoidCallback onDateRangePicker;
+  final Function(Transaction) onShowTransactionDetail;
+  final Function(Transaction) onQuickPrint;
 
   const ReportContent({
     super.key,
     required this.controller,
     required this.searchController,
     required this.onDateRangePicker,
+    required this.onShowTransactionDetail,
+    required this.onQuickPrint,
   });
 
   @override
@@ -157,7 +162,11 @@ class ReportContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ReportTransactionList(controller: controller),
+            ReportTransactionList(
+              controller: controller,
+              onShowTransactionDetail: onShowTransactionDetail,
+              onQuickPrint: onQuickPrint,
+            ),
             const SizedBox(height: 20),
           ],
         ),

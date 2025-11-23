@@ -6,9 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
-import 'pages/auth_wrapper.dart';
+import 'routes/auth_wrapper.dart';
 import 'pages/onboarding_page.dart';
-import 'pages/home_view.dart';
+import 'routes/app_routes.dart';
 import 'themes/app_theme.dart';
 
 Future<void> main() async {
@@ -86,9 +86,7 @@ class _KiosDarmaAppState extends State<KiosDarmaApp> {
           : OnboardingPage(
               onFinished: _handleOnboardingFinished,
             ),
-      routes: {
-        '/home': (context) => const HomeView(),
-      },
+      routes: AppRoutes.getRoutes(),
       debugShowCheckedModeBanner: false,
     );
   }

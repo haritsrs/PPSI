@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-import '../services/laporan_controller.dart';
+import '../controllers/laporan_controller.dart';
+import '../models/transaction_model.dart';
 import 'transaction_card.dart';
 
 class ReportTransactionList extends StatelessWidget {
   final LaporanController controller;
+  final Function(Transaction) onShowTransactionDetail;
+  final Function(Transaction) onQuickPrint;
 
   const ReportTransactionList({
     super.key,
     required this.controller,
+    required this.onShowTransactionDetail,
+    required this.onQuickPrint,
   });
 
   Widget _buildTransactionDismissBackground({
@@ -106,15 +111,15 @@ class ReportTransactionList extends StatelessWidget {
             ),
             confirmDismiss: (direction) async {
               if (direction == DismissDirection.startToEnd) {
-                controller.showTransactionDetail(context, transaction);
+                onShowTransactionDetail(transaction);
               } else {
-                await controller.quickPrint(context, transaction);
+                onQuickPrint(transaction);
               }
               return false;
             },
             child: TransactionCard(
               transaction: transaction,
-              onTap: () => controller.showTransactionDetail(context, transaction),
+              onTap: () => onShowTransactionDetail(transaction),
             ),
           ),
         );

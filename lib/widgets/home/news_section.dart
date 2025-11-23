@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import '../utils/responsive_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class NewsSection extends StatefulWidget {
   const NewsSection({super.key});

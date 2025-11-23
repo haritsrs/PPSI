@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/onboarding_controller.dart';
+import '../controllers/onboarding_controller.dart';
 import '../widgets/onboarding/skip_button.dart';
 import '../widgets/onboarding/onboarding_slide_content.dart';
 import '../widgets/onboarding/page_indicators.dart';

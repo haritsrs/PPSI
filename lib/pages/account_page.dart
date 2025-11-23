@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import '../services/account_controller.dart';
-import '../utils/snackbar_helper.dart';
+import '../controllers/account_controller.dart';
 import '../utils/haptic_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -66,52 +64,16 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
   }
 
 
-  Future<void> _handleSaveProfile() async {
-    try {
-      await _controller.saveProfile();
-      if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Profil berhasil diperbarui');
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal memperbarui profil: $e');
-      }
-    }
-  }
-
-  Future<void> _handlePickImage(ImageSource source) async {
-    try {
-      await _controller.pickImage(source);
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal memilih gambar: $e');
-      }
-    }
-  }
-
-  Future<void> _handleDeleteProfilePicture() async {
-    try {
-      await _controller.deleteProfilePicture();
-      if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Foto profil berhasil dihapus');
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal menghapus foto: $e');
-      }
-    }
-  }
-  
   void _showImagePickerDialog() {
     showDialog(
       context: context,
       builder: (_) => ImagePickerDialog(
         currentUser: _controller.currentUser,
         selectedImage: _controller.selectedImage,
-        onPickImage: _handlePickImage,
+        onPickImage: _controller.pickImage,
         onDeleteImage: () {
           _controller.clearSelectedImage();
-          _handleDeleteProfilePicture();
+          _controller.deleteProfilePicture();
         },
       ),
     );
@@ -130,51 +92,13 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
     );
   }
 
-  Future<void> _handleSendVerificationEmail() async {
-    try {
-      await _controller.sendVerificationEmail();
-      if (mounted) {
-        SnackbarHelper.showSuccess(
-          context,
-          'Email verifikasi telah dikirim. Silakan cek inbox Anda dan klik tautan verifikasi.',
-          duration: const Duration(seconds: 4),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal mengirim email verifikasi: $e');
-      }
-    }
-  }
-
-  Future<void> _handleCheckEmailVerification() async {
-    try {
-      await _controller.checkEmailVerification();
-      if (mounted) {
-        final isVerified = _controller.currentUser?.emailVerified ?? false;
-        if (isVerified) {
-          SnackbarHelper.showSuccess(context, 'Email berhasil diverifikasi!');
-        } else {
-          SnackbarHelper.showInfo(
-            context,
-            'Email belum diverifikasi. Silakan cek email Anda dan klik tautan verifikasi.',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal memeriksa status verifikasi: $e');
-      }
-    }
-  }
-
   void _showVerificationDialog() {
     showDialog(
       context: context,
       builder: (_) => VerificationDialog(
         currentUser: _controller.currentUser,
-        onSendEmail: _handleSendVerificationEmail,
-        onCheckStatus: _handleCheckEmailVerification,
+        onSendEmail: _controller.sendVerificationEmail,
+        onCheckStatus: _controller.checkEmailVerification,
       ),
     );
   }
@@ -229,14 +153,14 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                     isEditing: _controller.isEditing,
                     isLoading: _controller.isLoading,
                     onCancel: _controller.cancelEdit,
-                    onSave: _handleSaveProfile,
+                    onSave: _controller.saveProfile,
                   ),
                   const SizedBox(height: 24),
                   AccountActionsSection(
                     currentUser: _controller.currentUser,
                     onChangePassword: _showChangePasswordDialog,
                     onVerifyEmail: _showVerificationDialog,
-                    onCheckVerification: _handleCheckEmailVerification,
+                    onCheckVerification: _controller.checkEmailVerification,
                     onLogout: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const LogoutPage()),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-import '../utils/responsive_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class BannerCarousel extends StatefulWidget {
   final List<String> bannerImages;

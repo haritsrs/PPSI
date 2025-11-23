@@ -2,15 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import '../models/transaction_model.dart';
 import '../services/database_service.dart';
 import '../services/report_export_service.dart';
 import '../utils/error_helper.dart';
-import '../widgets/transaction_detail_modal.dart';
-import '../widgets/print_receipt_dialog.dart';
-import '../widgets/download_success_dialog.dart';
 
 class LaporanController extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
@@ -155,30 +150,69 @@ class LaporanController extends ChangeNotifier {
     }
     _errorMessage = null;
 
-    _transactionsSubscription = _databaseService.getTransactionsStream().listen(
-      (transactionsData) {
-        _transactions = transactionsData.map(Transaction.fromFirebase).toList();
+    try {
+      _transactionsSubscription = _databaseService.getTransactionsStream().listen(
+        (transactionsData) {
+          try {
+            _transactions = transactionsData.map((data) {
+              try {
+                return Transaction.fromFirebase(data);
+              } catch (e) {
+                debugPrint('Error parsing transaction: $e, data: $data');
+                rethrow;
+              }
+            }).toList();
+            _isLoading = false;
+            _isRetrying = false;
+            _isRefreshing = false;
+            _errorMessage = null;
+            _hasLoadedOnce = true;
+            notifyListeners();
+          } catch (e) {
+            debugPrint('Error processing transactions: $e');
+            final message = getFriendlyErrorMessage(
+              e,
+              fallbackMessage: 'Gagal memproses data transaksi. [DIAG: ${e.toString()}]',
+            );
+            if (!isRefresh) {
+              _isLoading = false;
+              _isRetrying = false;
+            }
+            _isRefreshing = false;
+            _errorMessage = message;
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('Error in transactions stream: $error');
+          final message = getFriendlyErrorMessage(
+            error,
+            fallbackMessage: 'Gagal memuat data transaksi. [DIAG: ${error.toString()}]',
+          );
+          if (!isRefresh) {
+            _isLoading = false;
+            _isRetrying = false;
+          }
+          _isRefreshing = false;
+          _errorMessage = message;
+          notifyListeners();
+        },
+        cancelOnError: false,
+      );
+    } catch (error) {
+      debugPrint('Error setting up transactions stream: $error');
+      final message = getFriendlyErrorMessage(
+        error,
+        fallbackMessage: 'Gagal menginisialisasi stream transaksi. [DIAG: ${error.toString()}]',
+      );
+      if (!isRefresh) {
         _isLoading = false;
         _isRetrying = false;
-        _isRefreshing = false;
-        _errorMessage = null;
-        _hasLoadedOnce = true;
-        notifyListeners();
-      },
-      onError: (error) {
-        final message = getFriendlyErrorMessage(
-          error,
-          fallbackMessage: 'Gagal memuat data transaksi.',
-        );
-        if (!isRefresh) {
-          _isLoading = false;
-          _isRetrying = false;
-        }
-        _isRefreshing = false;
-        _errorMessage = message;
-        notifyListeners();
-      },
-    );
+      }
+      _isRefreshing = false;
+      _errorMessage = message;
+      notifyListeners();
+    }
   }
 
   Future<void> _initializeConnectivity() async {
@@ -264,240 +298,62 @@ class LaporanController extends ChangeNotifier {
     return _selectedFilter;
   }
 
-  // Export methods
-  Future<void> exportToPDF(BuildContext context) async {
+  // Export methods - return data, let page handle UI
+  Future<File?> exportToPDF() async {
     try {
-      // Ensure locale is initialized
-      await initializeDateFormatting('id_ID', null);
-      
       final file = await ReportExportService.exportToPDF(
         transactions: filteredTransactions,
         periodText: getPeriodText(),
         totalRevenue: totalRevenue,
         totalTransactions: totalTransactions,
       );
-
-      if (file == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gagal membuat file PDF.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      if (context.mounted) {
-        DownloadSuccessDialog.show(
-          context: context,
-          filePath: file.path,
-          fileName: file.path.split(Platform.pathSeparator).last,
-          fileType: 'PDF',
-          onShare: () async {
-            try {
-              await ReportExportService.shareFile(file, getPeriodText());
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error sharing: $e'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-            }
-          },
-        );
-      }
+      return file;
     } catch (error) {
-      if (context.mounted) {
-        final message = getFriendlyErrorMessage(
-          error,
-          fallbackMessage: 'Gagal membuat laporan PDF.',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error exporting PDF: $error');
+      return null;
     }
   }
 
-  Future<void> exportToExcel(BuildContext context) async {
+  Future<File?> exportToExcel() async {
     try {
-      // Ensure locale is initialized
-      await initializeDateFormatting('id_ID', null);
-      
       final file = await ReportExportService.exportToExcel(
         transactions: filteredTransactions,
         periodText: getPeriodText(),
         totalRevenue: totalRevenue,
         totalTransactions: totalTransactions,
       );
-
-      if (file == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gagal membuat file Excel.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      if (context.mounted) {
-        DownloadSuccessDialog.show(
-          context: context,
-          filePath: file.path,
-          fileName: file.path.split(Platform.pathSeparator).last,
-          fileType: 'Excel',
-          onShare: () async {
-            try {
-              await ReportExportService.shareFile(file, getPeriodText());
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error sharing: $e'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-            }
-          },
-        );
-      }
+      return file;
     } catch (error) {
-      if (context.mounted) {
-        final message = getFriendlyErrorMessage(
-          error,
-          fallbackMessage: 'Gagal membuat laporan Excel.',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error exporting Excel: $error');
+      return null;
     }
   }
 
-  // Transaction detail methods
-  Future<void> showTransactionDetail(BuildContext context, Transaction transaction) async {
+  // Transaction detail methods - return data, let page handle UI
+  Future<Map<String, dynamic>?> getTransactionDetail(String transactionId) async {
     try {
-      final fullTransactionData = await _databaseService.getTransaction(transaction.id);
-
-      if (!context.mounted) return;
-
-      TransactionDetailModal.show(
-        context,
-        transaction: transaction,
-        fullTransactionData: fullTransactionData,
-        databaseService: _databaseService,
-        onPrint: fullTransactionData != null
-            ? () {
-                Navigator.pop(context);
-                showDialog(
-                  context: context,
-                  builder: (context) => PrintReceiptDialog(
-                    transactionId: transaction.id,
-                    transactionData: fullTransactionData,
-                  ),
-                );
-              }
-            : null,
-        onCancelled: () {
-          refreshTransactions();
-        },
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      final message = getFriendlyErrorMessage(
-        error,
-        fallbackMessage: 'Gagal memuat detail transaksi.',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> quickPrint(BuildContext context, Transaction transaction) async {
-    try {
-      final fullTransactionData = await _databaseService.getTransaction(transaction.id);
-      if (!context.mounted) return;
-
+      if (transactionId.isEmpty) {
+        debugPrint('Error: transactionId is empty [DIAG: empty_transaction_id]');
+        return null;
+      }
+      final fullTransactionData = await _databaseService.getTransaction(transactionId);
       if (fullTransactionData == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Detail transaksi tidak ditemukan.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
+        debugPrint('Transaction not found: $transactionId [DIAG: transaction_not_found]');
       }
-
-      showDialog(
-        context: context,
-        builder: (context) => PrintReceiptDialog(
-          transactionId: transaction.id,
-          transactionData: fullTransactionData,
-        ),
-      );
+      return fullTransactionData;
     } catch (error) {
-      if (!context.mounted) return;
-      final message = getFriendlyErrorMessage(
-        error,
-        fallbackMessage: 'Gagal menyiapkan struk.',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      debugPrint('Error getting transaction detail: $error [DIAG: ${error.toString()}]');
+      return null;
     }
   }
 
-  // Date range picker
-  Future<void> openDateRangePicker(BuildContext context) async {
-    await initializeDateFormatting('id_ID', null);
-    
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: _startDate != null && _endDate != null
-          ? DateTimeRange(start: _startDate!, end: _endDate!)
-          : null,
-      locale: const Locale('id', 'ID'),
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF6366F1),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF1F2937),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (picked != null) {
-      setDateRange(picked.start, picked.end);
+  Future<Map<String, dynamic>?> getTransactionForPrint(String transactionId) async {
+    try {
+      final fullTransactionData = await _databaseService.getTransaction(transactionId);
+      return fullTransactionData;
+    } catch (error) {
+      debugPrint('Error getting transaction for print: $error');
+      return null;
     }
   }
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/product_controller.dart';
+import '../../controllers/product_controller.dart';
 
 class ProductErrorState extends StatelessWidget {
   final ProductController controller;

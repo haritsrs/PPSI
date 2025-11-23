@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/product_controller.dart';
+import '../controllers/product_controller.dart';
 import '../models/product_model.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/haptic_helper.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/receipt_service.dart';
-import '../services/printer_service.dart';
+import '../controllers/printer_controller.dart';
 import '../utils/snackbar_helper.dart';
 
 class PrintReceiptDialog extends StatefulWidget {

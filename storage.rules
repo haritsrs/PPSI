@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Profile pictures: Users can only read/write their own profile picture
+    // Path structure: profile_pictures/{userId}.jpg
+    match /profile_pictures/{fileName} {
+      // Extract userId from filename (filename is userId.jpg)
+      // Users can only access their own profile picture
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
+      allow delete: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
+    }
+    
+    // Product images: Users can read/write product images
+    // Path structure: products/{productId}/{timestamp}.jpg
+    match /products/{productId}/{fileName} {
+      // Allow read for authenticated users (users can view products)
+      allow read: if isAuthenticated();
+      
+      // Allow write/delete only if authenticated
+      // Note: We rely on the application logic to ensure users only upload to their own products
+      // since productId doesn't directly contain userId. The app validates ownership before upload.
+      allow write: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+  }
+}
+

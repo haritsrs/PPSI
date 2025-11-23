@@ -20,7 +20,7 @@ final RegExp _dangerousChars = RegExp(
 );
 // Additional patterns for common XSS vectors
 final RegExp _xssPatterns = RegExp(
-  r'(?i)(javascript|onerror|onload|onclick|onmouseover|onfocus|onblur|eval|expression|vbscript|data:text/html)',
+  r'(javascript|onerror|onload|onclick|onmouseover|onfocus|onblur|eval|expression|vbscript|data:text/html)',
   caseSensitive: false,
 );
 final RegExp _numberSanitizer = RegExp(r'[^0-9.,-]');

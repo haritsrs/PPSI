@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/product_model.dart';
-import '../../services/product_controller.dart';
+import '../../controllers/product_controller.dart';
 
 class ProductDeleteDialog {
   static void show(BuildContext context, Product product, ProductController controller) {

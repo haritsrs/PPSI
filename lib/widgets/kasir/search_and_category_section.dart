@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../services/kasir_controller.dart';
+import '../../controllers/kasir_controller.dart';
 
 class SearchAndCategorySection extends StatelessWidget {
   final KasirController controller;

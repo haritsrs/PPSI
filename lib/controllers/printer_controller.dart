@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:usb_serial/usb_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'printer_commands.dart';
-import 'receipt_builder.dart';
+import '../services/printer_commands.dart';
+import '../services/receipt_builder.dart';
 
 /// Printer connection type
 enum PrinterType {

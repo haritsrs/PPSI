@@ -587,68 +587,141 @@ class DatabaseService {
     String? customerName,
     double? discount,
   }) async {
-    if (!RateLimiter.allow('add_transaction', interval: const Duration(milliseconds: 500))) {
-      throw const RateLimitException('Terlalu banyak transaksi dibuat dalam waktu bersamaan.');
-    }
-    final newTransactionRef = transactionsRef.push();
-    final transactionId = newTransactionRef.key!;
+    try {
+      if (!RateLimiter.allow('add_transaction', interval: const Duration(milliseconds: 500))) {
+        throw const RateLimitException('Terlalu banyak transaksi dibuat dalam waktu bersamaan.');
+      }
+      
+      // Validate items
+      if (items.isEmpty) {
+        throw Exception('Transaksi harus memiliki minimal 1 item. [DIAG: items_empty]');
+      }
+      
+      // Validate user is logged in
+      final userId = currentUserId;
+      if (userId == null) {
+        throw Exception('User tidak terautentikasi. Silakan login ulang. [DIAG: user_not_authenticated]');
+      }
+      
+      final newTransactionRef = transactionsRef.push();
+      final transactionId = newTransactionRef.key!;
+      
+      if (transactionId.isEmpty) {
+        throw Exception('Gagal membuat ID transaksi. [DIAG: transaction_id_empty]');
+      }
 
-    final sanitizedItems = items
-        .map((item) {
-          final sanitized = Map<String, dynamic>.from(item);
-          if (sanitized['productName'] is String) {
-            sanitized['productName'] = SecurityUtils.sanitizeInput(sanitized['productName'] as String);
+      final sanitizedItems = items
+          .map((item) {
+            try {
+              final sanitized = Map<String, dynamic>.from(item);
+              if (sanitized['productName'] is String) {
+                sanitized['productName'] = SecurityUtils.sanitizeInput(sanitized['productName'] as String);
+              }
+              // Validate required fields
+              if (sanitized['productId'] == null || sanitized['productId'].toString().isEmpty) {
+                throw Exception('Item tidak memiliki productId. [DIAG: missing_product_id]');
+              }
+              if (sanitized['quantity'] == null || (sanitized['quantity'] as num) <= 0) {
+                throw Exception('Item memiliki quantity tidak valid. [DIAG: invalid_quantity]');
+              }
+              return sanitized;
+            } catch (e) {
+              throw Exception('Error memproses item: $e');
+            }
+          })
+          .toList();
+
+      final sanitizedPaymentMethod = SecurityUtils.sanitizeInput(paymentMethod);
+      final sanitizedCustomerName =
+          customerName != null ? SecurityUtils.sanitizeInput(customerName) : null;
+      
+      final transactionData = {
+        'id': transactionId,
+        'items': sanitizedItems,
+        'subtotal': subtotal,
+        'tax': tax,
+        'total': total,
+        'paymentMethod': sanitizedPaymentMethod,
+        'cashAmount': cashAmount,
+        'change': change,
+        'createdAt': DateTime.now().toIso8601String(),
+        'createdBy': userId,
+        'status': 'Selesai',
+        if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+        if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty)
+          'customerName': _encryptionHelper.encrypt(sanitizedCustomerName),
+        if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty) 'customerNameEncrypted': true,
+        if (discount != null && discount > 0) 'discount': discount,
+      };
+      
+      // Save transaction
+      try {
+        await newTransactionRef.set(transactionData);
+        debugPrint('Transaction saved successfully: $transactionId');
+      } catch (e) {
+        throw Exception('Gagal menyimpan transaksi ke database: $e [DIAG: save_failed]');
+      }
+      
+      // Update stock for each item
+      final List<String> stockErrors = [];
+      for (var item in items) {
+        try {
+          final productId = item['productId'] as String?;
+          final quantity = item['quantity'] as int?;
+          
+          if (productId == null || productId.isEmpty) {
+            stockErrors.add('ProductId kosong');
+            continue;
           }
-          return sanitized;
-        })
-        .toList();
+          
+          if (quantity == null || quantity <= 0) {
+            stockErrors.add('Quantity tidak valid untuk produk $productId');
+            continue;
+          }
+          
+          await decrementProductStock(productId, quantity);
+        } catch (e) {
+          stockErrors.add('Error update stok untuk ${item['productId']}: $e');
+          debugPrint('Error decrementing stock for ${item['productId']}: $e');
+        }
+      }
+      
+      if (stockErrors.isNotEmpty) {
+        debugPrint('Stock update errors (transaction still saved): ${stockErrors.join(", ")}');
+        // Don't throw - transaction is already saved, just log the errors
+      }
+      
+      // Update customer transaction stats if customerId is provided
+      if (customerId != null && customerId.isNotEmpty) {
+        try {
+          await updateCustomerTransactionStats(customerId, total);
+        } catch (e) {
+          debugPrint('Error updating customer stats: $e');
+          // Don't throw - transaction is already saved
+        }
+      }
 
-    final sanitizedPaymentMethod = SecurityUtils.sanitizeInput(paymentMethod);
-    final sanitizedCustomerName =
-        customerName != null ? SecurityUtils.sanitizeInput(customerName) : null;
-    
-    final transactionData = {
-      'id': transactionId,
-      'items': sanitizedItems,
-      'subtotal': subtotal,
-      'tax': tax,
-      'total': total,
-      'paymentMethod': sanitizedPaymentMethod,
-      'cashAmount': cashAmount,
-      'change': change,
-      'createdAt': DateTime.now().toIso8601String(),
-      'createdBy': currentUserId ?? 'unknown',
-      'status': 'Selesai',
-      if (customerId != null) 'customerId': customerId,
-      if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty)
-        'customerName': _encryptionHelper.encrypt(sanitizedCustomerName),
-      if (sanitizedCustomerName != null && sanitizedCustomerName.isNotEmpty) 'customerNameEncrypted': true,
-      if (discount != null && discount > 0) 'discount': discount,
-    };
-    
-    await newTransactionRef.set(transactionData);
-    
-    // Update stock for each item
-    for (var item in items) {
-      final productId = item['productId'] as String;
-      final quantity = item['quantity'] as int;
-      await decrementProductStock(productId, quantity);
+      try {
+        await _logAuditEvent('add_transaction', {
+          'transactionId': transactionId,
+          'itemCount': sanitizedItems.length,
+          'total': total,
+          'paymentMethod': sanitizedPaymentMethod,
+          if (customerId != null) 'customerId': customerId,
+        });
+      } catch (e) {
+        debugPrint('Error logging audit event: $e');
+        // Don't throw - transaction is already saved
+      }
+      
+      return transactionId;
+    } catch (error) {
+      debugPrint('Error in addTransaction: $error');
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memproses transaksi. [DIAG: ${error.toString()}]',
+      );
     }
-    
-    // Update customer transaction stats if customerId is provided
-    if (customerId != null) {
-      await updateCustomerTransactionStats(customerId, total);
-    }
-
-    await _logAuditEvent('add_transaction', {
-      'transactionId': transactionId,
-      'itemCount': sanitizedItems.length,
-      'total': total,
-      'paymentMethod': sanitizedPaymentMethod,
-      if (customerId != null) 'customerId': customerId,
-    });
-    
-    return transactionId;
   }
 
   // Get transactions stream

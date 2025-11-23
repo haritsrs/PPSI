@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../utils/responsive_helper.dart';
-import '../services/database_service.dart';
-import '../utils/home_utils.dart';
-import '../pages/account_page.dart';
-import '../widgets/withdrawal_dialog.dart';
+import '../../utils/responsive_helper.dart';
+import '../../services/database_service.dart';
+import '../../utils/home_utils.dart';
+import '../../pages/account_page.dart';
+import '../withdrawal_dialog.dart';
 
 class ProfileHeader extends StatelessWidget {
   final User? currentUser;

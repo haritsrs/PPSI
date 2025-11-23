@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/register_controller.dart';
+import '../controllers/register_controller.dart';
 import '../utils/validation_utils.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
@@ -79,13 +79,7 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
       }
     } catch (e) {
       if (mounted) {
-        // Use friendly error message instead of exposing exception details
-        final message = e is Exception ? e.toString().replaceAll('Exception: ', '') : 'Terjadi kesalahan saat mendaftar. Silakan coba lagi.';
-        if (message.contains('syarat dan ketentuan') || message.contains('Format email')) {
-          SnackbarHelper.showInfo(context, message);
-        } else {
-          SnackbarHelper.showError(context, message);
-        }
+        SnackbarHelper.showError(context, e.toString());
       }
     }
   }

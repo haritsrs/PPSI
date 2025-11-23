@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/logout_controller.dart';
+import '../controllers/logout_controller.dart';
 import '../utils/snackbar_helper.dart';
 import '../widgets/responsive_page.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -72,7 +72,7 @@ class _LogoutPageState extends State<LogoutPage> with TickerProviderStateMixin {
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, 'Gagal keluar: $e');
+        SnackbarHelper.showError(context, e.toString());
       }
     }
   }
