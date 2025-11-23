@@ -4,7 +4,6 @@ import '../../services/settings_controller.dart';
 import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
-import 'settings_dialogs.dart';
 
 class DataSecuritySettingsSection extends StatelessWidget {
   final SettingsController controller;
@@ -13,81 +12,6 @@ class DataSecuritySettingsSection extends StatelessWidget {
     super.key,
     required this.controller,
   });
-
-  Future<void> _handleAutoBackupToggle(BuildContext context, bool value) async {
-    await controller.setAutoBackupEnabled(value);
-    if (value) {
-      try {
-        await controller.performBackup();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backup berhasil dilakukan'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error backup: $e'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _handleOfflineModeToggle(BuildContext context, bool value) async {
-    await controller.setOfflineModeEnabled(value);
-    if (!value) {
-      try {
-        await controller.syncToFirebase();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pengaturan disinkronkan ke cloud'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error sync: $e'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _handleBackupNow(BuildContext context) async {
-    try {
-      await controller.performBackup();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup berhasil dilakukan'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error backup: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

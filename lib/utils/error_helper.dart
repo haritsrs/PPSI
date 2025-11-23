@@ -49,9 +49,15 @@ AppException toAppException(
     return ServerException(message, details: error.code);
   }
 
+  // Don't expose full error details in production
+  // Only include sanitized error information
+  final sanitizedDetails = error is Exception 
+      ? error.toString().replaceAll(RegExp(r'Exception:\s*'), '')
+      : 'Unknown error';
+  
   return AppException(
     fallbackMessage ?? 'Terjadi kesalahan tidak terduga. Silakan coba lagi.',
-    details: error.toString(),
+    details: sanitizedDetails.length > 100 ? sanitizedDetails.substring(0, 100) : sanitizedDetails,
   );
 }
 

@@ -79,10 +79,12 @@ class _RegisterPageState extends State<RegisterPage> with TickerProviderStateMix
       }
     } catch (e) {
       if (mounted) {
-        if (e.toString().contains('syarat dan ketentuan')) {
-          SnackbarHelper.showInfo(context, e.toString());
+        // Use friendly error message instead of exposing exception details
+        final message = e is Exception ? e.toString().replaceAll('Exception: ', '') : 'Terjadi kesalahan saat mendaftar. Silakan coba lagi.';
+        if (message.contains('syarat dan ketentuan') || message.contains('Format email')) {
+          SnackbarHelper.showInfo(context, message);
         } else {
-          SnackbarHelper.showError(context, e.toString());
+          SnackbarHelper.showError(context, message);
         }
       }
     }

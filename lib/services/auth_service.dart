@@ -19,16 +19,21 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Validate email format before authentication
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      throw Exception('Format email tidak valid.');
+    }
     try {
       final UserCredential result = await _auth.signInWithEmailAndPassword(
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password,
       );
       return result;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw Exception('Terjadi kesalahan: $e');
+      // Don't expose internal error details to users
+      throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
   
@@ -37,16 +42,21 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Validate email format before authentication
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      throw Exception('Format email tidak valid.');
+    }
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password,
       );
       return result;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw Exception('Terjadi kesalahan: $e');
+      // Don't expose internal error details to users
+      throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
   
@@ -55,18 +65,24 @@ class AuthService {
     try {
       await _auth.signOut();
     } catch (e) {
-      throw Exception('Gagal keluar: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal keluar. Silakan coba lagi.');
     }
   }
   
   // Send password reset email
   static Future<void> sendPasswordResetEmail(String email) async {
+    // Validate email format before sending reset email
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      throw Exception('Format email tidak valid.');
+    }
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw Exception('Terjadi kesalahan: $e');
+      // Don't expose internal error details to users
+      throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
   
@@ -90,7 +106,8 @@ class AuthService {
         await user.reload();
       }
     } catch (e) {
-      throw Exception('Gagal memperbarui profil: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal memperbarui profil. Silakan coba lagi.');
     }
   }
   
@@ -124,7 +141,8 @@ class AuthService {
       
       return downloadURL;
     } catch (e) {
-      throw Exception('Gagal mengupload foto profil: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal mengupload foto profil. Silakan coba lagi.');
     }
   }
   
@@ -151,7 +169,8 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw Exception('Gagal mengubah password: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal mengubah password. Silakan coba lagi.');
     }
   }
   
@@ -164,7 +183,8 @@ class AuthService {
       }
       await user.sendEmailVerification();
     } catch (e) {
-      throw Exception('Gagal mengirim email verifikasi: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal mengirim email verifikasi. Silakan coba lagi.');
     }
   }
   
@@ -173,7 +193,8 @@ class AuthService {
     try {
       await _auth.currentUser?.reload();
     } catch (e) {
-      throw Exception('Gagal memuat ulang data user: $e');
+      // Don't expose internal error details to users
+      throw Exception('Gagal memuat ulang data user. Silakan coba lagi.');
     }
   }
   
@@ -215,7 +236,8 @@ class AuthService {
       case 'network-request-failed':
         return 'Koneksi internet bermasalah. Periksa koneksi Anda.';
       default:
-        return 'Terjadi kesalahan: ${e.message}';
+        // Don't expose internal error message details
+        return 'Terjadi kesalahan autentikasi. Silakan coba lagi.';
     }
   }
 }

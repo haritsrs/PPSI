@@ -5,8 +5,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class XenditService {
   static const String baseUrl = 'https://api.xendit.co';
-  static const String publicKey = 'xnd_public_development_uXR8rpP0d1GJyjhsNJQsUTN1_YA7QEsq3PXRs5Fa2TZ9ofFPaRgyOQHUkaWWjpP';
   
+  // Public key available if needed for client-side operations
+  // Currently not used but kept for future use
+  // ignore: unused_element
+  String? get _publicKey => dotenv.env['XENDIT_PUBLIC_KEY'];
   String? get _secretKey => dotenv.env['XENDIT_SECRET_KEY'];
 
   // Get authorization header
@@ -50,10 +53,13 @@ class XenditService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
-        throw Exception('Failed to create QRIS: ${response.statusCode} - ${response.body}');
+        // Don't expose full response body which may contain sensitive information
+        // Only log status code for debugging
+        throw Exception('Gagal membuat QRIS. Silakan coba lagi.');
       }
     } catch (e) {
-      throw Exception('Error creating QRIS: $e');
+      // Don't expose internal error details
+      throw Exception('Gagal membuat QRIS. Silakan coba lagi.');
     }
   }
 
@@ -70,10 +76,12 @@ class XenditService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
-        throw Exception('Failed to get QRIS status: ${response.statusCode} - ${response.body}');
+        // Don't expose full response body which may contain sensitive information
+        throw Exception('Gagal memeriksa status QRIS. Silakan coba lagi.');
       }
     } catch (e) {
-      throw Exception('Error getting QRIS status: $e');
+      // Don't expose internal error details
+      throw Exception('Gagal memeriksa status QRIS. Silakan coba lagi.');
     }
   }
 
@@ -107,10 +115,12 @@ class XenditService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
-        throw Exception('Failed to create Virtual Account: ${response.statusCode} - ${response.body}');
+        // Don't expose full response body which may contain sensitive information
+        throw Exception('Gagal membuat Virtual Account. Silakan coba lagi.');
       }
     } catch (e) {
-      throw Exception('Error creating Virtual Account: $e');
+      // Don't expose internal error details
+      throw Exception('Gagal membuat Virtual Account. Silakan coba lagi.');
     }
   }
 
@@ -127,10 +137,12 @@ class XenditService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
-        throw Exception('Failed to get VA status: ${response.statusCode} - ${response.body}');
+        // Don't expose full response body which may contain sensitive information
+        throw Exception('Gagal memeriksa status Virtual Account. Silakan coba lagi.');
       }
     } catch (e) {
-      throw Exception('Error getting VA status: $e');
+      // Don't expose internal error details
+      throw Exception('Gagal memeriksa status Virtual Account. Silakan coba lagi.');
     }
   }
 

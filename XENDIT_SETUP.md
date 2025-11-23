@@ -18,25 +18,29 @@ This document explains how to set up Xendit payment integration for QRIS and Vir
 ### 2. Configure Environment Variables
 
 1. Create a `.env` file in the root directory of your project (if it doesn't exist)
-2. Add your Xendit Secret Key to the `.env` file:
+2. Add the following required environment variables to the `.env` file:
 
 ```
+# Xendit API Keys
 XENDIT_SECRET_KEY=your_xendit_secret_key_here
+XENDIT_PUBLIC_KEY=your_xendit_public_key_here
+
+# Encryption Key (required for secure data encryption)
+ENCRYPTION_KEY=your_secure_encryption_key_here
 ```
 
 **Important:** 
 - Never commit the `.env` file to version control
 - The `.env` file is already in `.gitignore`
-- Make sure to add `XENDIT_SECRET_KEY` to your production environment variables
+- Make sure to add all required environment variables to your production environment
+- Generate a strong, random encryption key (at least 32 characters) for `ENCRYPTION_KEY`
+- For development, you can use the Xendit development public key: `xnd_public_development_uXR8rpP0d1GJyjhsNJQsUTN1_YA7QEsq3PXRs5Fa2TZ9ofFPaRgyOQHUkaWWjpP`
 
 ### 3. Public Key
 
-The public key is already configured in the code:
-- Public Key: `xnd_public_development_uXR8rpP0d1GJyjhsNJQsUTN1_YA7QEsq3PXRs5Fa2TZ9ofFPaRgyOQHUkaWWjpP`
-
-This is a development key. For production, you'll need to:
-1. Get your production public key from Xendit dashboard
-2. Update the `publicKey` constant in `lib/services/xendit_service.dart`
+The public key is now configured via environment variables:
+- Development: Use the development public key from Xendit dashboard
+- Production: Get your production public key from Xendit dashboard and add it to `XENDIT_PUBLIC_KEY` in your `.env` file
 
 ## Payment Methods
 
@@ -89,9 +93,10 @@ The application uses Xendit's development/sandbox environment. You can test paym
 
 ### Production Mode
 
-1. Update the public key to production key
+1. Update `XENDIT_PUBLIC_KEY` and `XENDIT_SECRET_KEY` in your production environment variables
 2. Ensure your Xendit account is activated for production
 3. Configure webhook URLs for payment callbacks (optional but recommended)
+4. Ensure `ENCRYPTION_KEY` is set with a strong, secure key in production
 
 ## Troubleshooting
 
@@ -100,6 +105,13 @@ The application uses Xendit's development/sandbox environment. You can test paym
 - Make sure you've added `XENDIT_SECRET_KEY` to your `.env` file
 - Restart your application after adding the key
 - Check that the `.env` file is in the root directory
+
+### Error: "ENCRYPTION_KEY must be set in environment variables"
+
+- Make sure you've added `ENCRYPTION_KEY` to your `.env` file
+- Generate a strong, random encryption key (at least 32 characters recommended)
+- Restart your application after adding the key
+- **Important:** Use the same encryption key across all environments for the same data, or data encrypted with one key cannot be decrypted with another
 
 ### Error: "Failed to create QRIS/VA"
 
@@ -121,11 +133,18 @@ The application uses Xendit's development/sandbox environment. You can test paym
    - Never commit `.env` to version control
    - Use environment variables in production
 
-2. **Use HTTPS:**
+2. **Protect your Encryption Key:**
+   - `ENCRYPTION_KEY` is critical for data security
+   - Never commit the encryption key to version control
+   - Use a strong, randomly generated key (at least 32 characters)
+   - Keep backups of your encryption key in a secure location
+   - If you lose the encryption key, encrypted data cannot be recovered
+
+3. **Use HTTPS:**
    - All API calls to Xendit use HTTPS
    - Ensure your callback URLs use HTTPS in production
 
-3. **Validate Payments:**
+4. **Validate Payments:**
    - Always verify payment status on your server
    - Use webhooks for real-time payment notifications
    - Don't rely solely on client-side status checks

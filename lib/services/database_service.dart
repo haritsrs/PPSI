@@ -283,7 +283,7 @@ class DatabaseService {
           );
         } catch (e) {
           // Ignore notification errors
-          print('Error creating low stock notification: $e');
+          debugPrint('Error creating low stock notification: $e');
         }
       }
       
@@ -301,7 +301,7 @@ class DatabaseService {
           );
         } catch (e) {
           // Ignore notification errors
-          print('Error creating out of stock notification: $e');
+          debugPrint('Error creating out of stock notification: $e');
         }
       }
 
@@ -368,7 +368,7 @@ class DatabaseService {
             },
           );
         } catch (e) {
-          print('Error creating low stock notification: $e');
+          debugPrint('Error creating low stock notification: $e');
         }
       }
       
@@ -385,7 +385,7 @@ class DatabaseService {
             },
           );
         } catch (e) {
-          print('Error creating out of stock notification: $e');
+          debugPrint('Error creating out of stock notification: $e');
         }
       }
 
@@ -529,7 +529,7 @@ class DatabaseService {
                 },
               );
             } catch (e) {
-              print('Error creating low stock notification: $e');
+              debugPrint('Error creating low stock notification: $e');
             }
           }
         }

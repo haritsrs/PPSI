@@ -74,7 +74,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       await _controller.signIn();
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showError(context, e.toString());
+        // Use friendly error message instead of exposing exception details
+        final message = e is Exception ? e.toString().replaceAll('Exception: ', '') : 'Terjadi kesalahan saat masuk. Silakan coba lagi.';
+        SnackbarHelper.showError(context, message);
       }
     }
   }
@@ -87,10 +89,12 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       }
     } catch (e) {
       if (mounted) {
-        if (e.toString().contains('Masukkan email')) {
-          SnackbarHelper.showInfo(context, e.toString());
+        // Use friendly error message instead of exposing exception details
+        final message = e is Exception ? e.toString().replaceAll('Exception: ', '') : 'Terjadi kesalahan. Silakan coba lagi.';
+        if (message.contains('Masukkan email') || message.contains('Format email')) {
+          SnackbarHelper.showInfo(context, message);
         } else {
-          SnackbarHelper.showError(context, e.toString());
+          SnackbarHelper.showError(context, message);
         }
       }
     }

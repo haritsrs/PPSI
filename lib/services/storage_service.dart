@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -16,6 +17,11 @@ class StorageService {
     required String productId,
   }) async {
     try {
+      // Validate productId to prevent path injection
+      if (productId.isEmpty || !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(productId)) {
+        throw Exception('Invalid product ID format');
+      }
+      
       // Optimize image (converts to JPEG, resizes to max 800px width, quality 80)
       final optimizedFile = await optimizeImage(imageFile);
       
@@ -117,8 +123,8 @@ class StorageService {
       
       return optimizedFile;
     } catch (e) {
-      // Log error for debugging
-      print('Image optimization error: $e');
+      // Log error for debugging (use debugPrint to avoid logging in production)
+      debugPrint('Image optimization error: $e');
       
       // If optimization fails, try to convert original to JPEG as fallback
       try {
@@ -137,7 +143,7 @@ class StorageService {
           return File(fallbackFile.path);
         }
       } catch (fallbackError) {
-        print('Fallback conversion also failed: $fallbackError');
+        debugPrint('Fallback conversion also failed: $fallbackError');
       }
       
       // If all else fails, throw the original error

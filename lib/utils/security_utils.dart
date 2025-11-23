@@ -9,7 +9,20 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app_exception.dart';
 
 final RegExp _multiWhitespace = RegExp(r'\s+');
-final RegExp _dangerousChars = RegExp(r'[\u0000-\u001F\u007F<>$`;{}]'); // Control chars + simple script injection
+// Enhanced dangerous characters: control chars, script injection patterns, SQL-like patterns, path traversal
+final RegExp _dangerousChars = RegExp(
+  r'[\u0000-\u001F\u007F-\u009F' // Control characters
+  r'<>$`;{}' // Script injection characters
+  r'\\\/' // Path traversal
+  r'\[\]\(\)' // Function call patterns
+  r'&#' // HTML entity starts
+  r'"]' // Quote patterns that could break contexts
+);
+// Additional patterns for common XSS vectors
+final RegExp _xssPatterns = RegExp(
+  r'(?i)(javascript|onerror|onload|onclick|onmouseover|onfocus|onblur|eval|expression|vbscript|data:text/html)',
+  caseSensitive: false,
+);
 final RegExp _numberSanitizer = RegExp(r'[^0-9.,-]');
 
 /// Common security helpers for sanitisation, rate limiting, and encryption.
@@ -18,8 +31,16 @@ class SecurityUtils {
 
   static String sanitizeInput(String value) {
     if (value.isEmpty) return value;
-    final cleaned = value.replaceAll(_dangerousChars, '');
+    
+    // Remove dangerous characters
+    var cleaned = value.replaceAll(_dangerousChars, '');
+    
+    // Remove XSS patterns (case-insensitive)
+    cleaned = cleaned.replaceAll(_xssPatterns, '');
+    
+    // Normalize whitespace
     final normalisedWhitespace = cleaned.replaceAll(_multiWhitespace, ' ').trim();
+    
     return normalisedWhitespace;
   }
 
@@ -75,7 +96,14 @@ class RateLimiter {
 class EncryptionHelper {
   factory EncryptionHelper() => _instance;
   EncryptionHelper._internal() {
-    final rawKey = dotenv.env['ENCRYPTION_KEY'] ?? _fallbackKey;
+    final rawKey = dotenv.env['ENCRYPTION_KEY'];
+    if (rawKey == null || rawKey.isEmpty) {
+      throw Exception(
+        'ENCRYPTION_KEY must be set in environment variables. '
+        'Please add ENCRYPTION_KEY to your .env file. '
+        'This is required for secure data encryption.'
+      );
+    }
     final keyBytes = sha256.convert(utf8.encode(rawKey)).bytes;
     final keySlice = keyBytes.sublist(0, 32); // AES-256 key
     _key = enc.Key(Uint8List.fromList(keySlice));
@@ -88,8 +116,6 @@ class EncryptionHelper {
   late final enc.Key _key;
   late final enc.IV _iv;
   late final enc.Encrypter _encrypter;
-
-  static const String _fallbackKey = 'kiosdarma-dev-encryption-key';
 
   String encrypt(String plaintext) {
     if (plaintext.isEmpty) {

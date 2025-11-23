@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 
 class SettingsService {
   static const String _prefsKeyPrefix = 'settings_';
@@ -30,6 +31,19 @@ class SettingsService {
   static const String keyTaxRate = 'tax_rate';
   static const String keyTaxInclusive = 'tax_inclusive';
 
+  /// Validates and sanitizes setting key to prevent path injection
+  /// Only allows alphanumeric characters, underscores, and hyphens
+  static String _sanitizeSettingKey(String key) {
+    if (key.isEmpty) {
+      throw ArgumentError('Setting key cannot be empty');
+    }
+    // Only allow alphanumeric, underscore, and hyphen
+    if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(key)) {
+      throw ArgumentError('Invalid setting key format. Only alphanumeric characters, underscores, and hyphens are allowed.');
+    }
+    return key;
+  }
+
   /// Get SharedPreferences instance
   static Future<SharedPreferences> get _prefs async {
     return await SharedPreferences.getInstance();
@@ -37,30 +51,32 @@ class SettingsService {
 
   /// Get setting value from local storage
   static Future<T?> getLocalSetting<T>(String key) async {
+    final sanitizedKey = _sanitizeSettingKey(key);
     final prefs = await _prefs;
     if (T == bool) {
-      return prefs.getBool('$_prefsKeyPrefix$key') as T?;
+      return prefs.getBool('$_prefsKeyPrefix$sanitizedKey') as T?;
     } else if (T == String) {
-      return prefs.getString('$_prefsKeyPrefix$key') as T?;
+      return prefs.getString('$_prefsKeyPrefix$sanitizedKey') as T?;
     } else if (T == int) {
-      return prefs.getInt('$_prefsKeyPrefix$key') as T?;
+      return prefs.getInt('$_prefsKeyPrefix$sanitizedKey') as T?;
     } else if (T == double) {
-      return prefs.getDouble('$_prefsKeyPrefix$key') as T?;
+      return prefs.getDouble('$_prefsKeyPrefix$sanitizedKey') as T?;
     }
     return null;
   }
 
   /// Set setting value in local storage
   static Future<bool> setLocalSetting<T>(String key, T value) async {
+    final sanitizedKey = _sanitizeSettingKey(key);
     final prefs = await _prefs;
     if (value is bool) {
-      return await prefs.setBool('$_prefsKeyPrefix$key', value);
+      return await prefs.setBool('$_prefsKeyPrefix$sanitizedKey', value);
     } else if (value is String) {
-      return await prefs.setString('$_prefsKeyPrefix$key', value);
+      return await prefs.setString('$_prefsKeyPrefix$sanitizedKey', value);
     } else if (value is int) {
-      return await prefs.setInt('$_prefsKeyPrefix$key', value);
+      return await prefs.setInt('$_prefsKeyPrefix$sanitizedKey', value);
     } else if (value is double) {
-      return await prefs.setDouble('$_prefsKeyPrefix$key', value);
+      return await prefs.setDouble('$_prefsKeyPrefix$sanitizedKey', value);
     }
     return false;
   }
@@ -71,7 +87,8 @@ class SettingsService {
     if (userId == null) return null;
 
     try {
-      final ref = _database.ref('settings/$userId/$key');
+      final sanitizedKey = _sanitizeSettingKey(key);
+      final ref = _database.ref('settings/$userId/$sanitizedKey');
       final snapshot = await ref.get();
       
       if (!snapshot.exists) return null;
@@ -79,7 +96,7 @@ class SettingsService {
       final value = snapshot.value;
       return value as T?;
     } catch (e) {
-      print('Error getting Firebase setting: $e');
+      debugPrint('Error getting Firebase setting: $e');
       return null;
     }
   }
@@ -90,7 +107,8 @@ class SettingsService {
     if (userId == null) throw Exception('User must be logged in');
 
     try {
-      final ref = _database.ref('settings/$userId/$key');
+      final sanitizedKey = _sanitizeSettingKey(key);
+      final ref = _database.ref('settings/$userId/$sanitizedKey');
       await ref.set(value);
     } catch (e) {
       throw Exception('Error setting Firebase setting: $e');
@@ -127,7 +145,7 @@ class SettingsService {
       await setFirebaseSetting(key, value);
     } catch (e) {
       // If Firebase fails, local storage still has the value
-      print('Error syncing to Firebase: $e');
+      debugPrint('Error syncing to Firebase: $e');
     }
   }
 
@@ -143,9 +161,15 @@ class SettingsService {
       final updates = <String, dynamic>{};
       for (final key in allKeys) {
         final settingKey = key.substring(_prefsKeyPrefix.length);
-        final value = prefs.get(key);
-        if (value != null) {
-          updates['settings/$userId/$settingKey'] = value;
+        try {
+          final sanitizedKey = _sanitizeSettingKey(settingKey);
+          final value = prefs.get(key);
+          if (value != null) {
+            updates['settings/$userId/$sanitizedKey'] = value;
+          }
+        } catch (e) {
+          // Skip invalid keys during sync
+          debugPrint('Skipping invalid setting key during sync: $settingKey');
         }
       }
 
@@ -153,7 +177,7 @@ class SettingsService {
         await _database.ref().update(updates);
       }
     } catch (e) {
-      print('Error syncing to Firebase: $e');
+      debugPrint('Error syncing to Firebase: $e');
     }
   }
 
@@ -174,20 +198,26 @@ class SettingsService {
       final prefs = await _prefs;
       for (final entry in data.entries) {
         final key = entry.key as String;
-        final value = entry.value;
-        
-        if (value is bool) {
-          await prefs.setBool('$_prefsKeyPrefix$key', value);
-        } else if (value is String) {
-          await prefs.setString('$_prefsKeyPrefix$key', value);
-        } else if (value is int) {
-          await prefs.setInt('$_prefsKeyPrefix$key', value);
-        } else if (value is double) {
-          await prefs.setDouble('$_prefsKeyPrefix$key', value);
+        try {
+          final sanitizedKey = _sanitizeSettingKey(key);
+          final value = entry.value;
+          
+          if (value is bool) {
+            await prefs.setBool('$_prefsKeyPrefix$sanitizedKey', value);
+          } else if (value is String) {
+            await prefs.setString('$_prefsKeyPrefix$sanitizedKey', value);
+          } else if (value is int) {
+            await prefs.setInt('$_prefsKeyPrefix$sanitizedKey', value);
+          } else if (value is double) {
+            await prefs.setDouble('$_prefsKeyPrefix$sanitizedKey', value);
+          }
+        } catch (e) {
+          // Skip invalid keys during sync
+          print('Skipping invalid setting key during sync: $key');
         }
       }
     } catch (e) {
-      print('Error syncing from Firebase: $e');
+      debugPrint('Error syncing from Firebase: $e');
     }
   }
 
@@ -208,9 +238,15 @@ class SettingsService {
       final allKeys = prefs.getKeys().where((key) => key.startsWith(_prefsKeyPrefix));
       for (final key in allKeys) {
         final settingKey = key.substring(_prefsKeyPrefix.length);
-        final value = prefs.get(key);
-        if (value != null) {
-          backupData['settings']![settingKey] = value;
+        try {
+          final sanitizedKey = _sanitizeSettingKey(settingKey);
+          final value = prefs.get(key);
+          if (value != null) {
+            backupData['settings']![sanitizedKey] = value;
+          }
+        } catch (e) {
+          // Skip invalid keys during backup
+          debugPrint('Skipping invalid setting key during backup: $settingKey');
         }
       }
 
