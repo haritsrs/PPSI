@@ -30,7 +30,7 @@ class KasirController extends ChangeNotifier {
   String _selectedCategory = 'Semua';
   String _searchQuery = '';
 
-  // Barcode
+  // Barcode - simplified approach
   String _barcodeBuffer = '';
   Timer? _barcodeResetTimer;
 
@@ -255,53 +255,57 @@ class KasirController extends ChangeNotifier {
   }
 
   /// Process a barcode character input
-  /// Returns true if a product was found and added to cart
+  /// Simplified approach: accumulate characters and process after a pause
+  /// Only one handler processes input now, so no deduplication needed
   bool handleBarcodeCharacter(String character) {
     _lastBarcodeNotFound = null;
+    
+    // Add character to buffer
     _barcodeBuffer += character;
+    
+    // Cancel any existing timer
     _barcodeResetTimer?.cancel();
-    _barcodeResetTimer = Timer(const Duration(milliseconds: 120), () {
-      final bufferedCode = _barcodeBuffer.trim();
-      // Clear buffer immediately to allow next scan
-      _barcodeBuffer = '';
-      if (bufferedCode.isNotEmpty) {
-        final product = findProductByBarcode(bufferedCode);
-        if (product != null) {
-          addToCart(product);
-          // Ensure buffer is cleared after successful scan
-          _barcodeBuffer = '';
-          _lastBarcodeNotFound = null;
-        } else {
-          _lastBarcodeNotFound = bufferedCode;
-        }
-        notifyListeners();
-      }
+    
+    // Set timer to process barcode after 200ms of no input
+    // This gives time for all characters from barcode scanner to arrive
+    _barcodeResetTimer = Timer(const Duration(milliseconds: 200), () {
+      _processBarcodeBuffer();
     });
+    
     notifyListeners();
     return false; // Will be processed by timer
   }
-
-  /// Check if current barcode buffer matches a product
-  /// Used for delayed checking after character input
-  bool checkBarcodeBuffer() {
+  
+  /// Process the current barcode buffer
+  void _processBarcodeBuffer() {
     final bufferedCode = _barcodeBuffer.trim();
-    if (bufferedCode.isEmpty) return false;
     
+    // Clear buffer first to prevent re-processing
+    _barcodeBuffer = '';
+    
+    if (bufferedCode.isEmpty || bufferedCode.length < 3) {
+      // Too short, ignore
+      return;
+    }
+    
+    // Look for product
     final product = findProductByBarcode(bufferedCode);
     if (product != null) {
       addToCart(product);
-      // Clear buffer immediately to allow next scan
-      _barcodeBuffer = '';
       _lastBarcodeNotFound = null;
-      // Cancel any pending timer
-      _barcodeResetTimer?.cancel();
-      notifyListeners();
-      return true;
     } else {
       _lastBarcodeNotFound = bufferedCode;
-      notifyListeners();
-      return false;
     }
+    
+    notifyListeners();
+  }
+
+  /// Check if current barcode buffer matches a product
+  /// Used for manual checking (e.g., after Enter key or test field)
+  bool checkBarcodeBuffer() {
+    _barcodeResetTimer?.cancel();
+    _processBarcodeBuffer();
+    return _lastBarcodeNotFound == null;
   }
 
   /// Handle Enter key press - process current barcode buffer
@@ -309,20 +313,24 @@ class KasirController extends ChangeNotifier {
   Product? handleBarcodeEnter() {
     _barcodeResetTimer?.cancel();
     final code = _barcodeBuffer.trim();
-    // Clear buffer immediately to allow next scan
+    
+    // Clear buffer first
     _barcodeBuffer = '';
     _lastBarcodeNotFound = null;
-    Product? foundProduct;
-    if (code.isNotEmpty) {
-      foundProduct = findProductByBarcode(code);
-      if (foundProduct != null) {
-        addToCart(foundProduct);
-        // Ensure buffer stays cleared after successful scan
-        _barcodeBuffer = '';
-      } else {
-        _lastBarcodeNotFound = code;
-      }
+    
+    if (code.isEmpty) {
+      notifyListeners();
+      return null;
     }
+    
+    // Find product
+    final foundProduct = findProductByBarcode(code);
+    if (foundProduct != null) {
+      addToCart(foundProduct);
+    } else {
+      _lastBarcodeNotFound = code;
+    }
+    
     notifyListeners();
     return foundProduct;
   }
@@ -339,6 +347,15 @@ class KasirController extends ChangeNotifier {
     _barcodeBuffer = '';
     _lastBarcodeNotFound = null;
     _barcodeResetTimer?.cancel();
+    notifyListeners();
+  }
+
+  /// Set barcode buffer directly (for test mode or when we have complete barcode)
+  void setBarcodeBuffer(String barcode) {
+    _barcodeResetTimer?.cancel();
+    // Store the complete barcode as-is, don't modify it
+    _barcodeBuffer = barcode;
+    _lastBarcodeNotFound = null;
     notifyListeners();
   }
 

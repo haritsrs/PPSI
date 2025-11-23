@@ -20,11 +20,15 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> with Si
   List<PrinterDevice> _bluetoothPrinters = [];
   bool _isScanning = false;
   String? _errorMessage;
+  bool _showAllBluetoothDevices = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild when tab changes to show/hide toggle
+    });
     _scanPrinters();
   }
 
@@ -44,7 +48,7 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> with Si
       // Scan both USB and Bluetooth in parallel
       final results = await Future.wait([
         widget.printerService.scanUSBPrinters(),
-        widget.printerService.scanBluetoothPrinters(),
+        widget.printerService.scanBluetoothPrinters(showAllDevices: _showAllBluetoothDevices),
       ]);
 
       setState(() {
@@ -118,6 +122,35 @@ class _PrinterSelectionDialogState extends State<PrinterSelectionDialog> with Si
                 Tab(text: 'Bluetooth', icon: Icon(Icons.bluetooth_rounded)),
               ],
             ),
+            // Toggle for showing all Bluetooth devices (only visible on Bluetooth tab)
+            if (_tabController.index == 1)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Tampilkan semua perangkat Bluetooth',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: _showAllBluetoothDevices,
+                      onChanged: (value) {
+                        setState(() {
+                          _showAllBluetoothDevices = value;
+                        });
+                        // Rescan when toggle changes
+                        _scanPrinters();
+                      },
+                      activeColor: const Color(0xFF6366F1),
+                    ),
+                  ],
+                ),
+              ),
             // Content
             Expanded(
               child: TabBarView(

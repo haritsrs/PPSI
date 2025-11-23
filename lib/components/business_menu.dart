@@ -86,7 +86,7 @@ class BusinessMenu extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Kelola Usahamu",
+            "Kelola Usahamu (SUDAH DIUPDATE APPNYA)",
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: const Color(0xFF1F2937),
               fontWeight: FontWeight.w700,

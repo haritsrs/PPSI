@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/settings_controller.dart';
 
 class LanguageDialog extends StatelessWidget {
@@ -256,16 +257,22 @@ class SettingsAboutDialog extends StatelessWidget {
           const Text('Tentang Aplikasi'),
         ],
       ),
-      content: const Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('KiosDarma v1.0.0'),
-          SizedBox(height: 8),
-          Text('Aplikasi manajemen toko modern dengan fitur lengkap untuk kasir, stok, dan laporan.'),
-          SizedBox(height: 16),
-          Text('© 2024 KiosDarma. All rights reserved.'),
-        ],
+      content: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snapshot) {
+          final version = snapshot.hasData ? snapshot.data!.version : 'Loading...';
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('KiosDarma v$version'),
+              const SizedBox(height: 8),
+              const Text('Aplikasi manajemen toko modern dengan fitur lengkap untuk kasir, stok, dan laporan.'),
+              const SizedBox(height: 16),
+              const Text('© 2024 KiosDarma. All rights reserved.'),
+            ],
+          );
+        },
       ),
       actions: [
         TextButton(

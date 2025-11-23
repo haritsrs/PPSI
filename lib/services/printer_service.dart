@@ -5,7 +5,6 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:usb_serial/usb_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
 import 'printer_commands.dart';
 import 'receipt_builder.dart';
 
@@ -35,17 +34,22 @@ class PrinterDevice {
 
 /// Printer service for USB and Bluetooth thermal printers
 /// Supports ESC/POS compatible printers (VSC TM 58V, etc.)
+/// Singleton pattern to maintain printer connection across widget lifecycles
 class PrinterService extends ChangeNotifier {
   static const String _prefsKeySelectedPrinter = 'selected_printer_id';
   static const String _prefsKeyPrinterType = 'selected_printer_type';
   static const String _prefsKeyPrinterName = 'selected_printer_name';
-
+  
+  // Singleton instance
+  static PrinterService? _instance;
+  
   PrinterDevice? _connectedPrinter;
   bool _isConnecting = false;
   bool _isScanning = false;
   String? _errorMessage;
   StreamSubscription? _bluetoothSubscription;
   UsbPort? _usbPort;
+  bool _isDisposed = false;
 
   // Getters
   PrinterDevice? get connectedPrinter => _connectedPrinter;
@@ -54,8 +58,15 @@ class PrinterService extends ChangeNotifier {
   bool get isScanning => _isScanning;
   String? get errorMessage => _errorMessage;
 
-  PrinterService() {
+  // Private constructor for singleton
+  PrinterService._internal() {
     _loadSavedPrinter();
+  }
+
+  // Factory constructor returns singleton instance
+  factory PrinterService() {
+    _instance ??= PrinterService._internal();
+    return _instance!;
   }
 
   /// Load saved printer from preferences
@@ -143,7 +154,8 @@ class PrinterService extends ChangeNotifier {
   }
 
   /// Scan for Bluetooth printers
-  Future<List<PrinterDevice>> scanBluetoothPrinters() async {
+  /// [showAllDevices] if true, shows all Bluetooth devices, not just those matching printer patterns
+  Future<List<PrinterDevice>> scanBluetoothPrinters({bool showAllDevices = false}) async {
     _isScanning = true;
     _errorMessage = null;
     notifyListeners();
@@ -160,23 +172,19 @@ class PrinterService extends ChangeNotifier {
         throw Exception('Bluetooth tidak didukung pada perangkat ini');
       }
 
-      // Start scan
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-      
       final printers = <PrinterDevice>[];
       final seenDevices = <String>{};
 
-      // Listen for scan results
-      _bluetoothSubscription?.cancel();
-      _bluetoothSubscription = FlutterBluePlus.scanResults.listen((results) {
-        for (final result in results) {
-          final device = result.device;
+      // First, get already bonded/paired devices (these might not be advertising)
+      try {
+        final bondedDevices = await FlutterBluePlus.bondedDevices;
+        for (final device in bondedDevices) {
           final name = device.platformName.isNotEmpty 
               ? device.platformName 
               : device.remoteId.toString();
 
-          // Filter for likely printers (check name patterns)
-          if (_isLikelyBluetoothPrinter(name) && !seenDevices.contains(device.remoteId.toString())) {
+          // Include bonded devices (filter only if showAllDevices is false)
+          if ((showAllDevices || _isLikelyBluetoothPrinter(name)) && !seenDevices.contains(device.remoteId.toString())) {
             seenDevices.add(device.remoteId.toString());
             printers.add(PrinterDevice(
               id: device.remoteId.toString(),
@@ -185,6 +193,40 @@ class PrinterService extends ChangeNotifier {
               device: device,
             ));
           }
+        }
+      } catch (e) {
+        debugPrint('Error getting bonded devices: $e');
+        // Continue with scan even if bonded devices fail
+      }
+
+      // Then, start scan for advertising devices
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+      
+      // Listen for scan results
+      _bluetoothSubscription?.cancel();
+      _bluetoothSubscription = FlutterBluePlus.scanResults.listen((results) {
+        bool foundNew = false;
+        for (final result in results) {
+          final device = result.device;
+          final name = device.platformName.isNotEmpty 
+              ? device.platformName 
+              : device.remoteId.toString();
+
+          // Filter for likely printers (check name patterns) or show all if enabled
+          if ((showAllDevices || _isLikelyBluetoothPrinter(name)) && !seenDevices.contains(device.remoteId.toString())) {
+            seenDevices.add(device.remoteId.toString());
+            printers.add(PrinterDevice(
+              id: device.remoteId.toString(),
+              name: name,
+              type: PrinterType.bluetooth,
+              device: device,
+            ));
+            foundNew = true;
+          }
+        }
+        // Notify listeners when new devices are found during scan
+        if (foundNew) {
+          notifyListeners();
         }
       });
 
@@ -217,7 +259,9 @@ class PrinterService extends ChangeNotifier {
         lowerName.contains('thermal') ||
         lowerName.contains('vsc') ||
         lowerName.contains('tm-') ||
-        lowerName.contains('58');
+        lowerName.contains('58') ||
+        lowerName.contains('rpp') || // RPP printer series (e.g., rpp02N)
+        lowerName.startsWith('rpp'); // RPP printers often start with "rpp"
   }
 
   /// Connect to USB printer
@@ -454,12 +498,18 @@ class PrinterService extends ChangeNotifier {
         ...PrinterCommands.emptyLines(2),
       ]);
 
-      // Date/time
+      // Date/time - use simple manual format to avoid locale initialization issues
       final now = DateTime.now();
-      final dateFormat = DateFormat('dd/MM/yyyy HH:mm:ss', 'id_ID');
+      final day = now.day.toString().padLeft(2, '0');
+      final month = now.month.toString().padLeft(2, '0');
+      final year = now.year.toString();
+      final hour = now.hour.toString().padLeft(2, '0');
+      final minute = now.minute.toString().padLeft(2, '0');
+      final second = now.second.toString().padLeft(2, '0');
+      final dateString = '$day/$month/$year $hour:$minute:$second';
       builder.addSection([
         ...PrinterCommands.align(TextAlign.center),
-        ...PrinterCommands.textLine('Tanggal: ${dateFormat.format(now)}'),
+        ...PrinterCommands.textLine('Tanggal: $dateString'),
         ...PrinterCommands.emptyLines(1),
       ]);
 
@@ -510,11 +560,33 @@ class PrinterService extends ChangeNotifier {
     }
   }
 
+  /// Manually disconnect printer and dispose service (for app shutdown)
+  /// Normally you should just use disconnect() which keeps the service alive
+  Future<void> disconnectAndDispose() async {
+    await disconnect();
+    _cleanupResources();
+    _isDisposed = true;
+    _instance = null; // Clear singleton instance
+    super.dispose();
+  }
+
+  /// Clean up resources without disconnecting printer
+  void _cleanupResources() {
+    _bluetoothSubscription?.cancel();
+    _bluetoothSubscription = null;
+    // Don't close USB port here - let disconnect() handle it if needed
+  }
+
   @override
   void dispose() {
-    _bluetoothSubscription?.cancel();
-    _usbPort?.close();
-    super.dispose();
+    // For singleton pattern, dispose() should NOT disconnect the printer
+    // Widgets should remove listeners but NOT call dispose() on the service
+    // Only disconnectAndDispose() should clean up everything and disconnect
+    if (_isDisposed) {
+      _cleanupResources();
+      super.dispose();
+    }
+    // Otherwise, do nothing - keep the service and printer connection alive
   }
 }
 

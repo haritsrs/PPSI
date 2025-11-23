@@ -24,14 +24,16 @@ class _PrinterSettingsSectionState extends State<PrinterSettingsSection> {
   @override
   void initState() {
     super.initState();
+    // Get singleton instance - don't create new one
     _printerService = PrinterService();
     _printerService.addListener(_onPrinterServiceChanged);
   }
 
   @override
   void dispose() {
+    // Only remove listener, don't dispose the service
+    // This keeps the printer connected across widget lifecycles
     _printerService.removeListener(_onPrinterServiceChanged);
-    _printerService.dispose();
     super.dispose();
   }
 

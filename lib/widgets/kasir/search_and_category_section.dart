@@ -5,6 +5,7 @@ import '../../services/kasir_controller.dart';
 class SearchAndCategorySection extends StatelessWidget {
   final KasirController controller;
   final TextEditingController searchController;
+  final FocusNode searchFocusNode;
   final double paddingScale;
   final double iconScale;
 
@@ -12,6 +13,7 @@ class SearchAndCategorySection extends StatelessWidget {
     super.key,
     required this.controller,
     required this.searchController,
+    required this.searchFocusNode,
     required this.paddingScale,
     required this.iconScale,
   });
@@ -40,6 +42,7 @@ class SearchAndCategorySection extends StatelessWidget {
             ),
             child: TextField(
               controller: searchController,
+              focusNode: searchFocusNode,
               onChanged: (value) {
                 controller.setSearchQuery(value);
               },

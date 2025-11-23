@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
 import 'pages/auth_wrapper.dart';
@@ -12,6 +13,13 @@ import 'themes/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize locale data for date formatting (do this early)
+  try {
+    await initializeDateFormatting('id_ID', null);
+  } catch (e) {
+    debugPrint('Warning: Failed to initialize locale data: $e');
+  }
 
   await dotenv.load(fileName: ".env"); // must come before using XenditService
   await Firebase.initializeApp(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/kasir_controller.dart';
@@ -34,8 +35,17 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   late Animation<Offset> _slideAnimation;
   
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _testBarcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode(skipTraversal: true, debugLabel: 'barcodeScanner');
+  final FocusNode _searchFocusNode = FocusNode(debugLabel: 'searchField');
+  final FocusNode _testBarcodeFocusNode = FocusNode(debugLabel: 'testBarcodeScanner');
   late KasirController _controller;
+  DateTime? _lastSearchInputTime;
+  String _lastSearchValue = '';
+  Timer? _testBarcodeProcessTimer;
+  Timer? _searchBarcodeTimer;
+  bool _testModeEnabled = false; // Disable test mode - use automatic barcode scanning
+  bool _barcodeScannerEnabled = true; // Barcode scanner listening toggle
 
   @override
   void initState() {
@@ -63,8 +73,137 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       curve: Curves.easeOutCubic,
     ));
     
+    // Add listener to search focus node to refocus barcode scanner when search loses focus
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus && mounted && !_testModeEnabled && _barcodeScannerEnabled) {
+        // Search field lost focus, refocus barcode scanner (only if not in test mode and scanner enabled)
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (mounted && !_testModeEnabled && _barcodeScannerEnabled) {
+            _refocusScanner();
+          }
+        });
+      }
+    });
+    
+    // Add listener to barcode focus node to maintain focus automatically
+    _barcodeFocusNode.addListener(() {
+      if (!_barcodeFocusNode.hasFocus && mounted && !_testModeEnabled && _barcodeScannerEnabled) {
+        // Barcode scanner lost focus, refocus it automatically (only if scanner enabled)
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && !_testModeEnabled && _barcodeScannerEnabled && !_searchFocusNode.hasFocus && !_testBarcodeFocusNode.hasFocus) {
+            _barcodeFocusNode.requestFocus();
+          }
+        });
+      }
+    });
+    
+    // Add listener to search controller to detect barcode scanner input
+    // Barcode scanners send input very rapidly (all characters in quick succession)
+    Timer? _searchBarcodeTimer;
+    _searchController.addListener(() {
+      if (!_testModeEnabled) {
+        // Only process barcode in search field if test mode is disabled
+        final currentValue = _searchController.text;
+        final now = DateTime.now();
+        
+        // If search field has focus and input is coming in rapidly, it might be a barcode scanner
+        if (_searchFocusNode.hasFocus && _lastSearchInputTime != null) {
+          final timeSinceLastInput = now.difference(_lastSearchInputTime!);
+          // If characters are coming in faster than 50ms apart, it's likely a barcode scanner
+          if (timeSinceLastInput < const Duration(milliseconds: 50) && 
+              currentValue.length > _lastSearchValue.length) {
+            // Cancel previous timer
+            _searchBarcodeTimer?.cancel();
+            
+            // Wait for input to settle (barcode scanners send all chars quickly)
+            _searchBarcodeTimer = Timer(const Duration(milliseconds: 500), () {
+              if (mounted && !_testModeEnabled) {
+                final fullBarcode = _searchController.text.trim();
+                if (fullBarcode.isNotEmpty && fullBarcode.length >= 3) {
+                  // Process the complete barcode
+                  _controller.setBarcodeBuffer(fullBarcode);
+                  Future.delayed(const Duration(milliseconds: 50), () {
+                    if (mounted) {
+                      final product = _controller.handleBarcodeEnter();
+                      if (product != null) {
+                        HapticHelper.lightImpact();
+                        // Clear search field and refocus barcode scanner
+                        _searchController.clear();
+                        _searchFocusNode.unfocus();
+                        _refocusScanner();
+                      }
+                    }
+                  });
+                }
+              }
+            });
+          }
+        }
+        
+        _lastSearchInputTime = now;
+        _lastSearchValue = currentValue;
+      }
+    });
+    
+    // Setup test barcode input field listener - simplified approach
+    _testBarcodeController.addListener(() {
+      if (!_testModeEnabled) return;
+      
+      final currentValue = _testBarcodeController.text;
+      
+      // Cancel previous timer
+      _testBarcodeProcessTimer?.cancel();
+      
+      if (currentValue.isEmpty) {
+        // Field cleared
+        _controller.clearBarcodeBuffer();
+        return;
+      }
+      
+      // Wait for input to settle (barcode scanners send all chars quickly)
+      _testBarcodeProcessTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted && _testModeEnabled) {
+          final fullBarcode = _testBarcodeController.text.trim();
+          if (fullBarcode.isNotEmpty && fullBarcode.length >= 3) {
+            // Set the complete barcode and process it
+            _controller.setBarcodeBuffer(fullBarcode);
+            final product = _controller.handleBarcodeEnter();
+            
+            if (product != null) {
+              HapticHelper.lightImpact();
+              // Clear test field after successful scan
+              _testBarcodeController.clear();
+              _refocusTestScanner();
+            }
+          }
+        }
+      });
+    });
+    
     _animationController.forward();
-    _refocusScanner();
+    // Ensure barcode scanner gets focus immediately for automatic scanning
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        if (_testModeEnabled) {
+          _refocusTestScanner();
+        } else if (_barcodeScannerEnabled) {
+          // Give focus to barcode scanner immediately for automatic scanning (only if enabled)
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (mounted && !_testModeEnabled && _barcodeScannerEnabled) {
+              _barcodeFocusNode.requestFocus();
+            }
+          });
+        }
+      }
+    });
+  }
+  
+  void _refocusTestScanner() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _testModeEnabled) {
+        _testBarcodeFocusNode.requestFocus();
+      }
+    });
   }
 
   void _onControllerChanged() {
@@ -89,7 +228,12 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   void dispose() {
     _animationController.dispose();
     _searchController.dispose();
+    _testBarcodeController.dispose();
     _barcodeFocusNode.dispose();
+    _searchFocusNode.dispose();
+    _testBarcodeFocusNode.dispose();
+    _testBarcodeProcessTimer?.cancel();
+    _searchBarcodeTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
@@ -127,8 +271,14 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
 
   void _refocusScanner() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _barcodeFocusNode.requestFocus();
+      if (mounted && !_testModeEnabled && _barcodeScannerEnabled) {
+        // Only refocus if test mode is disabled and scanner is enabled
+        // Request focus with delay to ensure other widgets have processed their events
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && !_testModeEnabled && _barcodeScannerEnabled && !_searchFocusNode.hasFocus) {
+            _barcodeFocusNode.requestFocus();
+          }
+        });
       }
     });
   }
@@ -136,35 +286,76 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   void _handleRawKeyEvent(RawKeyEvent event) {
     if (event is! RawKeyDownEvent) return;
 
-    final logicalKey = event.logicalKey;
-
-    if (logicalKey == LogicalKeyboardKey.enter || logicalKey == LogicalKeyboardKey.numpadEnter) {
-      final product = _controller.handleBarcodeEnter();
-      if (product != null) {
-        HapticHelper.lightImpact();
-      }
-      _refocusScanner();
+    // If barcode scanner is disabled, ignore barcode input
+    if (!_barcodeScannerEnabled) {
       return;
     }
 
+    final logicalKey = event.logicalKey;
+
+    // If search field has focus, only handle Enter key for barcode completion
+    // All other input goes to the search field
+    if (_searchFocusNode.hasFocus) {
+      if (logicalKey == LogicalKeyboardKey.enter || logicalKey == LogicalKeyboardKey.numpadEnter) {
+        // Enter key pressed in search field - check if we have barcode buffer
+        if (_controller.barcodeBuffer.isNotEmpty) {
+          final product = _controller.handleBarcodeEnter();
+          if (product != null) {
+            HapticHelper.lightImpact();
+            // Clear search and refocus scanner
+            _searchController.clear();
+            _searchFocusNode.unfocus();
+            if (_barcodeScannerEnabled) {
+              _refocusScanner();
+            }
+          }
+        }
+      }
+      // For all other keys when search has focus, let TextField handle them
+      return;
+    }
+
+    // Process barcode scanner input when barcode focus node has focus
+    // This is the main handler for barcode scanning
+
+    // Handle Enter key - complete barcode scan
+    if (logicalKey == LogicalKeyboardKey.enter || logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (_controller.barcodeBuffer.isNotEmpty) {
+        final product = _controller.handleBarcodeEnter();
+        if (product != null) {
+          HapticHelper.lightImpact();
+        }
+      }
+      if (_barcodeScannerEnabled) {
+        _refocusScanner();
+      }
+      return;
+    }
+
+    // Handle backspace - remove last character from barcode buffer
     if (logicalKey == LogicalKeyboardKey.backspace) {
       _controller.handleBarcodeBackspace();
       return;
     }
 
+    // Handle character input - add to barcode buffer
     final character = event.character;
     if (character != null && character.isNotEmpty) {
       final codeUnit = character.codeUnitAt(0);
+      // Accept printable characters (32-126), excluding DEL (127)
       if (codeUnit >= 32 && codeUnit != 127) {
         _controller.handleBarcodeCharacter(character);
-        // Check barcode buffer after a short delay
-        Future.delayed(const Duration(milliseconds: 150), () {
-          if (mounted) {
+        // Wait a bit for more characters (barcode scanners send them rapidly)
+        // Then check if buffer matches a product
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted && _barcodeScannerEnabled) {
             final found = _controller.checkBarcodeBuffer();
             if (found) {
               HapticHelper.lightImpact();
             }
-            _refocusScanner();
+            if (_barcodeScannerEnabled) {
+              _refocusScanner();
+            }
           }
         });
       }
@@ -304,10 +495,23 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 IconButton(
                   onPressed: () {
                     HapticHelper.lightImpact();
-                    _showPaymentModal();
+                    setState(() {
+                      _barcodeScannerEnabled = !_barcodeScannerEnabled;
+                      if (_barcodeScannerEnabled) {
+                        // Enable scanner - refocus barcode scanner
+                        _refocusScanner();
+                      } else {
+                        // Disable scanner - unfocus barcode scanner
+                        _barcodeFocusNode.unfocus();
+                      }
+                    });
                   },
-                  icon: Icon(Icons.payment_rounded, color: Colors.white, size: 22 * iconScale),
-                  tooltip: 'Pembayaran',
+                  icon: Icon(
+                    _barcodeScannerEnabled ? Icons.qr_code_scanner_rounded : Icons.qr_code_scanner_outlined,
+                    color: _barcodeScannerEnabled ? Colors.green[300] : Colors.white70,
+                    size: 22 * iconScale,
+                  ),
+                  tooltip: _barcodeScannerEnabled ? 'Nonaktifkan Barcode Scanner' : 'Aktifkan Barcode Scanner',
                   padding: EdgeInsets.all(8 * paddingScale),
                   constraints: const BoxConstraints(),
                 ),
@@ -316,21 +520,47 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           ),
         ],
       ),
-      body: RawKeyboardListener(
-        focusNode: _barcodeFocusNode,
-        autofocus: true,
-        onKey: _handleRawKeyEvent,
-        child: PatternBackground(
-          patternType: PatternType.dots,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: _buildDesktopLayout(context, paddingScale, iconScale),
+      body: _testModeEnabled
+          ? PatternBackground(
+              patternType: PatternType.dots,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: _buildDesktopLayout(context, paddingScale, iconScale),
+                ),
+              ),
+            )
+          : Focus(
+              autofocus: true,
+              canRequestFocus: true,
+              skipTraversal: true,
+              onFocusChange: (hasFocus) {
+                // Automatically maintain focus for barcode scanning (only if enabled)
+                if (!hasFocus && mounted && !_testModeEnabled && _barcodeScannerEnabled && !_searchFocusNode.hasFocus) {
+                  Future.delayed(const Duration(milliseconds: 50), () {
+                    if (mounted && !_testModeEnabled && _barcodeScannerEnabled && !_searchFocusNode.hasFocus) {
+                      _barcodeFocusNode.requestFocus();
+                    }
+                  });
+                }
+              },
+              child: RawKeyboardListener(
+                focusNode: _barcodeFocusNode,
+                autofocus: true,
+                onKey: _handleRawKeyEvent,
+                child: PatternBackground(
+                  patternType: PatternType.dots,
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: _buildDesktopLayout(context, paddingScale, iconScale),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
       floatingActionButton: CartFAB(
         controller: _controller,
         onPressed: _showCartBottomSheet,
@@ -341,9 +571,91 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   Widget _buildDesktopLayout(BuildContext context, double paddingScale, double iconScale) {
     return Column(
       children: [
+        // Test Barcode Input Field (for debugging)
+        if (_testModeEnabled)
+          Container(
+            margin: EdgeInsets.all(8 * paddingScale),
+            padding: EdgeInsets.all(12 * paddingScale),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              border: Border.all(color: Colors.orange, width: 2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bug_report, color: Colors.orange[700], size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'TEST MODE - Barcode Scanner Input',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange[900],
+                        fontSize: 14,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        setState(() {
+                          _testModeEnabled = false;
+                          _testBarcodeController.clear();
+                          _refocusScanner();
+                        });
+                      },
+                      tooltip: 'Disable Test Mode',
+                      padding: EdgeInsets.all(4),
+                      constraints: BoxConstraints(),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: _testBarcodeController,
+                  focusNode: _testBarcodeFocusNode,
+                  autofocus: true,
+                  enableInteractiveSelection: false, // Prevent text selection for barcode scanner
+                  decoration: InputDecoration(
+                    hintText: 'Scan barcode here or type manually...',
+                    hintStyle: TextStyle(fontSize: 12),
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _testBarcodeController.clear();
+                        _controller.clearBarcodeBuffer();
+                      },
+                    ),
+                  ),
+                  style: TextStyle(fontSize: 14),
+                  onSubmitted: (value) {
+                    if (value.isNotEmpty) {
+                      _controller.setBarcodeBuffer(value);
+                      final product = _controller.handleBarcodeEnter();
+                      if (product != null) {
+                        HapticHelper.lightImpact();
+                      }
+                      _testBarcodeController.clear();
+                    }
+                    _refocusTestScanner();
+                  },
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Buffer: "${_controller.barcodeBuffer}"',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+          ),
         SearchAndCategorySection(
           controller: _controller,
           searchController: _searchController,
+          searchFocusNode: _searchFocusNode,
           paddingScale: paddingScale,
           iconScale: iconScale,
         ),

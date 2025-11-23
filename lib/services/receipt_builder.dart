@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:intl/intl.dart';
 import 'printer_commands.dart';
 
 /// Receipt builder for 58mm thermal printers
@@ -53,13 +52,20 @@ class ReceiptBuilder {
   }
 
   /// Add transaction info
-  ReceiptBuilder addTransactionInfo({
+  Future<ReceiptBuilder> addTransactionInfo({
     required String transactionId,
     required DateTime date,
     String? customerName,
-  }) {
+  }) async {
     final commands = <int>[];
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
+    
+    // Format date manually to avoid locale initialization issues
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    final dateString = '$day/$month/$year $hour:$minute';
     
     commands.addAll(PrinterCommands.align(TextAlign.left));
     
@@ -72,7 +78,7 @@ class ReceiptBuilder {
     
     // Date
     commands.addAll(PrinterCommands.text('Tanggal: '));
-    commands.addAll(PrinterCommands.text(dateFormat.format(date)));
+    commands.addAll(PrinterCommands.text(dateString));
     commands.addAll(PrinterCommands.feed());
     
     // Customer name (if provided)

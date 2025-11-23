@@ -1,17 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/settings_controller.dart';
 import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
 
-class SupportSettingsSection extends StatelessWidget {
+class SupportSettingsSection extends StatefulWidget {
   final SettingsController controller;
 
   const SupportSettingsSection({
     super.key,
     required this.controller,
   });
+
+  @override
+  State<SupportSettingsSection> createState() => _SupportSettingsSectionState();
+}
+
+class _SupportSettingsSectionState extends State<SupportSettingsSection> {
+  String _version = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = 'Versi ${packageInfo.version}';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,14 +54,14 @@ class SupportSettingsSection extends StatelessWidget {
         SettingItem(
           icon: Icons.info_rounded,
           title: "Tentang Aplikasi",
-          subtitle: "Versi 1.0.0",
+          subtitle: _version,
           onTap: () => SettingsAboutDialog.show(context),
         ),
         SettingItem(
           icon: Icons.logout_rounded,
           title: "Keluar",
           subtitle: "Logout dari aplikasi",
-          onTap: () => LogoutDialog.show(context, controller),
+          onTap: () => LogoutDialog.show(context, widget.controller),
         ),
       ],
     );

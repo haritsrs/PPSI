@@ -1,10 +1,49 @@
+import 'dart:async';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'receipt_builder.dart';
 
 class ReceiptService {
+  // Static flag to track locale initialization
+  static bool _localeInitialized = false;
+  static Completer<void>? _localeInitCompleter;
+
+  /// Ensure locale data is initialized (only once, thread-safe)
+  static Future<void> _ensureLocaleInitialized() async {
+    // If already initialized, return immediately
+    if (_localeInitialized) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (_localeInitCompleter != null && !_localeInitCompleter!.isCompleted) {
+      try {
+        await _localeInitCompleter!.future;
+        return;
+      } catch (e) {
+        // If previous initialization failed, reset and try again
+        _localeInitCompleter = null;
+        _localeInitialized = false;
+      }
+    }
+
+    // Start new initialization
+    _localeInitCompleter = Completer<void>();
+    try {
+      await initializeDateFormatting('id_ID', null);
+      _localeInitialized = true;
+      _localeInitCompleter!.complete();
+    } catch (e) {
+      _localeInitCompleter!.completeError(e);
+      // Don't mark as initialized if it failed - allow retry
+      _localeInitCompleter = null;
+      rethrow;
+    }
+  }
+
   // Generate PDF receipt for preview and printing
   static Future<pw.Document> generatePDFReceipt({
     required String transactionId,
@@ -21,6 +60,9 @@ class ReceiptService {
     String? storeAddress,
     String? storePhone,
   }) async {
+    // Ensure locale is initialized before using DateFormat
+    await _ensureLocaleInitialized();
+    
     final pdf = pw.Document();
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
     
@@ -264,7 +306,7 @@ class ReceiptService {
     );
 
     // Transaction info
-    builder.addTransactionInfo(
+    await builder.addTransactionInfo(
       transactionId: transactionId,
       date: date,
       customerName: customerName,
