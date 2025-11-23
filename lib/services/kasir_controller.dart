@@ -78,7 +78,7 @@ class KasirController extends ChangeNotifier {
     await _loadProducts();
     await _loadCategories();
     await _loadTaxSettings();
-    _calculateTotals();
+    _recalculateTotalsWithSettings();
   }
 
   Future<void> _loadTaxSettings() async {
@@ -211,12 +211,18 @@ class KasirController extends ChangeNotifier {
       _cartItems.add(CartItem(product: product, quantity: 1));
     }
     
+    _recalculateTotalsWithSettings();
+  }
+
+  /// Recalculate totals after reloading tax settings
+  Future<void> _recalculateTotalsWithSettings() async {
+    await _loadTaxSettings();
     _calculateTotals();
   }
 
   void removeFromCart(String productId) {
     _cartItems.removeWhere((item) => item.product.id == productId);
-    _calculateTotals();
+    _recalculateTotalsWithSettings();
   }
 
   void updateQuantity(String productId, int newQuantity) {
@@ -232,13 +238,13 @@ class KasirController extends ChangeNotifier {
       } else {
         _cartItems[itemIndex].quantity = newQuantity;
       }
-      _calculateTotals();
+      _recalculateTotalsWithSettings();
     }
   }
 
   void clearCart() {
     _cartItems.clear();
-    _calculateTotals();
+    _recalculateTotalsWithSettings();
   }
 
   void _calculateTotals() {
@@ -413,14 +419,20 @@ class KasirController extends ChangeNotifier {
       'subtotal': item.product.price * item.quantity,
     }).toList();
 
+    // Save values BEFORE clearing cart (clearCart() resets them to 0)
+    final savedSubtotal = _subtotal;
+    final savedTax = _tax;
+    final savedTotal = _total;
+    final finalTotal = savedTotal - discount;
+
     // Save transaction to Firebase
     final sanitizedPaymentMethod = SecurityUtils.sanitizeInput(paymentMethod);
     final sanitizedCustomerName = customerName != null ? SecurityUtils.sanitizeInput(customerName) : null;
     final transactionId = await _databaseService.addTransaction(
       items: transactionItems,
-      subtotal: _subtotal,
-      tax: _tax,
-      total: _total - discount,
+      subtotal: savedSubtotal,
+      tax: savedTax,
+      total: finalTotal,
       paymentMethod: sanitizedPaymentMethod,
       cashAmount: cashAmount,
       change: change,
@@ -432,11 +444,11 @@ class KasirController extends ChangeNotifier {
     try {
       await _databaseService.addNotification(
         title: 'Transaksi Berhasil',
-        message: 'Transaksi sebesar Rp ${_total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} berhasil diproses dengan metode $sanitizedPaymentMethod',
+        message: 'Transaksi sebesar Rp ${finalTotal.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} berhasil diproses dengan metode $sanitizedPaymentMethod',
         type: 'transaction',
         data: {
           'transactionId': transactionId,
-          'total': _total,
+          'total': finalTotal,
           'paymentMethod': sanitizedPaymentMethod,
         },
       );
@@ -446,16 +458,15 @@ class KasirController extends ChangeNotifier {
       debugPrint('Error creating notification: $e');
     }
 
+    // Clear cart AFTER saving transaction data
     clearCart();
 
-    // Return transaction data for printing
-    // Note: total here should account for discount (it's already applied when saving to Firebase)
-    final finalTotal = _total - discount;
+    // Return transaction data for printing using saved values
     return {
       'id': transactionId,
       'items': transactionItems,
-      'subtotal': _subtotal,
-      'tax': _tax,
+      'subtotal': savedSubtotal,
+      'tax': savedTax,
       'total': finalTotal,
       'discount': discount,
       'paymentMethod': sanitizedPaymentMethod,

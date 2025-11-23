@@ -45,6 +45,7 @@ class _PaymentModalState extends State<PaymentModal> {
   String? _selectedCustomerId;
   String? _selectedCustomerName;
   List<Map<String, dynamic>> _customers = [];
+  final FocusNode _cashFocusNode = FocusNode();
 
   final List<PaymentMethod> _paymentMethods = [
     PaymentMethod(id: 'Cash', name: 'Tunai', icon: Icons.money_rounded),
@@ -108,6 +109,7 @@ class _PaymentModalState extends State<PaymentModal> {
   @override
   void dispose() {
     _cashController.dispose();
+    _cashFocusNode.dispose();
     _discountController.removeListener(_calculateDiscount);
     _discountController.dispose();
     super.dispose();
@@ -628,11 +630,16 @@ class _PaymentModalState extends State<PaymentModal> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _cashController,
+                      focusNode: _cashFocusNode,
                       inputFormatters: [CurrencyInputFormatter()],
                       onChanged: (_) => _calculateChange(),
                       keyboardType: TextInputType.number,
                       enabled: !_isProcessingPayment,
                       autofocus: false,
+                      onTap: () {
+                        // Ensure this field can get focus when tapped
+                        _cashFocusNode.requestFocus();
+                      },
                       decoration: InputDecoration(
                         hintText: 'Masukkan jumlah uang',
                         hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(

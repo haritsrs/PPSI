@@ -398,17 +398,33 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       return;
     }
 
+    // Unfocus barcode scanner when opening payment modal to allow text input
+    if (_barcodeScannerEnabled && _barcodeFocusNode.hasFocus) {
+      _barcodeFocusNode.unfocus();
+    }
+
+    // Reload tax settings before opening payment modal to ensure fresh values
+    _controller.reloadTaxSettings();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => PaymentModal(
-        total: _controller.total,
-        cartItems: _controller.cartItems,
-        databaseService: _controller.databaseService,
-        onPaymentSuccess: _handlePaymentSuccess,
+      builder: (context) => AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) => PaymentModal(
+          total: _controller.total,
+          cartItems: _controller.cartItems,
+          databaseService: _controller.databaseService,
+          onPaymentSuccess: _handlePaymentSuccess,
+        ),
       ),
-    ).then((_) => _refocusScanner());
+    ).then((_) {
+      // Refocus scanner after modal closes (if still enabled)
+      if (_barcodeScannerEnabled) {
+        _refocusScanner();
+      }
+    });
   }
 
   Future<void> _handlePaymentSuccess({
@@ -510,7 +526,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                     });
                   },
                   icon: Icon(
-                    _barcodeScannerEnabled ? Icons.qr_code_scanner_rounded : Icons.qr_code_scanner_outlined,
+                    // Use qr_code_scanner as there's no specific barcode icon in Material Icons
+                    // qr_code_2 is a variant that's closer to barcode appearance
+                    _barcodeScannerEnabled ? Icons.qr_code_2_rounded : Icons.qr_code_2_outlined,
                     color: _barcodeScannerEnabled ? Colors.green[300] : Colors.white70,
                     size: 22 * iconScale,
                   ),
