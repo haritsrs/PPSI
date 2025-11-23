@@ -25,6 +25,10 @@ class SettingsService {
   static const String keyCurrency = 'currency';
   static const String keyPrinter = 'printer';
   static const String keyLastBackup = 'last_backup';
+  // Tax settings
+  static const String keyTaxEnabled = 'tax_enabled';
+  static const String keyTaxRate = 'tax_rate';
+  static const String keyTaxInclusive = 'tax_inclusive';
 
   /// Get SharedPreferences instance
   static Future<SharedPreferences> get _prefs async {

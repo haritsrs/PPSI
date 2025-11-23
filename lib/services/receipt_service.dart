@@ -135,7 +135,10 @@ class ReceiptService {
               
               // Items
               ...items.map((item) {
-                final name = item['name'] as String? ?? 'Item';
+                // Support both 'name' and 'productName' fields for backward compatibility
+                final name = (item['productName'] as String?) ?? 
+                             (item['name'] as String?) ?? 
+                             'Item';
                 final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
                 final price = (item['price'] as num?)?.toDouble() ?? 0.0;
                 final itemTotal = quantity * price;
@@ -181,7 +184,8 @@ class ReceiptService {
               
               // Totals
               _buildTotalRow('Subtotal', subtotal),
-              _buildTotalRow('Pajak', tax),
+              // Tax (only show if > 0)
+              if (tax > 0) _buildTotalRow('Pajak', tax),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 2),
               pw.SizedBox(height: 4),
@@ -295,6 +299,7 @@ class ReceiptService {
     String? storeAddress,
     String? storePhone,
     String? qrCodeData,
+    double discount = 0.0,
   }) async {
     final builder = ReceiptBuilder();
 
@@ -320,6 +325,7 @@ class ReceiptService {
       subtotal: subtotal,
       tax: tax,
       total: total,
+      discount: discount,
     );
 
     // Payment info

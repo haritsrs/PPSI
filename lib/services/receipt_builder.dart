@@ -105,7 +105,10 @@ class ReceiptBuilder {
     commands.addAll(PrinterCommands.align(TextAlign.left));
     
     for (final item in items) {
-      final name = item['name'] as String? ?? 'Item';
+      // Support both 'name' and 'productName' fields for backward compatibility
+      final name = (item['productName'] as String?) ?? 
+                   (item['name'] as String?) ?? 
+                   'Item';
       final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
       final price = (item['price'] as num?)?.toDouble() ?? 0.0;
       final itemTotal = quantity * price;
@@ -138,6 +141,7 @@ class ReceiptBuilder {
     required double subtotal,
     required double tax,
     required double total,
+    double discount = 0.0,
   }) {
     final commands = <int>[];
     
@@ -147,9 +151,17 @@ class ReceiptBuilder {
     commands.addAll(PrinterCommands.text(_formatTotalLine('Subtotal', subtotal)));
     commands.addAll(PrinterCommands.feed());
     
-    // Tax
-    commands.addAll(PrinterCommands.text(_formatTotalLine('Pajak', tax)));
-    commands.addAll(PrinterCommands.feed());
+    // Tax (only show if > 0)
+    if (tax > 0) {
+      commands.addAll(PrinterCommands.text(_formatTotalLine('Pajak', tax)));
+      commands.addAll(PrinterCommands.feed());
+    }
+    
+    // Discount (if applicable)
+    if (discount > 0) {
+      commands.addAll(PrinterCommands.text(_formatTotalLine('Diskon', discount)));
+      commands.addAll(PrinterCommands.feed());
+    }
     
     commands.addAll(PrinterCommands.emptyLines(1));
     commands.addAll(PrinterCommands.doubleDivider());

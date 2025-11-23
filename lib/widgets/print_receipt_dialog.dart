@@ -256,6 +256,13 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
           throw Exception('Printer tidak terhubung. Silakan hubungkan printer terlebih dahulu.');
         }
 
+        // Generate QR code data with transaction info
+        // Format: Store info + transaction details for easy access
+        final qrCodeData = 'TRX:${widget.transactionId}|DATE:${date.toIso8601String()}|TOTAL:${(widget.transactionData['total'] as num?)?.toDouble() ?? 0.0}';
+        
+        // Get discount if present
+        final discount = (widget.transactionData['discount'] as num?)?.toDouble() ?? 0.0;
+        
         // Generate ESC/POS receipt bytes
         final receiptBytes = await ReceiptService.generateESCPOSReceipt(
           transactionId: widget.transactionId,
@@ -268,7 +275,8 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
           paymentMethod: widget.transactionData['paymentMethod'] as String? ?? 'Cash',
           cashAmount: (widget.transactionData['cashAmount'] as num?)?.toDouble(),
           change: (widget.transactionData['change'] as num?)?.toDouble(),
-          qrCodeData: widget.transactionId,
+          qrCodeData: qrCodeData,
+          discount: discount,
         );
 
         // Print to thermal printer

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
 import '../models/cart_item_model.dart';
 import '../services/database_service.dart';
+import '../services/settings_service.dart';
 import '../utils/error_helper.dart';
 import '../utils/security_utils.dart';
 
@@ -33,6 +34,11 @@ class KasirController extends ChangeNotifier {
   // Barcode - simplified approach
   String _barcodeBuffer = '';
   Timer? _barcodeResetTimer;
+
+  // Tax settings cache
+  bool _taxEnabled = true;
+  double _taxRate = 0.11;
+  bool _taxInclusive = false;
 
   // Subscriptions
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -71,7 +77,15 @@ class KasirController extends ChangeNotifier {
     await _initializeConnectivity();
     await _loadProducts();
     await _loadCategories();
+    await _loadTaxSettings();
     _calculateTotals();
+  }
+
+  Future<void> _loadTaxSettings() async {
+    _taxEnabled = await SettingsService.getSetting(SettingsService.keyTaxEnabled, true);
+    _taxRate = await SettingsService.getSetting(SettingsService.keyTaxRate, 0.11);
+    _taxInclusive = await SettingsService.getSetting(SettingsService.keyTaxInclusive, false);
+    // Reload tax settings when they might change (could add listener later)
   }
 
   Future<void> _loadProducts() async {
@@ -198,13 +212,11 @@ class KasirController extends ChangeNotifier {
     }
     
     _calculateTotals();
-    notifyListeners();
   }
 
   void removeFromCart(String productId) {
     _cartItems.removeWhere((item) => item.product.id == productId);
     _calculateTotals();
-    notifyListeners();
   }
 
   void updateQuantity(String productId, int newQuantity) {
@@ -221,20 +233,43 @@ class KasirController extends ChangeNotifier {
         _cartItems[itemIndex].quantity = newQuantity;
       }
       _calculateTotals();
-      notifyListeners();
     }
   }
 
   void clearCart() {
     _cartItems.clear();
     _calculateTotals();
-    notifyListeners();
   }
 
   void _calculateTotals() {
     _subtotal = _cartItems.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
-    _tax = _subtotal * 0.11; // 11% tax
-    _total = _subtotal + _tax;
+    
+    // Use cached tax settings
+    if (_taxEnabled) {
+      if (_taxInclusive) {
+        // Tax is included in price: calculate tax from subtotal
+        // If subtotal includes tax: tax = subtotal - (subtotal / (1 + taxRate))
+        // Or simpler: tax = subtotal * (taxRate / (1 + taxRate))
+        _tax = _subtotal * (_taxRate / (1 + _taxRate));
+        _total = _subtotal; // Total is same as subtotal (tax already included)
+      } else {
+        // Tax is added on top: calculate tax from subtotal
+        _tax = _subtotal * _taxRate;
+        _total = _subtotal + _tax;
+      }
+    } else {
+      // Tax disabled
+      _tax = 0.0;
+      _total = _subtotal;
+    }
+    
+    notifyListeners();
+  }
+
+  /// Reload tax settings (call when settings change)
+  Future<void> reloadTaxSettings() async {
+    await _loadTaxSettings();
+    _calculateTotals();
   }
 
   // Barcode scanning result
@@ -414,15 +449,20 @@ class KasirController extends ChangeNotifier {
     clearCart();
 
     // Return transaction data for printing
+    // Note: total here should account for discount (it's already applied when saving to Firebase)
+    final finalTotal = _total - discount;
     return {
       'id': transactionId,
       'items': transactionItems,
       'subtotal': _subtotal,
       'tax': _tax,
-      'total': _total,
+      'total': finalTotal,
+      'discount': discount,
       'paymentMethod': sanitizedPaymentMethod,
       'cashAmount': cashAmount,
       'change': change,
+      'customerId': customerId,
+      'customerName': sanitizedCustomerName,
       'createdAt': DateTime.now().toIso8601String(),
     };
   }

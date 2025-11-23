@@ -13,6 +13,11 @@ class SettingsController extends ChangeNotifier {
   bool _printerEnabled = true;
   bool _barcodeScannerEnabled = true;
   
+  // Tax settings
+  bool _taxEnabled = true;
+  double _taxRate = 0.11; // 11% default (PPN Indonesia)
+  bool _taxInclusive = false; // Tax exclusive by default
+  
   String _selectedLanguage = 'Bahasa Indonesia';
   String _selectedCurrency = 'IDR (Rupiah)';
   String _selectedPrinter = 'Default Printer';
@@ -34,6 +39,9 @@ class SettingsController extends ChangeNotifier {
   bool get offlineModeEnabled => _offlineModeEnabled;
   bool get printerEnabled => _printerEnabled;
   bool get barcodeScannerEnabled => _barcodeScannerEnabled;
+  bool get taxEnabled => _taxEnabled;
+  double get taxRate => _taxRate;
+  bool get taxInclusive => _taxInclusive;
   String get selectedLanguage => _selectedLanguage;
   String get selectedCurrency => _selectedCurrency;
   String get selectedPrinter => _selectedPrinter;
@@ -95,6 +103,18 @@ class SettingsController extends ChangeNotifier {
         SettingsService.keyPrinter,
         'Default Printer',
       );
+      _taxEnabled = await SettingsService.getSetting(
+        SettingsService.keyTaxEnabled,
+        true,
+      );
+      _taxRate = await SettingsService.getSetting(
+        SettingsService.keyTaxRate,
+        0.11,
+      );
+      _taxInclusive = await SettingsService.getSetting(
+        SettingsService.keyTaxInclusive,
+        false,
+      );
 
       // Sync from Firebase if online (only once on initial load)
       if (!_offlineModeEnabled) {
@@ -144,6 +164,18 @@ class SettingsController extends ChangeNotifier {
           _selectedPrinter = await SettingsService.getSetting(
             SettingsService.keyPrinter,
             'Default Printer',
+          );
+          _taxEnabled = await SettingsService.getSetting(
+            SettingsService.keyTaxEnabled,
+            true,
+          );
+          _taxRate = await SettingsService.getSetting(
+            SettingsService.keyTaxRate,
+            0.11,
+          );
+          _taxInclusive = await SettingsService.getSetting(
+            SettingsService.keyTaxInclusive,
+            false,
           );
         } catch (e) {
           debugPrint('Error syncing from Firebase: $e');
@@ -216,6 +248,24 @@ class SettingsController extends ChangeNotifier {
     await updateSetting(SettingsService.keyBarcodeScannerEnabled, value);
   }
 
+  Future<void> setTaxEnabled(bool value) async {
+    _taxEnabled = value;
+    notifyListeners();
+    await updateSetting(SettingsService.keyTaxEnabled, value);
+  }
+
+  Future<void> setTaxRate(double value) async {
+    _taxRate = value.clamp(0.0, 1.0); // Ensure between 0% and 100%
+    notifyListeners();
+    await updateSetting(SettingsService.keyTaxRate, _taxRate);
+  }
+
+  Future<void> setTaxInclusive(bool value) async {
+    _taxInclusive = value;
+    notifyListeners();
+    await updateSetting(SettingsService.keyTaxInclusive, value);
+  }
+
   Future<void> setLanguage(String value) async {
     _selectedLanguage = value;
     notifyListeners();
@@ -273,6 +323,9 @@ class SettingsController extends ChangeNotifier {
     _offlineModeEnabled = false;
     _printerEnabled = true;
     _barcodeScannerEnabled = true;
+    _taxEnabled = true;
+    _taxRate = 0.11;
+    _taxInclusive = false;
     _selectedLanguage = 'Bahasa Indonesia';
     _selectedCurrency = 'IDR (Rupiah)';
     _selectedPrinter = 'Default Printer';

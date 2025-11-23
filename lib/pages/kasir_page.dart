@@ -472,16 +472,18 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Help button - always visible
                 IconButton(
                   onPressed: () {
                     HapticHelper.lightImpact();
                     _showBarcodeScannerInstructions();
                   },
                   icon: Icon(Icons.help_outline_rounded, color: Colors.white, size: 22 * iconScale),
-                  tooltip: 'Cara Menggunakan Barcode Scanner',
+                  tooltip: 'Panduan Kasir',
                   padding: EdgeInsets.all(8 * paddingScale),
                   constraints: const BoxConstraints(),
                 ),
+                // Add product button - always visible
                 IconButton(
                   onPressed: () {
                     HapticHelper.lightImpact();
@@ -492,6 +494,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                   padding: EdgeInsets.all(8 * paddingScale),
                   constraints: const BoxConstraints(),
                 ),
+                // Barcode scanner toggle button - always visible
                 IconButton(
                   onPressed: () {
                     HapticHelper.lightImpact();

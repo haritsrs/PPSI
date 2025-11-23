@@ -64,7 +64,7 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Cara Menggunakan Barcode Scanner",
+                        "Cara Menggunakan Kasir",
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: const Color(0xFF1F2937),
                               fontWeight: FontWeight.w700,
@@ -74,7 +74,7 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                       ),
                       SizedBox(height: 4 * paddingScale),
                       Text(
-                        "Panduan lengkap penggunaan scanner",
+                        "Panduan lengkap penggunaan aplikasi kasir",
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: const Color(0xFF9CA3AF),
                               fontSize:
@@ -104,9 +104,9 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                   _buildInstructionStep(
                     context,
                     step: 1,
-                    title: "Siapkan Barcode Scanner",
-                    description: "Pastikan barcode scanner (barcode gun) sudah terhubung ke perangkat Anda melalui USB atau Bluetooth.",
-                    icon: Icons.usb_rounded,
+                    title: "Menambahkan Produk ke Keranjang",
+                    description: "Klik produk di daftar untuk menambahkannya ke keranjang, atau gunakan barcode scanner untuk scan produk secara otomatis.",
+                    icon: Icons.shopping_cart_rounded,
                     paddingScale: paddingScale,
                     fontSize: fontScale,
                     iconScale: iconScale,
@@ -115,30 +115,8 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                   _buildInstructionStep(
                     context,
                     step: 2,
-                    title: "Aktifkan Mode Scanner",
-                    description: "Tekan tombol pada barcode scanner untuk mengaktifkan mode scanning. Lampu indikator akan menyala.",
-                    icon: Icons.power_settings_new_rounded,
-                    paddingScale: paddingScale,
-                    fontSize: fontScale,
-                    iconScale: iconScale,
-                  ),
-                  SizedBox(height: 16 * paddingScale),
-                  _buildInstructionStep(
-                    context,
-                    step: 3,
-                    title: "Arahkan ke Barcode Produk",
-                    description: "Arahkan sinar laser dari scanner ke barcode produk. Pastikan barcode terlihat jelas dan tidak terhalang.",
-                    icon: Icons.center_focus_strong_rounded,
-                    paddingScale: paddingScale,
-                    fontSize: fontScale,
-                    iconScale: iconScale,
-                  ),
-                  SizedBox(height: 16 * paddingScale),
-                  _buildInstructionStep(
-                    context,
-                    step: 4,
-                    title: "Scan Barcode",
-                    description: "Tekan tombol trigger pada scanner atau biarkan scanner membaca barcode secara otomatis. Produk akan otomatis ditambahkan ke keranjang.",
+                    title: "Menggunakan Barcode Scanner",
+                    description: "Pastikan tombol scanner aktif (ikon hijau di pojok kanan atas). Scan barcode produk dan produk akan otomatis ditambahkan ke keranjang. Tidak perlu klik - scanner selalu siap.",
                     icon: Icons.qr_code_scanner_rounded,
                     paddingScale: paddingScale,
                     fontSize: fontScale,
@@ -147,10 +125,32 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                   SizedBox(height: 16 * paddingScale),
                   _buildInstructionStep(
                     context,
+                    step: 3,
+                    title: "Melihat Keranjang",
+                    description: "Klik ikon keranjang di pojok kanan bawah untuk melihat item di keranjang, mengubah jumlah, atau menghapus item.",
+                    icon: Icons.shopping_bag_rounded,
+                    paddingScale: paddingScale,
+                    fontSize: fontScale,
+                    iconScale: iconScale,
+                  ),
+                  SizedBox(height: 16 * paddingScale),
+                  _buildInstructionStep(
+                    context,
+                    step: 4,
+                    title: "Checkout & Pembayaran",
+                    description: "Setelah semua item ditambahkan, klik tombol 'Checkout' di keranjang. Pilih metode pembayaran (Tunai, QRIS, atau Virtual Account), masukkan jumlah uang jika tunai, lalu proses pembayaran.",
+                    icon: Icons.payment_rounded,
+                    paddingScale: paddingScale,
+                    fontSize: fontScale,
+                    iconScale: iconScale,
+                  ),
+                  SizedBox(height: 16 * paddingScale),
+                  _buildInstructionStep(
+                    context,
                     step: 5,
-                    title: "Lanjutkan Scanning",
-                    description: "Setelah produk ditambahkan, scanner siap untuk scan produk berikutnya. Tidak perlu klik atau fokus manual - scanner selalu siap.",
-                    icon: Icons.repeat_rounded,
+                    title: "Cetak Struk",
+                    description: "Setelah pembayaran berhasil, klik tombol 'Cetak Struk' untuk mencetak struk transaksi ke printer thermal atau PDF.",
+                    icon: Icons.print_rounded,
                     paddingScale: paddingScale,
                     fontSize: fontScale,
                     iconScale: iconScale,
@@ -182,7 +182,7 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
                         ),
                         SizedBox(height: 8 * paddingScale),
                         Text(
-                          "• Pastikan produk sudah memiliki barcode yang terdaftar di sistem\n• Jika produk tidak ditemukan, pastikan barcode sudah ditambahkan saat membuat produk\n• Scanner akan otomatis fokus kembali setelah setiap scan\n• Untuk menghapus item dari keranjang, gunakan tombol hapus pada item tersebut",
+                          "• Tombol (?) - Buka panduan ini\n• Tombol (+) - Tambah produk baru\n• Tombol Scanner (ikon QR) - Aktifkan/nonaktifkan barcode scanner\n• Scanner akan otomatis siap setelah diaktifkan - tidak perlu klik manual\n• Gunakan kotak pencarian untuk mencari produk berdasarkan nama\n• Filter kategori di atas untuk menyaring produk\n• Pastikan produk memiliki barcode yang terdaftar untuk bisa discan",
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Colors.blue[900],
                                 fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontScale,

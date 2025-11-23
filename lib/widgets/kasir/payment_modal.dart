@@ -58,6 +58,17 @@ class _PaymentModalState extends State<PaymentModal> {
   @override
   void initState() {
     super.initState();
+    // Reset all state to ensure fresh start for each transaction
+    _selectedPaymentMethod = 'Cash';
+    _cashAmount = 0.0;
+    _change = 0.0;
+    _discount = 0.0;
+    _selectedCustomerId = null;
+    _selectedCustomerName = null;
+    _isProcessingPayment = false;
+    _cashController.clear();
+    _discountController.clear();
+    
     _loadCustomers();
     _discountController.addListener(_calculateDiscount);
   }
@@ -620,6 +631,8 @@ class _PaymentModalState extends State<PaymentModal> {
                       inputFormatters: [CurrencyInputFormatter()],
                       onChanged: (_) => _calculateChange(),
                       keyboardType: TextInputType.number,
+                      enabled: !_isProcessingPayment,
+                      autofocus: false,
                       decoration: InputDecoration(
                         hintText: 'Masukkan jumlah uang',
                         hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -637,6 +650,14 @@ class _PaymentModalState extends State<PaymentModal> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
