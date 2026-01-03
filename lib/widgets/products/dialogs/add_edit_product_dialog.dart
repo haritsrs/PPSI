@@ -639,12 +639,21 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                               controller: _priceController,
                               inputFormatters: [CurrencyInputFormatter()],
                               decoration: InputDecoration(
-                                labelText: 'Harga *',
-                                hintText: '0',
+                                labelText: 'Harga Jual *',
+                                hintText: 'Contoh: 25.000',
+                                helperText: 'Harga jual per unit',
+                                helperMaxLines: 1,
                                 prefixText: 'Rp ',
-                                prefixIcon: const Icon(Icons.attach_money_rounded),
+                                prefixIcon: Tooltip(
+                                  message: 'Masukkan harga jual produk dalam Rupiah',
+                                  child: const Icon(Icons.attach_money_rounded),
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
+                                ),
+                                suffixIcon: Tooltip(
+                                  message: 'Masukkan harga jual untuk pelanggan. Format: angka dengan pemisah ribuan (titik).',
+                                  child: Icon(Icons.info_outline, size: 20, color: Colors.grey[500]),
                                 ),
                               ),
                               keyboardType: TextInputType.number,
@@ -654,7 +663,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                 }
                                 final parsed = _tryParsePrice(value);
                                 if (parsed == null || parsed <= 0) {
-                                  return 'Harga tidak valid';
+                                  return 'Masukkan harga yang valid (lebih dari 0)';
                                 }
                                 return null;
                               },
@@ -665,9 +674,14 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                             child: TextFormField(
                               controller: _stockController,
                               decoration: InputDecoration(
-                                labelText: 'Stok *',
-                                hintText: '0',
-                                prefixIcon: const Icon(Icons.inventory_rounded),
+                                labelText: 'Stok Awal *',
+                                hintText: 'Contoh: 100',
+                                helperText: 'Jumlah unit tersedia',
+                                helperMaxLines: 1,
+                                prefixIcon: Tooltip(
+                                  message: 'Jumlah stok awal produk',
+                                  child: const Icon(Icons.inventory_rounded),
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -679,7 +693,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                                 }
                                 final parsed = _tryParseInt(value);
                                 if (parsed == null || parsed < 0) {
-                                  return 'Stok tidak valid';
+                                  return 'Masukkan angka yang valid (≥0)';
                                 }
                                 return null;
                               },

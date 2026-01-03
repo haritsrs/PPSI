@@ -59,6 +59,7 @@ class ReceiptService {
     String? storeName,
     String? storeAddress,
     String? storePhone,
+    bool compactMode = false,
   }) async {
     // Ensure locale is initialized before using DateFormat
     await _ensureLocaleInitialized();
@@ -66,10 +67,19 @@ class ReceiptService {
     final pdf = pw.Document();
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
     
+    // Compact mode uses smaller spacing and font sizes
+    final double headerFontSize = compactMode ? 14 : 18;
+    final double normalFontSize = compactMode ? 8 : 10;
+    final double smallFontSize = compactMode ? 7 : 9;
+    final double itemFontSize = compactMode ? 8 : 10;
+    final double totalFontSize = compactMode ? 10 : 12;
+    final double spacing = compactMode ? 2 : 4;
+    final double sectionSpacing = compactMode ? 4 : 8;
+    
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
-            marginAll: 4 * PdfPageFormat.mm),
+            marginAll: compactMode ? 2 * PdfPageFormat.mm : 4 * PdfPageFormat.mm),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -79,61 +89,61 @@ class ReceiptService {
                 pw.Text(
                   storeName,
                   style: pw.TextStyle(
-                    fontSize: 18,
+                    fontSize: headerFontSize,
                     fontWeight: pw.FontWeight.bold,
                   ),
                   textAlign: pw.TextAlign.center,
                 ),
-                pw.SizedBox(height: 4),
+                pw.SizedBox(height: spacing),
               ],
-              if (storeAddress != null) ...[
+              if (storeAddress != null && !compactMode) ...[
                 pw.Text(
                   storeAddress,
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: pw.TextStyle(fontSize: normalFontSize),
                   textAlign: pw.TextAlign.center,
                 ),
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: spacing / 2),
               ],
-              if (storePhone != null) ...[
+              if (storePhone != null && !compactMode) ...[
                 pw.Text(
                   storePhone,
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: pw.TextStyle(fontSize: normalFontSize),
                   textAlign: pw.TextAlign.center,
                 ),
-                pw.SizedBox(height: 8),
+                pw.SizedBox(height: sectionSpacing),
               ],
               if (storeName == null && storeAddress == null && storePhone == null)
                 pw.Text(
                   'Toko Saya',
                   style: pw.TextStyle(
-                    fontSize: 18,
+                    fontSize: headerFontSize,
                     fontWeight: pw.FontWeight.bold,
                   ),
                   textAlign: pw.TextAlign.center,
                 ),
               
               pw.Divider(),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: spacing),
               
               // Transaction Info
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('ID: $transactionId', style: const pw.TextStyle(fontSize: 9)),
-                  pw.Text(dateFormat.format(date), style: const pw.TextStyle(fontSize: 9)),
+                  pw.Text('ID: $transactionId', style: pw.TextStyle(fontSize: smallFontSize)),
+                  pw.Text(dateFormat.format(date), style: pw.TextStyle(fontSize: smallFontSize)),
                 ],
               ),
               
-              if (customerName != null && customerName.isNotEmpty) ...[
-                pw.SizedBox(height: 4),
-                pw.Text('Pelanggan: $customerName', style: const pw.TextStyle(fontSize: 9)),
+              if (customerName != null && customerName.isNotEmpty && !compactMode) ...[
+                pw.SizedBox(height: spacing),
+                pw.Text('Pelanggan: $customerName', style: pw.TextStyle(fontSize: smallFontSize)),
               ],
               
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: spacing),
               
-              // Items
+              // Items - compact mode shows simplified format
               ...items.map((item) {
                 // Support both 'name' and 'productName' fields for backward compatibility
                 final name = (item['productName'] as String?) ?? 
@@ -143,8 +153,30 @@ class ReceiptService {
                 final price = (item['price'] as num?)?.toDouble() ?? 0.0;
                 final itemTotal = quantity * price;
                 
+                if (compactMode) {
+                  // Single line format for compact mode
+                  return pw.Padding(
+                    padding: pw.EdgeInsets.only(bottom: spacing / 2),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text(
+                            '$name x$quantity',
+                            style: pw.TextStyle(fontSize: itemFontSize),
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(itemTotal),
+                          style: pw.TextStyle(fontSize: itemFontSize),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
                 return pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 6),
+                  padding: pw.EdgeInsets.only(bottom: spacing + 2),
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
@@ -154,22 +186,22 @@ class ReceiptService {
                           pw.Expanded(
                             child: pw.Text(
                               name,
-                              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                              style: pw.TextStyle(fontSize: itemFontSize, fontWeight: pw.FontWeight.bold),
                             ),
                           ),
                           pw.Text(
                             _formatCurrency(itemTotal),
-                            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(fontSize: itemFontSize, fontWeight: pw.FontWeight.bold),
                           ),
                         ],
                       ),
-                      pw.SizedBox(height: 2),
+                      pw.SizedBox(height: spacing / 2),
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text(
                             '$quantity x ${_formatCurrency(price)}',
-                            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                            style: pw.TextStyle(fontSize: smallFontSize, color: PdfColors.grey700),
                           ),
                         ],
                       ),
@@ -178,59 +210,68 @@ class ReceiptService {
                 );
               }).toList(),
               
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: spacing),
               
               // Totals
-              _buildTotalRow('Subtotal', subtotal),
+              _buildTotalRowCompact('Subtotal', subtotal, normalFontSize, spacing),
               // Tax (only show if > 0)
-              if (tax > 0) _buildTotalRow('Pajak', tax),
-              pw.SizedBox(height: 4),
+              if (tax > 0) _buildTotalRowCompact('Pajak', tax, normalFontSize, spacing),
+              pw.SizedBox(height: spacing),
               pw.Divider(thickness: 2),
-              pw.SizedBox(height: 4),
-              _buildTotalRow('TOTAL', total, isBold: true, isLarge: true),
+              pw.SizedBox(height: spacing),
+              _buildTotalRowCompact('TOTAL', total, totalFontSize, spacing, isBold: true),
               
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: spacing),
               
               // Payment Info
               pw.Text(
                 'Pembayaran: ${_formatPaymentMethod(paymentMethod)}',
-                style: const pw.TextStyle(fontSize: 10),
+                style: pw.TextStyle(fontSize: normalFontSize),
               ),
-              if (cashAmount != null) ...[
-                pw.SizedBox(height: 2),
+              if (cashAmount != null && !compactMode) ...[
+                pw.SizedBox(height: spacing / 2),
                 pw.Text(
                   'Tunai: ${_formatCurrency(cashAmount)}',
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: pw.TextStyle(fontSize: normalFontSize),
                 ),
               ],
               if (change != null && change > 0) ...[
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: spacing / 2),
                 pw.Text(
                   'Kembalian: ${_formatCurrency(change)}',
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: pw.TextStyle(fontSize: normalFontSize),
                 ),
               ],
               
-              pw.SizedBox(height: 16),
-              pw.Text(
-                'Terima Kasih',
-                style: pw.TextStyle(
-                  fontSize: 12,
-                  fontWeight: pw.FontWeight.bold,
+              pw.SizedBox(height: compactMode ? sectionSpacing : 16),
+              if (!compactMode) ...[
+                pw.Text(
+                  'Terima Kasih',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  textAlign: pw.TextAlign.center,
                 ),
-                textAlign: pw.TextAlign.center,
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                'Selamat Berbelanja Kembali',
-                style: const pw.TextStyle(fontSize: 10),
-                textAlign: pw.TextAlign.center,
-              ),
-              pw.SizedBox(height: 8),
+                pw.SizedBox(height: spacing),
+                pw.Text(
+                  'Selamat Berbelanja Kembali',
+                  style: pw.TextStyle(fontSize: normalFontSize),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.SizedBox(height: sectionSpacing),
+              ] else ...[
+                pw.Text(
+                  'Terima Kasih',
+                  style: pw.TextStyle(fontSize: normalFontSize, fontWeight: pw.FontWeight.bold),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.SizedBox(height: spacing),
+              ],
             ],
           );
         },
@@ -238,6 +279,31 @@ class ReceiptService {
     );
     
     return pdf;
+  }
+
+  static pw.Widget _buildTotalRowCompact(String label, double value, double fontSize, double spacing, {bool isBold = false}) {
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(bottom: spacing),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+          pw.Text(
+            _formatCurrency(value),
+            style: pw.TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   static pw.Widget _buildTotalRow(String label, double value, {bool isBold = false, bool isLarge = false}) {

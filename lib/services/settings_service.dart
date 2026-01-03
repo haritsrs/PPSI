@@ -32,6 +32,8 @@ class SettingsService {
   static const String keyTaxInclusive = 'tax_inclusive';
   // Custom QR code setting
   static const String keyCustomQRCodeUrl = 'custom_qr_code_url';
+  // Compact receipt mode setting
+  static const String keyCompactReceiptMode = 'compact_receipt_mode';
 
   /// Validates and sanitizes setting key to prevent path injection
   /// Only allows alphanumeric characters, underscores, and hyphens

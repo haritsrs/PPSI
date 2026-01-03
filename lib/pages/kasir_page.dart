@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../controllers/kasir_controller.dart';
 import '../services/barcode_scanner_service.dart';
+import '../controllers/printer_controller.dart';
 import '../utils/error_helper.dart';
 import '../utils/snackbar_helper.dart';
 import '../utils/haptic_helper.dart';
@@ -100,6 +101,23 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
 
     _animationController.forward();
     _barcodeScanner.initializeFocus();
+    
+    // Attempt to auto-reconnect to printer when entering kasir page
+    _attemptPrinterAutoReconnect();
+  }
+  
+  /// Attempt to auto-reconnect to the previously configured printer
+  Future<void> _attemptPrinterAutoReconnect() async {
+    // This runs in the background; don't block the UI
+    try {
+      final printerController = PrinterController.instance;
+      await printerController.autoReconnect(maxRetries: 2);
+    } catch (e) {
+      // Silently fail; user can manually reconnect in settings if needed
+      if (kDebugMode) {
+        print('Auto-reconnect attempt failed: $e');
+      }
+    }
   }
 
   void _onControllerChanged() {
@@ -602,11 +620,15 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 Expanded(
                   child: CartPanel(
                     cartItems: _controller.cartItems,
+                    customItems: _controller.customItems,
                     subtotal: _controller.subtotal,
                     tax: _controller.tax,
                     total: _controller.total,
                     onRemoveItem: _controller.removeFromCart,
                     onUpdateQuantity: _controller.updateQuantity,
+                    onRemoveCustomItem: _controller.removeCustomItem,
+                    onUpdateCustomItemQuantity: _controller.updateCustomItemQuantity,
+                    onAddCustomItem: _controller.addCustomItem,
                     onClearCart: () {
                       _controller.clearCart();
                       HapticHelper.lightImpact();

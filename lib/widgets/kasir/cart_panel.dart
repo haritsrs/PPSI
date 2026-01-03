@@ -1,26 +1,37 @@
 import 'package:flutter/material.dart';
 import '../../models/cart_item_model.dart';
+import '../../models/custom_item_model.dart';
 import '../../utils/responsive_helper.dart';
 import 'cart_item_card.dart';
+import 'custom_item_card.dart';
+import 'custom_item_dialog.dart';
 
 class CartPanel extends StatelessWidget {
   final List<CartItem> cartItems;
+  final List<CustomItem> customItems;
   final double subtotal;
   final double tax;
   final double total;
   final Function(String) onRemoveItem;
   final Function(String, int) onUpdateQuantity;
+  final Function(CustomItem) onAddCustomItem;
+  final Function(String) onRemoveCustomItem;
+  final Function(String, int) onUpdateCustomItemQuantity;
   final VoidCallback onClearCart;
   final VoidCallback onCheckout;
 
   const CartPanel({
     super.key,
     required this.cartItems,
+    required this.customItems,
     required this.subtotal,
     required this.tax,
     required this.total,
     required this.onRemoveItem,
     required this.onUpdateQuantity,
+    required this.onAddCustomItem,
+    required this.onRemoveCustomItem,
+    required this.onUpdateCustomItemQuantity,
     required this.onClearCart,
     required this.onCheckout,
   });
@@ -78,7 +89,7 @@ class CartPanel extends StatelessWidget {
           ),
         ),
         Flexible(
-          child: cartItems.isEmpty
+          child: cartItems.isEmpty && customItems.isEmpty
               ? SingleChildScrollView(
                   child: Padding(
                     padding: EdgeInsets.all(24 * paddingScale),
@@ -124,18 +135,27 @@ class CartPanel extends StatelessWidget {
                 )
               : ListView.builder(
                   padding: EdgeInsets.all(16 * paddingScale),
-                  itemCount: cartItems.length,
+                  itemCount: cartItems.length + customItems.length,
                   itemBuilder: (context, index) {
-                    final item = cartItems[index];
-                    return CartItemCard(
-                      item: item,
-                      onRemove: () => onRemoveItem(item.product.id),
-                      onUpdateQuantity: (quantity) => onUpdateQuantity(item.product.id, quantity),
-                    );
+                    if (index < cartItems.length) {
+                      final item = cartItems[index];
+                      return CartItemCard(
+                        item: item,
+                        onRemove: () => onRemoveItem(item.product.id),
+                        onUpdateQuantity: (quantity) => onUpdateQuantity(item.product.id, quantity),
+                      );
+                    } else {
+                      final customItem = customItems[index - cartItems.length];
+                      return CustomItemCard(
+                        item: customItem,
+                        onRemove: () => onRemoveCustomItem(customItem.id),
+                        onUpdateQuantity: (quantity) => onUpdateCustomItemQuantity(customItem.id, quantity),
+                      );
+                    }
                   },
                 ),
         ),
-        if (cartItems.isNotEmpty) ...[
+        if (cartItems.isNotEmpty || customItems.isNotEmpty) ...[
           Container(
             padding: EdgeInsets.all(16 * paddingScale),
             decoration: BoxDecoration(
@@ -166,6 +186,24 @@ class CartPanel extends StatelessWidget {
                   child: _buildBillRow(context, "Total", total, paddingScale, isTotal: true),
                 ),
                 SizedBox(height: 16 * paddingScale),
+                // Add custom item button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => CustomItemDialog.show(context, onAdd: onAddCustomItem),
+                    icon: Icon(Icons.add, size: 18 * iconScale),
+                    label: const Text('Tambah Item Custom'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF6366F1),
+                      side: const BorderSide(color: Color(0xFF6366F1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 12 * paddingScale),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12 * paddingScale),
                 SizedBox(
                   width: double.infinity,
                   height: 50 * paddingScale,

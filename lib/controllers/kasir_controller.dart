@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
 import '../models/cart_item_model.dart';
+import '../models/custom_item_model.dart';
 import '../services/database_service.dart';
 import '../services/settings_service.dart';
 import '../utils/error_helper.dart';
@@ -23,6 +24,7 @@ class KasirController extends ChangeNotifier {
 
   // Cart
   List<CartItem> _cartItems = [];
+  List<CustomItem> _customItems = [];
   double _subtotal = 0.0;
   double _tax = 0.0;
   double _total = 0.0;
@@ -53,6 +55,7 @@ class KasirController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isOffline => _isOffline;
   List<CartItem> get cartItems => _cartItems;
+  List<CustomItem> get customItems => _customItems;
   double get subtotal => _subtotal;
   double get tax => _tax;
   double get total => _total;
@@ -244,11 +247,45 @@ class KasirController extends ChangeNotifier {
 
   void clearCart() {
     _cartItems.clear();
+    _customItems.clear();
     _recalculateTotalsWithSettings();
+  }
+
+  // Custom item methods
+  void addCustomItem(CustomItem item) {
+    // Check if same name and price exists, merge quantities
+    final existingIndex = _customItems.indexWhere(
+      (i) => i.name == item.name && i.price == item.price,
+    );
+    if (existingIndex != -1) {
+      _customItems[existingIndex].quantity += item.quantity;
+    } else {
+      _customItems.add(item);
+    }
+    _recalculateTotalsWithSettings();
+  }
+
+  void removeCustomItem(String id) {
+    _customItems.removeWhere((item) => item.id == id);
+    _recalculateTotalsWithSettings();
+  }
+
+  void updateCustomItemQuantity(String id, int newQuantity) {
+    final itemIndex = _customItems.indexWhere((item) => item.id == id);
+    if (itemIndex != -1) {
+      if (newQuantity <= 0) {
+        _customItems.removeAt(itemIndex);
+      } else {
+        _customItems[itemIndex].quantity = newQuantity;
+      }
+      _recalculateTotalsWithSettings();
+    }
   }
 
   void _calculateTotals() {
     _subtotal = _cartItems.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
+    // Add custom items to subtotal
+    _subtotal += _customItems.fold(0.0, (sum, item) => sum + item.subtotal);
     
     // Use cached tax settings
     if (_taxEnabled) {
@@ -418,6 +455,18 @@ class KasirController extends ChangeNotifier {
       'price': item.product.price,
       'subtotal': item.product.price * item.quantity,
     }).toList();
+
+    // Add custom items to transaction
+    for (final customItem in _customItems) {
+      transactionItems.add({
+        'productId': customItem.id,
+        'productName': SecurityUtils.sanitizeInput(customItem.name),
+        'quantity': customItem.quantity,
+        'price': customItem.price,
+        'subtotal': customItem.subtotal,
+        'isCustom': true,
+      });
+    }
 
     // Save values BEFORE clearing cart (clearCart() resets them to 0)
     final savedSubtotal = _subtotal;

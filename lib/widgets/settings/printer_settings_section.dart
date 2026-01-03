@@ -116,6 +116,34 @@ class _PrinterSettingsSectionState extends State<PrinterSettingsSection> {
     return Colors.grey;
   }
 
+  Widget _buildInstructionItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              children: [
+                TextSpan(
+                  text: '$title: ',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(text: description),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsSection(
@@ -123,6 +151,61 @@ class _PrinterSettingsSectionState extends State<PrinterSettingsSection> {
       icon: Icons.print_rounded,
       color: const Color(0xFF10B981),
       children: [
+        // Printer Setup Instructions Banner
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6366F1).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF6366F1).withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      size: 18,
+                      color: const Color(0xFF6366F1),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Panduan Koneksi Printer',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF6366F1),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _buildInstructionItem(
+                  icon: Icons.usb_rounded,
+                  title: 'USB',
+                  description: 'Colokkan kabel USB dan pilih printer dari daftar.',
+                ),
+                const SizedBox(height: 8),
+                _buildInstructionItem(
+                  icon: Icons.bluetooth,
+                  title: 'Bluetooth',
+                  description: 'Pastikan Bluetooth aktif dan printer sudah dipasangkan (paired) di pengaturan perangkat.',
+                ),
+                const SizedBox(height: 8),
+                _buildInstructionItem(
+                  icon: Icons.wifi,
+                  title: 'Network/WiFi',
+                  description: 'Printer dan perangkat harus terhubung ke jaringan yang sama. Gunakan port 9100.',
+                ),
+              ],
+            ),
+          ),
+        ),
         SettingItem(
           icon: Icons.usb_rounded,
           title: "Pilih Printer",

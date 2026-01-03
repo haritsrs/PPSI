@@ -44,6 +44,12 @@ class PrinterService extends ChangeNotifier {
   // Singleton instance
   static PrinterService? _instance;
   
+  /// Static getter for singleton instance (for use without constructor)
+  static PrinterService get instance {
+    _instance ??= PrinterService._internal();
+    return _instance!;
+  }
+  
   PrinterDevice? _connectedPrinter;
   bool _isConnecting = false;
   bool _isScanning = false;
@@ -110,6 +116,61 @@ class PrinterService extends ChangeNotifier {
       await prefs.remove(_prefsKeyPrinterName);
     } catch (e) {
       debugPrint('Error clearing saved printer: $e');
+    }
+  }
+
+  /// Auto-reconnect to previously saved printer
+  /// Returns true if reconnection was successful
+  Future<bool> autoReconnect({int maxRetries = 2}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final printerId = prefs.getString(_prefsKeySelectedPrinter);
+      final printerTypeStr = prefs.getString(_prefsKeyPrinterType);
+      final printerName = prefs.getString(_prefsKeyPrinterName);
+
+      if (printerId == null || printerTypeStr == null || printerName == null) {
+        return false; // No saved printer
+      }
+
+      // Already connected to this printer
+      if (_connectedPrinter != null && _connectedPrinter!.id == printerId) {
+        return true;
+      }
+
+      final printerType = printerTypeStr == 'usb' ? PrinterType.usb : PrinterType.bluetooth;
+
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          if (printerType == PrinterType.usb) {
+            final usbPrinters = await scanUSBPrinters();
+            final savedPrinter = usbPrinters.where((p) => p.id == printerId).firstOrNull;
+            if (savedPrinter != null) {
+              await connectToUSBPrinter(savedPrinter);
+              return true;
+            }
+          } else {
+            final btPrinters = await scanBluetoothPrinters(showAllDevices: true);
+            final savedPrinter = btPrinters.where((p) => p.id == printerId).firstOrNull;
+            if (savedPrinter != null) {
+              await connectToBluetoothPrinter(savedPrinter);
+              return true;
+            }
+          }
+        } catch (e) {
+          debugPrint('Auto-reconnect attempt ${attempt + 1} failed: $e');
+        }
+
+        if (attempt < maxRetries - 1) {
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+
+      _errorMessage = 'Gagal terhubung ke printer yang tersimpan. Silakan hubungkan manual.';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      debugPrint('Auto-reconnect error: $e');
+      return false;
     }
   }
 
@@ -591,3 +652,5 @@ class PrinterService extends ChangeNotifier {
   }
 }
 
+/// Alias for PrinterService for backwards compatibility
+typedef PrinterController = PrinterService;
