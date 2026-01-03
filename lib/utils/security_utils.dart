@@ -107,35 +107,65 @@ class EncryptionHelper {
     final keyBytes = sha256.convert(utf8.encode(rawKey)).bytes;
     final keySlice = keyBytes.sublist(0, 32); // AES-256 key
     _key = enc.Key(Uint8List.fromList(keySlice));
-    _iv = enc.IV.fromLength(16);
     _encrypter = enc.Encrypter(enc.AES(_key, mode: enc.AESMode.cbc));
   }
 
   static final EncryptionHelper _instance = EncryptionHelper._internal();
 
   late final enc.Key _key;
-  late final enc.IV _iv;
   late final enc.Encrypter _encrypter;
 
+  /// Encrypt plaintext with a random IV.
+  /// Returns base64-encoded string in format: "IV:ENCRYPTED_DATA"
+  /// The IV is prepended to the ciphertext and separated by a colon.
   String encrypt(String plaintext) {
     if (plaintext.isEmpty) {
       throw const ValidationException('Data sensitif tidak boleh kosong saat dienkripsi.');
     }
     try {
       final sanitized = SecurityUtils.sanitizeInput(plaintext);
-      return _encrypter.encrypt(sanitized, iv: _iv).base64;
+      // Generate random IV for each encryption
+      final iv = enc.IV.fromSecureRandom(16);
+      final encrypted = _encrypter.encrypt(sanitized, iv: iv);
+      // Store IV with ciphertext: "IV_BASE64:ENCRYPTED_BASE64"
+      return '${iv.base64}:${encrypted.base64}';
     } catch (error, stackTrace) {
       debugPrint('Encryption error: $error\n$stackTrace');
       rethrow;
     }
   }
 
+  /// Decrypt ciphertext that was encrypted with random IV.
+  /// Handles both old format (IV:ENCRYPTED) and legacy format (ENCRYPTED only, for backward compatibility).
   String? decryptIfPossible(String? cipherText) {
     if (cipherText == null || cipherText.isEmpty) return null;
     try {
-      return _encrypter.decrypt64(cipherText, iv: _iv);
+      // Check if ciphertext contains IV (new format: "IV:ENCRYPTED")
+      if (cipherText.contains(':')) {
+        final parts = cipherText.split(':');
+        if (parts.length == 2) {
+          final iv = enc.IV.fromBase64(parts[0]);
+          final encrypted = enc.Encrypted.fromBase64(parts[1]);
+          return _encrypter.decrypt(encrypted, iv: iv);
+        }
+      }
+      
+      // Legacy format: Try to decrypt without IV (for backward compatibility with old data)
+      // Note: This will only work for data encrypted before the IV fix
+      // New data should always include IV
+      try {
+        // Try to decrypt as if it's base64 only (legacy format)
+        final encrypted = enc.Encrypted.fromBase64(cipherText);
+        // Use a default IV for legacy decryption (not secure, but needed for old data)
+        // This is a migration path - old data should be re-encrypted
+        final legacyIV = enc.IV.fromLength(16);
+        return _encrypter.decrypt(encrypted, iv: legacyIV);
+      } catch (e) {
+        debugPrint('Failed to decrypt legacy format: $e');
+        return null;
+      }
     } catch (error) {
-      debugPrint('Failed to decrypt text, returning raw value: $error');
+      debugPrint('Failed to decrypt text: $error');
       return null;
     }
   }

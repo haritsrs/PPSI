@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../controllers/settings_controller.dart';
+import '../../services/storage_service.dart';
+import '../../services/auth_service.dart';
+import '../../utils/error_helper.dart';
+import '../../utils/snackbar_helper.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'printer_settings_section.dart';
@@ -72,6 +79,14 @@ class BusinessSettingsSection extends StatelessWidget {
                 ),
               ),
             ],
+            SettingItem(
+              icon: Icons.qr_code_rounded,
+              title: "QR Code Pembayaran",
+              subtitle: controller.customQRCodeUrl != null && controller.customQRCodeUrl!.isNotEmpty
+                  ? "QR code sudah dikonfigurasi"
+                  : "Unggah QR code untuk pembayaran",
+              onTap: () => _showQRCodeDialog(context, controller),
+            ),
           ],
         ),
       ],
@@ -136,6 +151,247 @@ class BusinessSettingsSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showQRCodeDialog(BuildContext context, SettingsController controller) {
+    showDialog(
+      context: context,
+      builder: (context) => _QRCodeManagementDialog(controller: controller),
+    );
+  }
+}
+
+class _QRCodeManagementDialog extends StatefulWidget {
+  final SettingsController controller;
+
+  const _QRCodeManagementDialog({required this.controller});
+
+  @override
+  State<_QRCodeManagementDialog> createState() => _QRCodeManagementDialogState();
+}
+
+class _QRCodeManagementDialogState extends State<_QRCodeManagementDialog> {
+  bool _isUploading = false;
+  bool _isDeleting = false;
+
+  Future<void> _pickAndUploadQRCode(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(source: source);
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      final user = AuthService.currentUser;
+      if (user == null) {
+        throw Exception('User tidak terautentikasi');
+      }
+
+      final imageFile = File(pickedFile.path);
+      
+      // Delete old QR code if exists
+      final oldUrl = widget.controller.customQRCodeUrl;
+      if (oldUrl != null && oldUrl.isNotEmpty) {
+        try {
+          await StorageService.deleteCustomQRCode(oldUrl);
+        } catch (e) {
+          // Ignore deletion errors, continue with upload
+          debugPrint('Error deleting old QR code: $e');
+        }
+      }
+
+      // Upload new QR code
+      final downloadUrl = await StorageService.uploadCustomQRCode(
+        imageFile: imageFile,
+        userId: user.uid,
+      );
+
+      // Save URL to settings
+      await widget.controller.setCustomQRCodeUrl(downloadUrl);
+
+      if (mounted) {
+        Navigator.pop(context);
+        SnackbarHelper.showSuccess(context, 'QR code berhasil diunggah');
+      }
+    } catch (e) {
+      if (mounted) {
+        final message = getFriendlyErrorMessage(
+          e,
+          fallbackMessage: 'Gagal mengunggah QR code.',
+        );
+        SnackbarHelper.showError(context, message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteQRCode() async {
+    try {
+      setState(() {
+        _isDeleting = true;
+      });
+
+      final url = widget.controller.customQRCodeUrl;
+      if (url != null && url.isNotEmpty) {
+        await StorageService.deleteCustomQRCode(url);
+      }
+
+      await widget.controller.setCustomQRCodeUrl(null);
+
+      if (mounted) {
+        Navigator.pop(context);
+        SnackbarHelper.showSuccess(context, 'QR code berhasil dihapus');
+      }
+    } catch (e) {
+      if (mounted) {
+        final message = getFriendlyErrorMessage(
+          e,
+          fallbackMessage: 'Gagal menghapus QR code.',
+        );
+        SnackbarHelper.showError(context, message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQRCode = widget.controller.customQRCodeUrl != null &&
+        widget.controller.customQRCodeUrl!.isNotEmpty;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Kelola QR Code Pembayaran'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasQRCode) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Image.network(
+                  widget.controller.customQRCodeUrl!,
+                  width: 250,
+                  height: 250,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.qr_code_rounded, size: 64, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'Belum ada QR code',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            if (_isUploading) ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Mengunggah QR code...'),
+            ] else if (_isDeleting) ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Menghapus QR code...'),
+            ] else ...[
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: const Text('Ambil dari Kamera'),
+                onTap: () => _pickAndUploadQRCode(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Pilih dari Galeri'),
+                onTap: () => _pickAndUploadQRCode(ImageSource.gallery),
+              ),
+              if (hasQRCode)
+                ListTile(
+                  leading: const Icon(Icons.delete_rounded, color: Colors.red),
+                  title: const Text('Hapus QR Code', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Hapus QR Code?'),
+                        content: const Text('Apakah Anda yakin ingin menghapus QR code ini?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Batal'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _deleteQRCode();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Hapus'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tutup'),
+        ),
+      ],
     );
   }
 }

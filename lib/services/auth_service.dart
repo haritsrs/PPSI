@@ -3,6 +3,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
 import 'storage_service.dart';
+import '../utils/security_utils.dart';
+import '../utils/app_exception.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -19,6 +21,14 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Rate limiting: prevent brute force attacks
+    final rateLimitKey = 'auth_signin_${email.trim().toLowerCase()}';
+    if (!RateLimiter.allow(rateLimitKey, interval: const Duration(seconds: 2))) {
+      throw const RateLimitException(
+        'Terlalu banyak percobaan masuk. Silakan tunggu beberapa saat sebelum mencoba lagi.',
+      );
+    }
+    
     // Validate email format before authentication
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       throw Exception('Format email tidak valid.');
@@ -33,6 +43,7 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       // Don't expose internal error details to users
+      if (e is RateLimitException) rethrow;
       throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
@@ -42,6 +53,14 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Rate limiting: prevent rapid account creation
+    final rateLimitKey = 'auth_register_${email.trim().toLowerCase()}';
+    if (!RateLimiter.allow(rateLimitKey, interval: const Duration(seconds: 5))) {
+      throw const RateLimitException(
+        'Terlalu banyak percobaan pendaftaran. Silakan tunggu beberapa saat sebelum mencoba lagi.',
+      );
+    }
+    
     // Validate email format before authentication
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       throw Exception('Format email tidak valid.');
@@ -56,6 +75,7 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       // Don't expose internal error details to users
+      if (e is RateLimitException) rethrow;
       throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
@@ -72,6 +92,14 @@ class AuthService {
   
   // Send password reset email
   static Future<void> sendPasswordResetEmail(String email) async {
+    // Rate limiting: prevent email enumeration and spam
+    final rateLimitKey = 'auth_password_reset_${email.trim().toLowerCase()}';
+    if (!RateLimiter.allow(rateLimitKey, interval: const Duration(minutes: 1))) {
+      throw const RateLimitException(
+        'Terlalu banyak permintaan reset password. Silakan tunggu beberapa saat sebelum mencoba lagi.',
+      );
+    }
+    
     // Validate email format before sending reset email
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       throw Exception('Format email tidak valid.');
@@ -82,6 +110,7 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       // Don't expose internal error details to users
+      if (e is RateLimitException) rethrow;
       throw Exception('Terjadi kesalahan saat masuk. Silakan coba lagi.');
     }
   }
@@ -197,6 +226,31 @@ class AuthService {
       throw Exception('Gagal memuat ulang data user. Silakan coba lagi.');
     }
   }
+
+  // Delete user account
+  static Future<void> deleteAccount(String password) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Re-authenticate user before deletion (security requirement)
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Delete the user account
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      // Don't expose internal error details to users
+      throw Exception('Gagal menghapus akun. Silakan coba lagi.');
+    }
+  }
   
   // Get user display name
   static String getUserDisplayName(User? user) {
@@ -222,7 +276,7 @@ class AuthService {
       case 'email-already-in-use':
         return 'Email sudah digunakan. Silakan gunakan email lain.';
       case 'weak-password':
-        return 'Password terlalu lemah. Gunakan minimal 6 karakter.';
+        return 'Password terlalu lemah. Gunakan minimal 8 karakter dengan kombinasi huruf dan angka.';
       case 'invalid-email':
         return 'Format email tidak valid.';
       case 'user-disabled':

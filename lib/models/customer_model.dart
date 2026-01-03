@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/security_utils.dart';
 
 class Customer {
   final String id;
@@ -46,17 +47,50 @@ class Customer {
       lastTransaction = DateTime.now();
     }
 
+    // Decrypt PII fields if encrypted
+    final encryptionHelper = EncryptionHelper();
+    String phone = '';
+    String email = '';
+    String address = '';
+    
+    if (data['phone'] is String) {
+      final phoneValue = data['phone'] as String;
+      if (data['phoneEncrypted'] == true && phoneValue.isNotEmpty) {
+        phone = encryptionHelper.decryptIfPossible(phoneValue) ?? '';
+      } else {
+        phone = SecurityUtils.sanitizeInput(phoneValue);
+      }
+    }
+    
+    if (data['email'] is String) {
+      final emailValue = data['email'] as String;
+      if (data['emailEncrypted'] == true && emailValue.isNotEmpty) {
+        email = encryptionHelper.decryptIfPossible(emailValue) ?? '';
+      } else {
+        email = SecurityUtils.sanitizeInput(emailValue);
+      }
+    }
+    
+    if (data['address'] is String) {
+      final addressValue = data['address'] as String;
+      if (data['addressEncrypted'] == true && addressValue.isNotEmpty) {
+        address = encryptionHelper.decryptIfPossible(addressValue) ?? '';
+      } else {
+        address = SecurityUtils.sanitizeInput(addressValue);
+      }
+    }
+
     return Customer(
       id: data['id'] as String? ?? '',
-      name: data['name'] as String? ?? '',
-      phone: data['phone'] as String? ?? '',
-      email: data['email'] as String? ?? '',
-      address: data['address'] as String? ?? '',
+      name: SecurityUtils.sanitizeInput(data['name'] as String? ?? ''),
+      phone: phone,
+      email: email,
+      address: address,
       transactionCount: (data['transactionCount'] as num?)?.toInt() ?? 0,
       totalSpent: (data['totalSpent'] as num?)?.toDouble() ?? 0.0,
       createdAt: createdAt,
       lastTransaction: lastTransaction,
-      notes: data['notes'] as String? ?? '',
+      notes: SecurityUtils.sanitizeInput(data['notes'] as String? ?? ''),
     );
   }
 

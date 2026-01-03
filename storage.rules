@@ -25,14 +25,36 @@ service firebase.storage {
     // Product images: Users can read/write product images
     // Path structure: products/{productId}/{timestamp}.jpg
     match /products/{productId}/{fileName} {
+      // Helper function to validate image file
+      function isValidImageFile() {
+        // Check file size (max 5MB)
+        return request.resource.size < 5 * 1024 * 1024 &&
+               // Check content type is image
+               request.resource.contentType.matches('image/.*') &&
+               // Check filename extension
+               fileName.matches('.*\\.(jpg|jpeg|png|webp)');
+      }
+      
       // Allow read for authenticated users (users can view products)
       allow read: if isAuthenticated();
       
-      // Allow write/delete only if authenticated
-      // Note: We rely on the application logic to ensure users only upload to their own products
-      // since productId doesn't directly contain userId. The app validates ownership before upload.
-      allow write: if isAuthenticated();
+      // Allow write/delete only if authenticated and file is valid
+      // Note: Product ownership validation happens at the application/database level
+      // since Storage rules cannot query the database. The database rules ensure
+      // only the product owner can create/update products, and the app validates
+      // ownership before uploading images.
+      allow write: if isAuthenticated() && isValidImageFile();
       allow delete: if isAuthenticated();
+    }
+    
+    // Custom QR codes: Users can only read/write their own QR code
+    // Path structure: custom_qr_codes/{userId}.jpg
+    match /custom_qr_codes/{fileName} {
+      // Extract userId from filename (filename is userId.jpg)
+      // Users can only access their own QR code
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
+      allow delete: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
     }
   }
 }

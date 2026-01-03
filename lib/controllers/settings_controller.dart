@@ -18,6 +18,9 @@ class SettingsController extends ChangeNotifier {
   double _taxRate = 0.11; // 11% default (PPN Indonesia)
   bool _taxInclusive = false; // Tax exclusive by default
   
+  // Custom QR code
+  String? _customQRCodeUrl;
+  
   String _selectedLanguage = 'Bahasa Indonesia';
   String _selectedCurrency = 'IDR (Rupiah)';
   String _selectedPrinter = 'Default Printer';
@@ -42,6 +45,7 @@ class SettingsController extends ChangeNotifier {
   bool get taxEnabled => _taxEnabled;
   double get taxRate => _taxRate;
   bool get taxInclusive => _taxInclusive;
+  String? get customQRCodeUrl => _customQRCodeUrl;
   String get selectedLanguage => _selectedLanguage;
   String get selectedCurrency => _selectedCurrency;
   String get selectedPrinter => _selectedPrinter;
@@ -115,6 +119,11 @@ class SettingsController extends ChangeNotifier {
         SettingsService.keyTaxInclusive,
         false,
       );
+      final qrCodeUrl = await SettingsService.getSetting<String>(
+        SettingsService.keyCustomQRCodeUrl,
+        '',
+      );
+      _customQRCodeUrl = qrCodeUrl.isEmpty ? null : qrCodeUrl;
 
       // Sync from Firebase if online (only once on initial load)
       if (!_offlineModeEnabled) {
@@ -177,6 +186,11 @@ class SettingsController extends ChangeNotifier {
             SettingsService.keyTaxInclusive,
             false,
           );
+          final qrCodeUrlAfterSync = await SettingsService.getSetting<String>(
+            SettingsService.keyCustomQRCodeUrl,
+            '',
+          );
+          _customQRCodeUrl = qrCodeUrlAfterSync.isEmpty ? null : qrCodeUrlAfterSync;
         } catch (e) {
           debugPrint('Error syncing from Firebase: $e');
         }
@@ -282,6 +296,13 @@ class SettingsController extends ChangeNotifier {
     _selectedPrinter = value;
     notifyListeners();
     await updateSetting(SettingsService.keyPrinter, value);
+  }
+
+  Future<void> setCustomQRCodeUrl(String? url) async {
+    _customQRCodeUrl = url;
+    notifyListeners();
+    // Use empty string to represent null in settings
+    await updateSetting(SettingsService.keyCustomQRCodeUrl, url ?? '');
   }
 
   Future<void> performBackup() async {

@@ -57,6 +57,9 @@ class RegisterController extends ChangeNotifier {
       await AuthService.updateUserProfile(
         displayName: _nameController.text.trim(),
       );
+
+      // Send email verification after successful registration
+      await AuthService.sendEmailVerification();
     } catch (e) {
       _isLoading = false;
       notifyListeners();

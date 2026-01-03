@@ -156,5 +156,66 @@ class StorageService {
     final bytes = file.lengthSync();
     return bytes / (1024 * 1024);
   }
+
+  /// Upload custom QR code to Firebase Storage with automatic optimization
+  /// Returns the download URL
+  static Future<String> uploadCustomQRCode({
+    required File imageFile,
+    required String userId,
+  }) async {
+    try {
+      // Validate userId to prevent path injection
+      if (userId.isEmpty || !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(userId)) {
+        throw Exception('Invalid user ID format');
+      }
+      
+      // Optimize image (converts to JPEG, resizes to max 800px width, quality 80)
+      final optimizedFile = await optimizeImage(imageFile);
+      
+      // Create filename (always .jpg since we convert to JPEG)
+      final fileName = 'custom_qr_codes/$userId.jpg';
+      
+      // Upload to Firebase Storage
+      final ref = _storage.ref().child(fileName);
+      final uploadTask = ref.putFile(optimizedFile);
+      
+      // Wait for upload to complete
+      final snapshot = await uploadTask;
+      
+      // Get download URL
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      // Clean up optimized file
+      try {
+        await optimizedFile.delete();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      return downloadUrl;
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal mengunggah QR code.',
+      );
+    }
+  }
+
+  /// Delete custom QR code from Firebase Storage
+  static Future<void> deleteCustomQRCode(String imageUrl) async {
+    try {
+      // Extract file path from URL
+      if (imageUrl.isEmpty) {
+        return;
+      }
+      final ref = _storage.refFromURL(imageUrl);
+      await ref.delete();
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menghapus QR code.',
+      );
+    }
+  }
 }
 

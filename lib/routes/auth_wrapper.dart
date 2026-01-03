@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../pages/login_page.dart';
 import '../pages/home_page.dart';
+import '../pages/email_verification_page.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -39,6 +40,11 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData && snapshot.data != null) {
+          final user = snapshot.data!;
+          // Check if email is verified
+          if (!user.emailVerified) {
+            return const EmailVerificationPage();
+          }
           return const HomePage();
         }
 

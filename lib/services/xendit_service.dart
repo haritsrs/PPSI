@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -5,11 +6,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class XenditService {
   static const String baseUrl = 'https://api.xendit.co';
+  static const Duration _requestTimeout = Duration(seconds: 30);
   
-  // Public key available if needed for client-side operations
-  // Currently not used but kept for future use
-  // ignore: unused_element
-  String? get _publicKey => dotenv.env['XENDIT_PUBLIC_KEY'];
+  // Private keys - should not be exposed
   String? get _secretKey => dotenv.env['XENDIT_SECRET_KEY'];
 
   // Get authorization header
@@ -48,7 +47,7 @@ class XenditService {
         url,
         headers: _headers,
         body: jsonEncode(body),
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -57,6 +56,8 @@ class XenditService {
         // Only log status code for debugging
         throw Exception('Gagal membuat QRIS. Silakan coba lagi.');
       }
+    } on TimeoutException {
+      throw Exception('Permintaan ke Xendit melebihi batas waktu. Silakan coba lagi.');
     } catch (e) {
       // Don't expose internal error details
       throw Exception('Gagal membuat QRIS. Silakan coba lagi.');
@@ -71,7 +72,7 @@ class XenditService {
       final response = await http.get(
         url,
         headers: _headers,
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -79,6 +80,8 @@ class XenditService {
         // Don't expose full response body which may contain sensitive information
         throw Exception('Gagal memeriksa status QRIS. Silakan coba lagi.');
       }
+    } on TimeoutException {
+      throw Exception('Permintaan ke Xendit melebihi batas waktu. Silakan coba lagi.');
     } catch (e) {
       // Don't expose internal error details
       throw Exception('Gagal memeriksa status QRIS. Silakan coba lagi.');
@@ -110,7 +113,7 @@ class XenditService {
         url,
         headers: _headers,
         body: jsonEncode(body),
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -118,6 +121,8 @@ class XenditService {
         // Don't expose full response body which may contain sensitive information
         throw Exception('Gagal membuat Virtual Account. Silakan coba lagi.');
       }
+    } on TimeoutException {
+      throw Exception('Permintaan ke Xendit melebihi batas waktu. Silakan coba lagi.');
     } catch (e) {
       // Don't expose internal error details
       throw Exception('Gagal membuat Virtual Account. Silakan coba lagi.');
@@ -132,7 +137,7 @@ class XenditService {
       final response = await http.get(
         url,
         headers: _headers,
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -140,6 +145,8 @@ class XenditService {
         // Don't expose full response body which may contain sensitive information
         throw Exception('Gagal memeriksa status Virtual Account. Silakan coba lagi.');
       }
+    } on TimeoutException {
+      throw Exception('Permintaan ke Xendit melebihi batas waktu. Silakan coba lagi.');
     } catch (e) {
       // Don't expose internal error details
       throw Exception('Gagal memeriksa status Virtual Account. Silakan coba lagi.');

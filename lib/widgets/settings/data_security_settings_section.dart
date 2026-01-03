@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../controllers/settings_controller.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/settings/data_export_dialog.dart';
+import '../../widgets/settings/account_deletion_dialog.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 
@@ -20,6 +22,12 @@ class DataSecuritySettingsSection extends StatelessWidget {
       icon: Icons.security_rounded,
       color: const Color(0xFFEF4444),
       children: [
+        SettingItem(
+          icon: Icons.download_rounded,
+          title: "Ekspor Data Saya",
+          subtitle: "Unduh semua data Anda (GDPR)",
+          onTap: () => DataExportDialog.show(context),
+        ),
         SettingItem(
           icon: Icons.backup_rounded,
           title: "Backup Otomatis",
@@ -59,6 +67,12 @@ class DataSecuritySettingsSection extends StatelessWidget {
           onTap: () {
             SnackbarHelper.showInfo(context, 'Fitur ubah password akan segera hadir!');
           },
+        ),
+        SettingItem(
+          icon: Icons.delete_forever_rounded,
+          title: "Hapus Akun",
+          subtitle: "Hapus akun dan semua data (GDPR)",
+          onTap: () => AccountDeletionDialog.show(context),
         ),
       ],
     );

@@ -138,7 +138,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               textInputAction: TextInputAction.done,
                               onToggleVisibility: _controller.togglePasswordVisibility,
                               onSubmitted: _handleSignIn,
-                              validator: ValidationUtils.validatePassword,
+                              validator: ValidationUtils.validateLoginPassword,
                             ),
                             const SizedBox(height: 16),
                             RememberMeForgotPasswordRow(

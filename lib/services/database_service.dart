@@ -4,13 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../utils/app_exception.dart';
 import '../utils/error_helper.dart';
 import '../utils/security_utils.dart';
 
 class DatabaseService {
-  static const String databaseURL = 'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
+  // Database URL from environment variable, with fallback for backward compatibility
+  static String get databaseURL => dotenv.env['FIREBASE_DATABASE_URL'] ?? 
+    'https://gunadarma-pos-marketplace-default-rtdb.asia-southeast1.firebasedatabase.app/';
   
   late final DatabaseReference _database;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -1180,8 +1183,33 @@ class DatabaseService {
     final newCustomerRef = customersRef.push();
     final customerId = newCustomerRef.key!;
     
+    // Prepare customer data with encrypted PII fields
+    final sanitizedData = Map<String, dynamic>.from(customerData);
+    
+    // Encrypt PII fields (email, phone, address) if they exist
+    if (sanitizedData['email'] is String && (sanitizedData['email'] as String).isNotEmpty) {
+      sanitizedData['email'] = _encryptionHelper.encrypt(sanitizedData['email'] as String);
+      sanitizedData['emailEncrypted'] = true;
+    }
+    if (sanitizedData['phone'] is String && (sanitizedData['phone'] as String).isNotEmpty) {
+      sanitizedData['phone'] = _encryptionHelper.encrypt(sanitizedData['phone'] as String);
+      sanitizedData['phoneEncrypted'] = true;
+    }
+    if (sanitizedData['address'] is String && (sanitizedData['address'] as String).isNotEmpty) {
+      sanitizedData['address'] = _encryptionHelper.encrypt(sanitizedData['address'] as String);
+      sanitizedData['addressEncrypted'] = true;
+    }
+    
+    // Sanitize name and notes (non-PII but still need sanitization)
+    if (sanitizedData['name'] is String) {
+      sanitizedData['name'] = SecurityUtils.sanitizeInput(sanitizedData['name'] as String);
+    }
+    if (sanitizedData['notes'] is String) {
+      sanitizedData['notes'] = SecurityUtils.sanitizeInput(sanitizedData['notes'] as String);
+    }
+    
     await newCustomerRef.set({
-      ...customerData,
+      ...sanitizedData,
       'id': customerId,
       'transactionCount': 0,
       'totalSpent': 0.0,
@@ -1195,8 +1223,51 @@ class DatabaseService {
 
   // Update a customer
   Future<void> updateCustomer(String customerId, Map<String, dynamic> customerData) async {
+    // Prepare customer data with encrypted PII fields
+    final sanitizedData = Map<String, dynamic>.from(customerData);
+    
+    // Encrypt PII fields (email, phone, address) if they exist
+    if (sanitizedData.containsKey('email') && sanitizedData['email'] is String) {
+      final emailValue = sanitizedData['email'] as String;
+      if (emailValue.isNotEmpty) {
+        sanitizedData['email'] = _encryptionHelper.encrypt(emailValue);
+        sanitizedData['emailEncrypted'] = true;
+      } else {
+        sanitizedData['email'] = '';
+        sanitizedData['emailEncrypted'] = false;
+      }
+    }
+    if (sanitizedData.containsKey('phone') && sanitizedData['phone'] is String) {
+      final phoneValue = sanitizedData['phone'] as String;
+      if (phoneValue.isNotEmpty) {
+        sanitizedData['phone'] = _encryptionHelper.encrypt(phoneValue);
+        sanitizedData['phoneEncrypted'] = true;
+      } else {
+        sanitizedData['phone'] = '';
+        sanitizedData['phoneEncrypted'] = false;
+      }
+    }
+    if (sanitizedData.containsKey('address') && sanitizedData['address'] is String) {
+      final addressValue = sanitizedData['address'] as String;
+      if (addressValue.isNotEmpty) {
+        sanitizedData['address'] = _encryptionHelper.encrypt(addressValue);
+        sanitizedData['addressEncrypted'] = true;
+      } else {
+        sanitizedData['address'] = '';
+        sanitizedData['addressEncrypted'] = false;
+      }
+    }
+    
+    // Sanitize name and notes (non-PII but still need sanitization)
+    if (sanitizedData['name'] is String) {
+      sanitizedData['name'] = SecurityUtils.sanitizeInput(sanitizedData['name'] as String);
+    }
+    if (sanitizedData['notes'] is String) {
+      sanitizedData['notes'] = SecurityUtils.sanitizeInput(sanitizedData['notes'] as String);
+    }
+    
     await customersRef.child(customerId).update({
-      ...customerData,
+      ...sanitizedData,
       'updatedAt': DateTime.now().toIso8601String(),
     });
   }
@@ -1470,6 +1541,25 @@ class DatabaseService {
     });
     
     return totalWithdrawals;
+  }
+
+  // Delete all user data (for account deletion)
+  Future<void> deleteAllUserData() async {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('User must be logged in');
+    }
+
+    try {
+      // Delete all user data in a single operation
+      final userRef = _database.child('users').child(userId);
+      await userRef.remove();
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menghapus data pengguna.',
+      );
+    }
   }
 }
 

@@ -30,6 +30,8 @@ class SettingsService {
   static const String keyTaxEnabled = 'tax_enabled';
   static const String keyTaxRate = 'tax_rate';
   static const String keyTaxInclusive = 'tax_inclusive';
+  // Custom QR code setting
+  static const String keyCustomQRCodeUrl = 'custom_qr_code_url';
 
   /// Validates and sanitizes setting key to prevent path injection
   /// Only allows alphanumeric characters, underscores, and hyphens

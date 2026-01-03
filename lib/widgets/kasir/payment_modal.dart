@@ -4,11 +4,13 @@ import '../../models/cart_item_model.dart';
 import '../../models/payment_method_model.dart';
 import '../../services/database_service.dart';
 import '../../services/xendit_service.dart';
+import '../../services/settings_service.dart';
 import '../../utils/error_helper.dart';
 import '../../utils/currency_input_formatter.dart';
 import 'qris_payment_dialog.dart';
 import 'virtual_account_bank_selection_dialog.dart';
 import 'virtual_account_payment_dialog.dart';
+import 'custom_qr_payment_dialog.dart';
 
 class PaymentModal extends StatefulWidget {
   final double total;
@@ -36,6 +38,9 @@ class PaymentModal extends StatefulWidget {
 }
 
 class _PaymentModalState extends State<PaymentModal> {
+  // Temporarily disable Xendit payments
+  static const bool _xenditEnabled = false;
+
   String _selectedPaymentMethod = 'Cash';
   final TextEditingController _cashController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
@@ -47,11 +52,24 @@ class _PaymentModalState extends State<PaymentModal> {
   List<Map<String, dynamic>> _customers = [];
   final FocusNode _cashFocusNode = FocusNode();
 
-  final List<PaymentMethod> _paymentMethods = [
-    PaymentMethod(id: 'Cash', name: 'Tunai', icon: Icons.money_rounded),
-    PaymentMethod(id: 'QRIS', name: 'QRIS', icon: Icons.qr_code_rounded),
-    PaymentMethod(id: 'VirtualAccount', name: 'Virtual Account', icon: Icons.account_balance_rounded),
-  ];
+  List<PaymentMethod> get _paymentMethods {
+    final methods = [
+      PaymentMethod(id: 'Cash', name: 'Tunai', icon: Icons.money_rounded),
+    ];
+    
+    if (_xenditEnabled) {
+      methods.addAll([
+        PaymentMethod(id: 'QRIS', name: 'QRIS', icon: Icons.qr_code_rounded),
+        PaymentMethod(id: 'VirtualAccount', name: 'Virtual Account', icon: Icons.account_balance_rounded),
+      ]);
+    } else {
+      methods.add(
+        PaymentMethod(id: 'CustomQR', name: 'QR Code', icon: Icons.qr_code_rounded),
+      );
+    }
+    
+    return methods;
+  }
 
   final XenditService _xenditService = XenditService();
   bool _isProcessingPayment = false;
@@ -215,10 +233,12 @@ class _PaymentModalState extends State<PaymentModal> {
     });
 
     try {
-      if (_selectedPaymentMethod == 'QRIS') {
+      if (_selectedPaymentMethod == 'QRIS' && _xenditEnabled) {
         await _processQRISPayment();
-      } else if (_selectedPaymentMethod == 'VirtualAccount') {
+      } else if (_selectedPaymentMethod == 'VirtualAccount' && _xenditEnabled) {
         await _processVirtualAccountPayment();
+      } else if (_selectedPaymentMethod == 'CustomQR') {
+        await _processCustomQRPayment();
       }
     } catch (error) {
       setState(() {
@@ -239,6 +259,8 @@ class _PaymentModalState extends State<PaymentModal> {
   }
 
   Future<void> _processQRISPayment() async {
+    if (!_xenditEnabled) return;
+    
     try {
       final referenceId = 'TXN-${DateTime.now().millisecondsSinceEpoch}';
       final expiredAt = DateTime.now().add(const Duration(hours: 24)).toIso8601String();
@@ -312,6 +334,8 @@ class _PaymentModalState extends State<PaymentModal> {
   }
 
   Future<void> _createVirtualAccount(String bankCode, String bankName) async {
+    if (!_xenditEnabled) return;
+    
     try {
       setState(() {
         _isProcessingPayment = true;
@@ -351,6 +375,76 @@ class _PaymentModalState extends State<PaymentModal> {
         ),
       );
     }
+  }
+
+  Future<void> _processCustomQRPayment() async {
+    try {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+
+      // Load custom QR code URL from settings
+      final qrCodeUrl = await SettingsService.getSetting<String>(
+        SettingsService.keyCustomQRCodeUrl,
+        '',
+      );
+
+      if (qrCodeUrl.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR code belum dikonfigurasi. Silakan atur QR code di Pengaturan > Bisnis.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        _showCustomQRPaymentDialog(qrCodeUrl, _finalTotal);
+      }
+    } catch (e) {
+      setState(() {
+        _isProcessingPayment = false;
+      });
+      if (!mounted) return;
+      final message = getFriendlyErrorMessage(
+        e,
+        fallbackMessage: 'Gagal memproses pembayaran QR code.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showCustomQRPaymentDialog(String qrImageUrl, double total) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CustomQRPaymentDialog(
+        qrImageUrl: qrImageUrl,
+        total: total,
+        onPaymentConfirmed: () {
+          widget.onPaymentSuccess(
+            paymentMethod: 'CustomQR',
+            cashAmount: null,
+            change: null,
+            customerId: _selectedCustomerId,
+            customerName: _selectedCustomerName,
+            discount: _discount,
+          );
+        },
+        onCancel: () {
+          // Handle cancel
+        },
+      ),
+    );
   }
 
   void _showVirtualAccountPaymentDialog(Map<String, dynamic> vaData, String bankName, double total) {
@@ -495,47 +589,30 @@ class _PaymentModalState extends State<PaymentModal> {
                       ),
                       const SizedBox(height: 16),
                       Row(
-                        children: [
-                          Expanded(
-                            child: _buildPaymentMethodButton(
-                              method: _paymentMethods[0],
-                              isSelected: _selectedPaymentMethod == _paymentMethods[0].id,
-                              onTap: () {
-                                setState(() {
-                                  _selectedPaymentMethod = _paymentMethods[0].id;
-                                  _calculateChange();
-                                });
-                                HapticFeedback.lightImpact();
-                              },
+                        children: _paymentMethods.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final method = entry.value;
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                right: index < _paymentMethods.length - 1 ? 12 : 0,
+                              ),
+                              child: _buildPaymentMethodButton(
+                                method: method,
+                                isSelected: _selectedPaymentMethod == method.id,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedPaymentMethod = method.id;
+                                    if (method.id == 'Cash') {
+                                      _calculateChange();
+                                    }
+                                  });
+                                  HapticFeedback.lightImpact();
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildPaymentMethodButton(
-                              method: _paymentMethods[1],
-                              isSelected: _selectedPaymentMethod == _paymentMethods[1].id,
-                              onTap: () {
-                                setState(() {
-                                  _selectedPaymentMethod = _paymentMethods[1].id;
-                                });
-                                HapticFeedback.lightImpact();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildPaymentMethodButton(
-                              method: _paymentMethods[2],
-                              isSelected: _selectedPaymentMethod == _paymentMethods[2].id,
-                              onTap: () {
-                                setState(() {
-                                  _selectedPaymentMethod = _paymentMethods[2].id;
-                                });
-                                HapticFeedback.lightImpact();
-                              },
-                            ),
-                          ),
-                        ],
+                          );
+                        }).toList(),
                       ),
                     ],
                   ),
@@ -753,11 +830,13 @@ class _PaymentModalState extends State<PaymentModal> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _selectedPaymentMethod == 'QRIS'
-                            ? Icons.qr_code_rounded
-                            : _selectedPaymentMethod == 'VirtualAccount'
-                                ? Icons.account_balance_rounded
-                                : Icons.payment_rounded,
+                        _selectedPaymentMethod == 'Cash'
+                            ? Icons.payment_rounded
+                            : _selectedPaymentMethod == 'QRIS'
+                                ? Icons.qr_code_rounded
+                                : _selectedPaymentMethod == 'VirtualAccount'
+                                    ? Icons.account_balance_rounded
+                                    : Icons.qr_code_rounded,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -766,7 +845,9 @@ class _PaymentModalState extends State<PaymentModal> {
                             ? "Proses Pembayaran"
                             : _selectedPaymentMethod == 'QRIS'
                                 ? "Buat QRIS"
-                                : "Buat Virtual Account",
+                                : _selectedPaymentMethod == 'VirtualAccount'
+                                    ? "Buat Virtual Account"
+                                    : "Tampilkan QR Code",
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
