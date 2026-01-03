@@ -56,6 +56,25 @@ class _TransactionDetailModalState extends State<TransactionDetailModal> {
     _currentStatus = widget.transaction.status;
   }
 
+  List<Map<String, dynamic>> _getItemsList() {
+    if (widget.fullTransactionData == null) return [];
+    final items = widget.fullTransactionData!['items'];
+    if (items is List) {
+      return items.map((e) {
+        if (e is Map) {
+          // Convert any Map type (including LinkedMap from Firebase) to Map<String, dynamic>
+          return Map<String, dynamic>.from(e);
+        }
+        return <String, dynamic>{};
+      }).toList();
+    }
+    return [];
+  }
+
+  String _formatItemPrice(double price) {
+    return 'Rp ${price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+  }
+
   Future<void> _cancelTransaction() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -186,17 +205,18 @@ class _TransactionDetailModalState extends State<TransactionDetailModal> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow("ID Transaksi", widget.transaction.id),
-                  _buildDetailRow("Tanggal", formatDateTime(widget.transaction.date)),
-                  _buildDetailRow("Pelanggan", widget.transaction.customerName),
-                  _buildDetailRow("Jumlah Item", "${widget.transaction.items} item"),
-                  _buildDetailRow("Metode Pembayaran", widget.transaction.paymentMethod),
-                  _buildDetailRow("Status", _currentStatus),
-                  const SizedBox(height: 16),
-                  Container(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailRow("ID Transaksi", widget.transaction.id),
+                    _buildDetailRow("Tanggal", formatDateTime(widget.transaction.date)),
+                    _buildDetailRow("Pelanggan", widget.transaction.customerName),
+                    _buildItemsList(),
+                    _buildDetailRow("Metode Pembayaran", widget.transaction.paymentMethod),
+                    _buildDetailRow("Status", _currentStatus),
+                    const SizedBox(height: 16),
+                    Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -228,56 +248,57 @@ class _TransactionDetailModalState extends State<TransactionDetailModal> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // Action Buttons
-                  Row(
-                    children: [
-                      if (widget.onPrint != null)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: widget.onPrint,
-                            icon: const Icon(Icons.print_rounded),
-                            label: const Text('Cetak'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        if (widget.onPrint != null)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onPrint,
+                              icon: const Icon(Icons.print_rounded),
+                              label: const Text('Cetak'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6366F1),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      if (canCancel && widget.onPrint != null) const SizedBox(width: 12),
-                      if (canCancel)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoading ? null : _cancelTransaction,
-                            icon: _isLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : const Icon(Icons.cancel_rounded),
-                            label: const Text('Batalkan'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                        if (canCancel && widget.onPrint != null) const SizedBox(width: 12),
+                        if (canCancel)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _isLoading ? null : _cancelTransaction,
+                              icon: _isLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.cancel_rounded),
+                              label: const Text('Batalkan'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -304,6 +325,92 @@ class _TransactionDetailModalState extends State<TransactionDetailModal> {
             style: const TextStyle(
               color: Color(0xFF1F2937),
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsList() {
+    final items = _getItemsList();
+    if (items.isEmpty) {
+      return _buildDetailRow("Jumlah Item", "${widget.transaction.items} item");
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Daftar Item",
+            style: TextStyle(
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: items.asMap().entries.map((entry) {
+                final item = entry.value;
+                final isLast = entry.key == items.length - 1;
+                final name = item['name'] ?? item['productName'] ?? 'Item';
+                final qty = item['quantity'] ?? 1;
+                final price = (item['price'] ?? item['subtotal'] ?? 0).toDouble();
+                final subtotal = price * qty;
+                final isCustom = item['isCustom'] == true;
+
+                return Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  color: const Color(0xFF1F2937),
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: isCustom ? FontStyle.italic : FontStyle.normal,
+                                ),
+                              ),
+                              Text(
+                                '${_formatItemPrice(price)} x $qty',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _formatItemPrice(subtotal),
+                          style: const TextStyle(
+                            color: Color(0xFF1F2937),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!isLast)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, color: Colors.grey.shade300),
+                      ),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         ],

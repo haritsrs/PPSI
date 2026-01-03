@@ -171,7 +171,7 @@ class CartPanel extends StatelessWidget {
               children: [
                 _buildBillRow(context, "Subtotal", subtotal, paddingScale),
                 SizedBox(height: 8 * paddingScale),
-                _buildBillRow(context, "Pajak (11%)", tax, paddingScale),
+                _buildTaxRow(context, tax, paddingScale),
                 SizedBox(height: 12 * paddingScale),
                 Container(
                   padding: EdgeInsets.symmetric(vertical: 12 * paddingScale),
@@ -276,6 +276,78 @@ class CartPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTaxRow(BuildContext context, double amount, double paddingScale) {
+    final fontSize = ResponsiveHelper.getFontScale(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Pajak",
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                  fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontSize,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _showTaxInfoDialog(context),
+                child: Icon(
+                  Icons.info_outline,
+                  size: 16 * fontSize,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF1F2937),
+                fontWeight: FontWeight.w600,
+                fontSize: (Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14) * fontSize,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showTaxInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: const Color(0xFF6366F1)),
+            const SizedBox(width: 8),
+            const Text('Informasi Pajak'),
+          ],
+        ),
+        content: const Text(
+          'Pajak dapat diaktifkan, dinonaktifkan, atau diubah tarifnya melalui menu Pengaturan → Bisnis → Pajak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      ),
     );
   }
 }

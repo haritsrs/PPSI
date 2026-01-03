@@ -10,6 +10,7 @@ import 'routes/auth_wrapper.dart';
 import 'pages/onboarding_page.dart';
 import 'routes/app_routes.dart';
 import 'themes/app_theme.dart';
+import 'services/settings_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,14 +48,24 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+  // UI scale setting stored with 'settings_' prefix per SettingsService convention
+  final uiScalePreset = prefs.getString('settings_${SettingsService.keyUIScale}') ?? 'normal';
 
-  runApp(KiosDarmaApp(hasSeenOnboarding: hasSeenOnboarding));
+  runApp(KiosDarmaApp(hasSeenOnboarding: hasSeenOnboarding, initialUIScale: uiScalePreset));
 }
 
 class KiosDarmaApp extends StatefulWidget {
-  const KiosDarmaApp({super.key, required this.hasSeenOnboarding});
+  const KiosDarmaApp({super.key, required this.hasSeenOnboarding, required this.initialUIScale});
 
   final bool hasSeenOnboarding;
+  final String initialUIScale;
+
+  // Global key to allow UI scale updates from anywhere
+  static final GlobalKey<_KiosDarmaAppState> appKey = GlobalKey<_KiosDarmaAppState>();
+  
+  static void updateUIScale(String preset) {
+    appKey.currentState?.updateUIScale(preset);
+  }
 
   @override
   State<KiosDarmaApp> createState() => _KiosDarmaAppState();
@@ -62,11 +73,13 @@ class KiosDarmaApp extends StatefulWidget {
 
 class _KiosDarmaAppState extends State<KiosDarmaApp> {
   late bool _hasSeenOnboarding;
+  late String _uiScalePreset;
 
   @override
   void initState() {
     super.initState();
     _hasSeenOnboarding = widget.hasSeenOnboarding;
+    _uiScalePreset = widget.initialUIScale;
   }
 
   void _handleOnboardingFinished() {
@@ -75,11 +88,40 @@ class _KiosDarmaAppState extends State<KiosDarmaApp> {
     });
   }
 
+  void updateUIScale(String preset) {
+    if (['small', 'normal', 'large', 'extra_large'].contains(preset)) {
+      setState(() {
+        _uiScalePreset = preset;
+      });
+    }
+  }
+
+  double get _scaleFactor {
+    switch (_uiScalePreset) {
+      case 'small': return 0.9;
+      case 'large': return 1.15;
+      case 'extra_large': return 1.3;
+      default: return 1.0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      key: KiosDarmaApp.appKey,
       title: 'KiosDarma',
       theme: AppTheme.theme,
+      // Apply global UI scaling via MediaQuery
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        // Apply text scale only (not affecting layout/hitboxes)
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(_scaleFactor),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       // Routing setup: AuthWrapper handles authentication state
       home: _hasSeenOnboarding
           ? const AuthWrapper()

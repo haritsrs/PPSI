@@ -52,7 +52,12 @@ class BusinessSettingsSection extends StatelessWidget {
               trailing: Switch(
                 value: controller.taxEnabled,
                 onChanged: (value) async {
-                  await controller.setTaxEnabled(value);
+                  if (!value) {
+                    // Show informational popup when disabling tax
+                    _showTaxDisableWarning(context, controller);
+                  } else {
+                    await controller.setTaxEnabled(value);
+                  }
                 },
                 activeColor: const Color(0xFF6366F1),
               ),
@@ -148,6 +153,54 @@ class BusinessSettingsSection extends StatelessWidget {
               }
             },
             child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTaxDisableWarning(BuildContext context, SettingsController controller) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange),
+            const SizedBox(width: 8),
+            const Text('Informasi Pajak'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sebaiknya pajak tetap diaktifkan untuk memastikan pencatatan yang akurat.',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Catatan: Kewajiban perpajakan tetap menjadi tanggung jawab pemilik usaha sesuai peraturan yang berlaku.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await controller.setTaxEnabled(false);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Tetap Nonaktifkan'),
           ),
         ],
       ),

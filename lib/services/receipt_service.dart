@@ -45,6 +45,7 @@ class ReceiptService {
   }
 
   // Generate PDF receipt for preview and printing
+  // Always uses minimal format: store name, date, items, subtotal, tax (if enabled), total, payment
   static Future<pw.Document> generatePDFReceipt({
     required String transactionId,
     required DateTime date,
@@ -59,7 +60,6 @@ class ReceiptService {
     String? storeName,
     String? storeAddress,
     String? storePhone,
-    bool compactMode = false,
   }) async {
     // Ensure locale is initialized before using DateFormat
     await _ensureLocaleInitialized();
@@ -67,85 +67,46 @@ class ReceiptService {
     final pdf = pw.Document();
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
     
-    // Compact mode uses smaller spacing and font sizes
-    final double headerFontSize = compactMode ? 14 : 18;
-    final double normalFontSize = compactMode ? 8 : 10;
-    final double smallFontSize = compactMode ? 7 : 9;
-    final double itemFontSize = compactMode ? 8 : 10;
-    final double totalFontSize = compactMode ? 10 : 12;
-    final double spacing = compactMode ? 2 : 4;
-    final double sectionSpacing = compactMode ? 4 : 8;
+    // Fixed minimal font sizes
+    const double headerFontSize = 14;
+    const double normalFontSize = 9;
+    const double smallFontSize = 8;
+    const double totalFontSize = 10;
+    const double spacing = 3;
+    const double sectionSpacing = 6;
     
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat(80 * PdfPageFormat.mm, double.infinity,
-            marginAll: compactMode ? 2 * PdfPageFormat.mm : 4 * PdfPageFormat.mm),
+            marginAll: 3 * PdfPageFormat.mm),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               // Store Header
-              if (storeName != null) ...[
-                pw.Text(
-                  storeName,
-                  style: pw.TextStyle(
-                    fontSize: headerFontSize,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  textAlign: pw.TextAlign.center,
+              pw.Text(
+                storeName ?? 'Toko Saya',
+                style: pw.TextStyle(
+                  fontSize: headerFontSize,
+                  fontWeight: pw.FontWeight.bold,
                 ),
-                pw.SizedBox(height: spacing),
-              ],
-              if (storeAddress != null && !compactMode) ...[
-                pw.Text(
-                  storeAddress,
-                  style: pw.TextStyle(fontSize: normalFontSize),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: spacing / 2),
-              ],
-              if (storePhone != null && !compactMode) ...[
-                pw.Text(
-                  storePhone,
-                  style: pw.TextStyle(fontSize: normalFontSize),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: sectionSpacing),
-              ],
-              if (storeName == null && storeAddress == null && storePhone == null)
-                pw.Text(
-                  'Toko Saya',
-                  style: pw.TextStyle(
-                    fontSize: headerFontSize,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-              
-              pw.Divider(),
+                textAlign: pw.TextAlign.center,
+              ),
               pw.SizedBox(height: spacing),
               
-              // Transaction Info
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('ID: $transactionId', style: pw.TextStyle(fontSize: smallFontSize)),
-                  pw.Text(dateFormat.format(date), style: pw.TextStyle(fontSize: smallFontSize)),
-                ],
+              // Date/Time
+              pw.Text(
+                dateFormat.format(date),
+                style: pw.TextStyle(fontSize: smallFontSize),
+                textAlign: pw.TextAlign.center,
               ),
-              
-              if (customerName != null && customerName.isNotEmpty && !compactMode) ...[
-                pw.SizedBox(height: spacing),
-                pw.Text('Pelanggan: $customerName', style: pw.TextStyle(fontSize: smallFontSize)),
-              ],
               
               pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
               pw.SizedBox(height: spacing),
               
-              // Items - compact mode shows simplified format
+              // Items - single line format: name x qty = total
               ...items.map((item) {
-                // Support both 'name' and 'productName' fields for backward compatibility
                 final name = (item['productName'] as String?) ?? 
                              (item['name'] as String?) ?? 
                              'Item';
@@ -153,125 +114,66 @@ class ReceiptService {
                 final price = (item['price'] as num?)?.toDouble() ?? 0.0;
                 final itemTotal = quantity * price;
                 
-                if (compactMode) {
-                  // Single line format for compact mode
-                  return pw.Padding(
-                    padding: pw.EdgeInsets.only(bottom: spacing / 2),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Expanded(
-                          child: pw.Text(
-                            '$name x$quantity',
-                            style: pw.TextStyle(fontSize: itemFontSize),
-                          ),
-                        ),
-                        pw.Text(
-                          _formatCurrency(itemTotal),
-                          style: pw.TextStyle(fontSize: itemFontSize),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                
                 return pw.Padding(
-                  padding: pw.EdgeInsets.only(bottom: spacing + 2),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  padding: const pw.EdgeInsets.only(bottom: 2),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Expanded(
-                            child: pw.Text(
-                              name,
-                              style: pw.TextStyle(fontSize: itemFontSize, fontWeight: pw.FontWeight.bold),
-                            ),
-                          ),
-                          pw.Text(
-                            _formatCurrency(itemTotal),
-                            style: pw.TextStyle(fontSize: itemFontSize, fontWeight: pw.FontWeight.bold),
-                          ),
-                        ],
+                      pw.Expanded(
+                        child: pw.Text(
+                          '$name x$quantity',
+                          style: pw.TextStyle(fontSize: normalFontSize),
+                        ),
                       ),
-                      pw.SizedBox(height: spacing / 2),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text(
-                            '$quantity x ${_formatCurrency(price)}',
-                            style: pw.TextStyle(fontSize: smallFontSize, color: PdfColors.grey700),
-                          ),
-                        ],
+                      pw.Text(
+                        _formatCurrency(itemTotal),
+                        style: pw.TextStyle(fontSize: normalFontSize),
                       ),
                     ],
                   ),
                 );
-              }).toList(),
+              }),
               
               pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
               pw.SizedBox(height: spacing),
               
-              // Totals
-              _buildTotalRowCompact('Subtotal', subtotal, normalFontSize, spacing),
+              // Subtotal
+              _buildReceiptRow('Subtotal', subtotal, normalFontSize),
               // Tax (only show if > 0)
-              if (tax > 0) _buildTotalRowCompact('Pajak', tax, normalFontSize, spacing),
+              if (tax > 0) _buildReceiptRow('Pajak', tax, normalFontSize),
               pw.SizedBox(height: spacing),
-              pw.Divider(thickness: 2),
+              pw.Divider(thickness: 1.5),
               pw.SizedBox(height: spacing),
-              _buildTotalRowCompact('TOTAL', total, totalFontSize, spacing, isBold: true),
+              // Total
+              _buildReceiptRow('TOTAL', total, totalFontSize, isBold: true),
               
               pw.SizedBox(height: sectionSpacing),
               pw.Divider(),
               pw.SizedBox(height: spacing),
               
-              // Payment Info
+              // Payment method
               pw.Text(
                 'Pembayaran: ${_formatPaymentMethod(paymentMethod)}',
                 style: pw.TextStyle(fontSize: normalFontSize),
               ),
-              if (cashAmount != null && !compactMode) ...[
-                pw.SizedBox(height: spacing / 2),
-                pw.Text(
-                  'Tunai: ${_formatCurrency(cashAmount)}',
-                  style: pw.TextStyle(fontSize: normalFontSize),
-                ),
-              ],
+              
+              // Change (if applicable)
               if (change != null && change > 0) ...[
-                pw.SizedBox(height: spacing / 2),
+                pw.SizedBox(height: 2),
                 pw.Text(
                   'Kembalian: ${_formatCurrency(change)}',
                   style: pw.TextStyle(fontSize: normalFontSize),
                 ),
               ],
               
-              pw.SizedBox(height: compactMode ? sectionSpacing : 16),
-              if (!compactMode) ...[
-                pw.Text(
-                  'Terima Kasih',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: spacing),
-                pw.Text(
-                  'Selamat Berbelanja Kembali',
-                  style: pw.TextStyle(fontSize: normalFontSize),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: sectionSpacing),
-              ] else ...[
-                pw.Text(
-                  'Terima Kasih',
-                  style: pw.TextStyle(fontSize: normalFontSize, fontWeight: pw.FontWeight.bold),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: spacing),
-              ],
+              pw.SizedBox(height: sectionSpacing),
+              pw.Text(
+                'Terima Kasih',
+                style: pw.TextStyle(fontSize: normalFontSize, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center,
+              ),
+              pw.SizedBox(height: spacing),
             ],
           );
         },
@@ -281,9 +183,9 @@ class ReceiptService {
     return pdf;
   }
 
-  static pw.Widget _buildTotalRowCompact(String label, double value, double fontSize, double spacing, {bool isBold = false}) {
+  static pw.Widget _buildReceiptRow(String label, double value, double fontSize, {bool isBold = false}) {
     return pw.Padding(
-      padding: pw.EdgeInsets.only(bottom: spacing),
+      padding: const pw.EdgeInsets.only(bottom: 2),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
@@ -298,31 +200,6 @@ class ReceiptService {
             _formatCurrency(value),
             style: pw.TextStyle(
               fontSize: fontSize,
-              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _buildTotalRow(String label, double value, {bool isBold = false, bool isLarge = false}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 4),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(
-            label,
-            style: pw.TextStyle(
-              fontSize: isLarge ? 12 : 10,
-              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
-            ),
-          ),
-          pw.Text(
-            _formatCurrency(value),
-            style: pw.TextStyle(
-              fontSize: isLarge ? 12 : 10,
               fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
             ),
           ),

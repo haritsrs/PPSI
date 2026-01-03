@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../models/product_model.dart';
 import '../../../services/database_service.dart';
 import '../../../services/storage_service.dart';
+import '../../../services/settings_service.dart';
 import '../../../utils/security_utils.dart';
 import '../../../utils/error_helper.dart';
 import '../../../utils/currency_input_formatter.dart';
@@ -29,6 +30,7 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _priceAfterTaxController = TextEditingController();
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
   final _supplierController = TextEditingController();
@@ -40,6 +42,11 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
   File? _selectedImageFile;
   String? _imageUrl;
   bool _isUploadingImage = false;
+  
+  // Tax settings
+  bool _taxEnabled = true;
+  double _taxRate = 0.11;
+  bool _isUpdatingPrice = false; // Prevent circular updates
   
   final DatabaseService _databaseService = DatabaseService();
   final ImagePicker _imagePicker = ImagePicker();
@@ -58,6 +65,9 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
   @override
   void initState() {
     super.initState();
+    _loadTaxSettings();
+    _priceController.addListener(_onBasePriceChanged);
+    _priceAfterTaxController.addListener(_onPriceAfterTaxChanged);
     if (widget.product != null) {
       _nameController.text = widget.product!.name;
       _descriptionController.text = widget.product!.description;
@@ -74,11 +84,60 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
     }
   }
 
+  Future<void> _loadTaxSettings() async {
+    _taxEnabled = await SettingsService.getSetting(SettingsService.keyTaxEnabled, true);
+    _taxRate = await SettingsService.getSetting(SettingsService.keyTaxRate, 0.11);
+    // Update price after tax if base price exists
+    if (_priceController.text.isNotEmpty) {
+      _updatePriceAfterTax();
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _onBasePriceChanged() {
+    if (_isUpdatingPrice) return;
+    _updatePriceAfterTax();
+  }
+
+  void _onPriceAfterTaxChanged() {
+    if (_isUpdatingPrice) return;
+    _updateBasePrice();
+  }
+
+  void _updatePriceAfterTax() {
+    if (!_taxEnabled) return;
+    final basePrice = _tryParsePrice(_priceController.text);
+    if (basePrice == null) return;
+    
+    _isUpdatingPrice = true;
+    final priceAfterTax = basePrice * (1 + _taxRate);
+    final formatted = priceAfterTax.round().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+    _priceAfterTaxController.text = formatted;
+    _isUpdatingPrice = false;
+  }
+
+  void _updateBasePrice() {
+    if (!_taxEnabled) return;
+    final priceAfterTax = _tryParsePrice(_priceAfterTaxController.text);
+    if (priceAfterTax == null) return;
+    
+    _isUpdatingPrice = true;
+    final basePrice = priceAfterTax / (1 + _taxRate);
+    final formatted = basePrice.round().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+    _priceController.text = formatted;
+    _isUpdatingPrice = false;
+  }
+
   @override
   void dispose() {
+    _priceController.removeListener(_onBasePriceChanged);
+    _priceAfterTaxController.removeListener(_onPriceAfterTaxChanged);
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
+    _priceAfterTaxController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
     _supplierController.dispose();
@@ -631,45 +690,64 @@ class _AddEditProductDialogState extends State<AddEditProductDialog> {
                       ),
                       const SizedBox(height: 16),
                       
-                      // Price and Stock in Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _priceController,
-                              inputFormatters: [CurrencyInputFormatter()],
-                              decoration: InputDecoration(
-                                labelText: 'Harga Jual *',
-                                hintText: 'Contoh: 25.000',
-                                helperText: 'Harga jual per unit',
-                                helperMaxLines: 1,
-                                prefixText: 'Rp ',
-                                prefixIcon: Tooltip(
-                                  message: 'Masukkan harga jual produk dalam Rupiah',
-                                  child: const Icon(Icons.attach_money_rounded),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                suffixIcon: Tooltip(
-                                  message: 'Masukkan harga jual untuk pelanggan. Format: angka dengan pemisah ribuan (titik).',
-                                  child: Icon(Icons.info_outline, size: 20, color: Colors.grey[500]),
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Harga wajib diisi';
-                                }
-                                final parsed = _tryParsePrice(value);
-                                if (parsed == null || parsed <= 0) {
-                                  return 'Masukkan harga yang valid (lebih dari 0)';
-                                }
-                                return null;
-                              },
+                      // Price fields - Base price and Price after tax
+                      TextFormField(
+                        controller: _priceController,
+                        inputFormatters: [CurrencyInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: _taxEnabled ? 'Harga Sebelum Pajak *' : 'Harga Jual *',
+                          hintText: 'Contoh: 25.000',
+                          helperText: _taxEnabled ? 'Harga dasar sebelum pajak ${(_taxRate * 100).toStringAsFixed(0)}%' : 'Harga jual per unit',
+                          helperMaxLines: 1,
+                          prefixText: 'Rp ',
+                          prefixIcon: Tooltip(
+                            message: 'Masukkan harga jual produk dalam Rupiah',
+                            child: const Icon(Icons.attach_money_rounded),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Harga wajib diisi';
+                          }
+                          final parsed = _tryParsePrice(value);
+                          if (parsed == null || parsed <= 0) {
+                            return 'Masukkan harga yang valid (lebih dari 0)';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (_taxEnabled) ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _priceAfterTaxController,
+                          inputFormatters: [CurrencyInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: 'Harga Setelah Pajak',
+                            hintText: 'Otomatis dihitung',
+                            helperText: 'Harga yang dibayar pelanggan (termasuk pajak ${(_taxRate * 100).toStringAsFixed(0)}%)',
+                            helperMaxLines: 1,
+                            prefixText: 'Rp ',
+                            prefixIcon: const Icon(Icons.receipt_long_rounded),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            suffixIcon: Tooltip(
+                              message: 'Anda dapat mengisi dari field ini, harga sebelum pajak akan dihitung otomatis',
+                              child: Icon(Icons.sync, size: 20, color: Colors.grey[500]),
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      
+                      // Stock field
+                      Row(
+                        children: [
                           Expanded(
                             child: TextFormField(
                               controller: _stockController,

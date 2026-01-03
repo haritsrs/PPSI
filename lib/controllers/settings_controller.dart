@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/settings_service.dart';
 import '../services/auth_service.dart';
+import '../main.dart';
 
 class SettingsController extends ChangeNotifier {
   // Settings state
@@ -20,6 +21,9 @@ class SettingsController extends ChangeNotifier {
   
   // Custom QR code
   String? _customQRCodeUrl;
+  
+  // UI Scale preset (small=0.9, normal=1.0, large=1.15, extra_large=1.3)
+  String _uiScalePreset = 'normal';
   
   String _selectedLanguage = 'Bahasa Indonesia';
   String _selectedCurrency = 'IDR (Rupiah)';
@@ -46,6 +50,15 @@ class SettingsController extends ChangeNotifier {
   double get taxRate => _taxRate;
   bool get taxInclusive => _taxInclusive;
   String? get customQRCodeUrl => _customQRCodeUrl;
+  String get uiScalePreset => _uiScalePreset;
+  double get uiScaleFactor {
+    switch (_uiScalePreset) {
+      case 'small': return 0.9;
+      case 'large': return 1.15;
+      case 'extra_large': return 1.3;
+      default: return 1.0;
+    }
+  }
   String get selectedLanguage => _selectedLanguage;
   String get selectedCurrency => _selectedCurrency;
   String get selectedPrinter => _selectedPrinter;
@@ -124,6 +137,11 @@ class SettingsController extends ChangeNotifier {
         '',
       );
       _customQRCodeUrl = qrCodeUrl.isEmpty ? null : qrCodeUrl;
+      
+      _uiScalePreset = await SettingsService.getSetting(
+        SettingsService.keyUIScale,
+        'normal',
+      );
 
       // Sync from Firebase if online (only once on initial load)
       if (!_offlineModeEnabled) {
@@ -305,6 +323,21 @@ class SettingsController extends ChangeNotifier {
     await updateSetting(SettingsService.keyCustomQRCodeUrl, url ?? '');
   }
 
+  Future<void> setUIScalePreset(String preset) async {
+    if (!['small', 'normal', 'large', 'extra_large'].contains(preset)) return;
+    _uiScalePreset = preset;
+    notifyListeners();
+    
+    // Save to SharedPreferences immediately
+    await updateSetting(SettingsService.keyUIScale, preset);
+    
+    // Also update the global app state to apply the new scale
+    // Using a small delay to ensure SharedPreferences write completes
+    await Future.delayed(const Duration(milliseconds: 50), () {
+      KiosDarmaApp.updateUIScale(preset);
+    });
+  }
+
   Future<void> performBackup() async {
     try {
       await SettingsService.performBackup();
@@ -350,6 +383,7 @@ class SettingsController extends ChangeNotifier {
     _selectedLanguage = 'Bahasa Indonesia';
     _selectedCurrency = 'IDR (Rupiah)';
     _selectedPrinter = 'Default Printer';
+    _uiScalePreset = 'normal';
     notifyListeners();
   }
 }
