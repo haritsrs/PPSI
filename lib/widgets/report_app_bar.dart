@@ -61,26 +61,6 @@ class ReportAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ExportDialog.show(
-                context,
-                onExportPDF: onExportPDF ?? () {},
-                onExportExcel: onExportExcel ?? () {},
-              );
-            },
-            icon: const Icon(Icons.download_rounded, color: Colors.white),
-          ),
-        ),
-      ],
     );
   }
 }

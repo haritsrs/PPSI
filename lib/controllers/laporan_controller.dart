@@ -30,7 +30,16 @@ class LaporanController extends ChangeNotifier {
   
   // Filter options
   final List<String> _periods = ['Hari', 'Minggu', 'Bulan'];
-  final List<String> _filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Rentang Tanggal'];
+  final List<String> _filters = [
+    'Semua',
+    'Hari Ini',
+    'Minggu Ini',
+    'Bulan Ini',
+    'Kuartal Ini',
+    'Tahun Ini',
+    'Sepanjang Waktu',
+    'Rentang Tanggal'
+  ];
   final List<String> _paymentMethods = ['Semua', 'Cash', 'QRIS', 'VirtualAccount'];
   String _selectedPeriod = 'Hari';
 
@@ -91,6 +100,20 @@ class LaporanController extends ChangeNotifier {
             matchesDate = transaction.date.year == now.year &&
                    transaction.date.month == now.month;
             break;
+          case 'Kuartal Ini':
+            final now = DateTime.now();
+            final currentQuarter = ((now.month - 1) ~/ 3) + 1;
+            final transactionQuarter = ((transaction.date.month - 1) ~/ 3) + 1;
+            matchesDate = transaction.date.year == now.year &&
+                   transactionQuarter == currentQuarter;
+            break;
+          case 'Tahun Ini':
+            final now = DateTime.now();
+            matchesDate = transaction.date.year == now.year;
+            break;
+          case 'Sepanjang Waktu':
+            matchesDate = true;
+            break;
           default:
             matchesDate = true;
         }
@@ -117,7 +140,8 @@ class LaporanController extends ChangeNotifier {
       }
       
       return true;
-    }).toList();
+    }).toList()
+      ..sort((a, b) => b.date.compareTo(a.date)); // Sort chronologically (newest first)
   }
 
   double get totalRevenue {
@@ -321,6 +345,8 @@ class LaporanController extends ChangeNotifier {
         periodText: getPeriodText(),
         totalRevenue: totalRevenue,
         totalTransactions: totalTransactions,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       return file;
     } catch (error) {

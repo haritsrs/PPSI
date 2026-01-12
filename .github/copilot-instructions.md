@@ -1,234 +1,257 @@
-# PPSI - Copilot Instructions
+# PPSI (KiosDarma) - AI Coding Guidelines
 
-**KiosDarma** is a cross-platform Flutter POS (Point of Sale) system for retail business management. This document guides AI agents on essential architectural patterns, developer workflows, and project-specific conventions.
+**KiosDarma** is a cross-platform Flutter POS (Point of Sale) system for retail business management. This guide helps AI agents rapidly become productive in this codebase.
 
-## Architecture Overview
+## Architecture Overview: Clean Layers with Clear Boundaries
 
-### Clean Architecture with Separation of Concerns
+The project strictly separates concerns across these layers:
 
-The codebase follows a strict layered architecture:
+```
+Pages (UI entry points)
+    ↓ initializes
+Controllers (state management, ChangeNotifier)
+    ↓ calls
+Services (business logic, Firebase operations)
+    ↓ marshals
+Models (data structures with fromFirebase/toFirebase methods)
+```
 
-- **Models** (`lib/models/`) - Data structures with Firebase marshaling (e.g., `Product.fromFirebase()`, `toFirebase()`)
-- **Services** (`lib/services/`) - Stateless business logic & Firebase operations; use static methods or singletons
-- **Controllers** (`lib/controllers/`) - ChangeNotifier-based state management; call services, not Firebase directly
-- **Pages** (`lib/pages/`) - Entry points that initialize controllers and compose widgets
-- **Widgets** (`lib/widgets/`) - Reusable UI components organized by feature (e.g., `widgets/kasir/`, `widgets/products/`)
-- **Utils** (`lib/utils/`) - Utility functions (formatting, validation, error handling)
-- **Routes** (`lib/routes/`) - Navigation configuration via `AppRoutes` class
+### Layer Responsibilities
 
-**Critical rule**: Pages only initialize controllers; business logic belongs in services; UI composition goes in widgets.
+**Models** (`lib/models/`)
+- Pure data structures with Firebase marshaling: `Product.fromFirebase(Map data)` and `toFirebase() → Map`
+- Include computed properties (e.g., `isLowStock`, `stockStatus`) only for data representation
+- Never add business logic; never make Firebase calls
 
-## Firebase Integration Pattern
+**Services** (`lib/services/`)
+- Stateless; NEVER extend ChangeNotifier
+- All Firebase Realtime Database operations use `DatabaseService._getUserRef(path)` pattern for user-scoped data
+- Use static methods or singleton pattern (e.g., `AuthService`, `DatabaseService`)
+- One responsibility per service; separate concerns (auth, database, storage, payments)
+- Handle errors via `toAppException(error, fallbackMessage: '...')` from `error_helper.dart`
 
-### Database Service
-[DatabaseService](lib/services/database_service.dart) manages Realtime Database operations with user-scoped references:
+**Controllers** (`lib/controllers/`)
+- Extend `ChangeNotifier`; manage UI state only
+- Call services for data operations; NEVER call Firebase directly
+- Always `notifyListeners()` after state mutations
+- Implement `dispose()` to clean up streams and subscriptions (critical!)
+- Example stream pattern: `StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;` → cleaned in dispose
+
+**Pages** (`lib/pages/`)
+- Initialize controller: `ChangeNotifierProvider(create: (_) => ProductController()...)`
+- Compose widgets; no business logic
+
+**Widgets** (`lib/widgets/`)
+- Reusable UI components organized by feature: `widgets/kasir/`, `widgets/products/`
+- Stateful widgets for UI interactions; rely on parent controller for data
+
+**Utils** (`lib/utils/`)
+- Stateless functions: `FormatUtils.formatCurrency()`, `FormatUtils.formatDate()`, validation, error conversion
+- `error_helper.dart`: converts Firebase exceptions to user-friendly `AppException` subclasses (Indonesian messages)
+
+## Firebase Data Pattern: User-Scoped Isolation
+
+All user data is stored under `users/{uid}/` in Realtime Database:
 
 ```dart
-// User-scoped reference pattern
+// Correct: user-scoped reference
 DatabaseReference _getUserRef(String path) {
   final userId = currentUserId;
   return _database.child('users').child(userId).child(path);
 }
+
+// Usage in service
+Stream<List<Product>> getProductsStream() {
+  return _getUserRef('products').onValue.map(...);
+}
+
+// NEVER access global paths like _database.child('products')
 ```
 
-All product, transaction, and customer data is stored under `users/{userId}/`. **Never assume globally accessible data paths.**
+Models serialize/deserialize via:
+```dart
+factory Product.fromFirebase(Map<String, dynamic> data) {
+  return Product(
+    id: data['id'] as String? ?? '',
+    name: data['name'] as String? ?? '',
+    // ... type-safe deserialization
+  );
+}
 
-### Models & Serialization
-All models implement Firebase marshaling:
+Map<String, dynamic> toFirebase() {
+  return {
+    'name': name,
+    'price': price,
+    'createdAt': createdAt.toIso8601String(),
+    // ... toFirebase EXCLUDES the 'id' field
+  };
+}
+```
+
+## Error Handling & User Messages
+
+**Always use `error_helper.dart`** to convert exceptions:
 
 ```dart
-factory Product.fromFirebase(Map<String, dynamic> data) { ... }
-Map<String, dynamic> toFirebase() { ... }
+try {
+  await _databaseService.saveProduct(product);
+} catch (error) {
+  throw toAppException(
+    error,
+    fallbackMessage: 'Gagal menyimpan produk. Silakan coba lagi.',
+  );
+}
 ```
 
-Use these for every Firebase read/write to ensure type safety.
+- Custom `AppException` subclasses: `OfflineException`, `TimeoutRequestException`, `NetworkException`, `UnauthorizedException`, `NotFoundException`, `ServerException`
+- **All user-facing messages are in Indonesian**; never expose Firebase error codes to users
+- Controllers catch exceptions and display via `SnackBar` with `snackbar_helper.dart`
 
-### Authentication
-[AuthService](lib/services/auth_service.dart) handles Firebase Auth with:
-- Rate limiting to prevent brute force attacks
-- Input validation (email format checks)
-- User-specific error messages (never expose internal Firebase errors)
+## State Management Patterns
 
-## State Management & Controllers
-
-Controllers extend `ChangeNotifier` and manage UI state:
-
+**Controllers manage state immutably:**
 ```dart
 class ProductController extends ChangeNotifier {
   List<Product> _products = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  
+  List<Product> get products => _products; // Expose as getter, not setter
   
   Future<void> loadProducts() async {
-    _products = await DatabaseService().getProducts();
-    notifyListeners(); // Always notify after state changes
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _products = await _databaseService.getProducts();
+    } catch (error) {
+      _errorMessage = toAppException(error).message;
+    } finally {
+      _isLoading = false;
+      notifyListeners(); // Always notify listeners, even on error
+    }
   }
   
   @override
   void dispose() {
-    // Clean up subscriptions, timers, streams
+    _productsSubscription?.cancel(); // Clean up streams!
     super.dispose();
   }
 }
 ```
 
-**Key patterns**:
-- Call `notifyListeners()` after every state mutation
-- Implement `dispose()` to clean up resources (critical for streams)
-- Controllers call services; never call Firebase directly
+**Streams & Connectivity:** Controllers listen to `getProductsStream()` and handle offline scenarios via `Connectivity` plugin.
 
-## Key Features & Services
+## Common Features & Their Services
 
-### 1. **Receipt & Printer System**
-- [ReceiptService](lib/services/receipt_service.dart) generates receipt data
-- [PrinterCommands](lib/services/printer_commands.dart) implements ESC/POS thermal printer protocol
-- Supports both Bluetooth (`flutter_blue_plus`) and USB (`usb_serial`) connections
-- Print workflows handle offline scenarios gracefully
+| Feature | Key Files |
+|---------|-----------|
+| Auth & Login | `AuthService`, `LoginController`, `login_page.dart`, `AuthWrapper` |
+| Product Management | `ProductService`, `ProductController`, `product_model.dart` |
+| Kasir/Transactions | `KasirController`, `TransactionModel`, `receipt_service.dart` |
+| Barcode Scanning | `BarcodeScannerService` (wraps `mobile_scanner`); returns product lookup |
+| Receipts & Printing | `ReceiptService` (generates receipt data), `PrinterCommands` (ESC/POS thermal printer protocol), `PrinterController` |
+| Reports & Export | `ReportExportService` (Excel/PDF via `excel`, `pdf` packages), `DataExportService` (Firebase queries) |
+| Payments (QRIS/VA) | `XenditService` (requires `.env`: `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY`) |
+| Settings | `SettingsService`, `SettingsController`, `settings_page.dart` |
+| Encryption/Security | `SecurityUtils` (encrypt package), audit logging via `DatabaseService._logAuditEvent()` |
 
-### 2. **Report Export**
-- [ReportExportService](lib/services/report_export_service.dart) exports to Excel and PDF
-- [DataExportService](lib/services/data_export_service.dart) handles Firebase data queries
-- Use `excel` and `pdf` packages; format currency via `FormatUtils.formatCurrency()`
-
-### 3. **Barcode Scanning**
-- [BarcodeScanner](lib/services/barcode_scanner_service.dart) wraps `mobile_scanner`
-- Returns product lookup results; integrate with product controller
-
-### 4. **Payment Integration**
-- [XenditService](lib/services/xendit_service.dart) handles QRIS and Virtual Account payments
-- Requires `.env` variables: `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY`
-- Payment callbacks update transaction status in database
-
-### 5. **Data Security**
-- [SecurityUtils](lib/utils/security_utils.dart) provides encryption/decryption via `encrypt` package
-- Audit logging via `DatabaseService._logAuditEvent()` tracks sensitive operations
-- Sensitive data (payment info, customer details) must be encrypted before Firebase storage
-
-## Common Development Workflows
-
-### Adding a New Feature
-
-1. **Create Model** → `lib/models/feature_model.dart` with Firebase marshaling
-2. **Create Service** → `lib/services/feature_service.dart` for Firebase operations
-3. **Create Controller** → `lib/controllers/feature_controller.dart` extending `ChangeNotifier`
-4. **Create Widgets** → `lib/widgets/feature/` with reusable components
-5. **Create Page** → `lib/pages/feature_page.dart` that initializes controller
-6. **Register Route** → Add to `AppRoutes` in `lib/routes/app_routes.dart`
-
-### Handling Firebase Errors
-Use [ErrorHelper](lib/utils/error_helper.dart) to convert Firebase exceptions:
-
-```dart
-try {
-  await service.operation();
-} catch (error) {
-  throw toAppException(error, 
-    fallbackMessage: 'Gagal melakukan operasi. Silakan coba lagi.');
-}
-```
-
-Always provide user-friendly Indonesian error messages; never expose Firebase internals.
-
-### Building & Running
+## Building & Running
 
 ```bash
-# Get dependencies
-flutter pub get
+# Activate locale formatting early in main.dart
+await initializeDateFormatting('id_ID', null);
 
-# Run app (development)
+# Load environment variables (before Firebase & Xendit)
+await dotenv.load(fileName: ".env");
+
+# Build APK (Windows)
+build_apk.bat
+
+# Run development build
 flutter run
 
-# Build APK
+# Build release APK
 flutter build apk --release
 
-# Build IPA (iOS)
+# Build iOS
 flutter build ios --release
 ```
 
-Generated APK scripts: `build_apk.bat` on Windows.
+**Development Environment:**
+- Flutter 3.9.2+, Dart 3.9.2+
+- Firebase CLI for rules deployment
+- `.env` file required for Xendit API keys and Firebase database URL
 
-## Project-Specific Conventions
+## Naming & Conventions
 
-### Naming
-- Classes: `PascalCase` (e.g., `ProductController`, `AuthService`)
-- Files: `snake_case` (e.g., `product_controller.dart`, `auth_service.dart`)
-- Constants in routes: `/path` format (e.g., `'/kasir'`, `'/produk'`)
+- **Files**: `snake_case` (e.g., `product_controller.dart`, `auth_service.dart`)
+- **Classes**: `PascalCase` (e.g., `ProductController`, `AuthService`)
+- **Routes**: `/path` format (e.g., `'/kasir'`, `'/produk'`)
+- **Localization**: All user-facing text is **Indonesian**; use `intl` package for dates/currency with `'id_ID'` locale
+- **Dates**: Format via `intl` with `'id_ID'` locale; initialize early in `main.dart`
+- **Currency**: Use `FormatUtils.formatCurrency(value)` for "Rp" formatting with thousand separators
 
-### Indonesian Localization
-- All user-facing messages, error texts, and UI labels are in Indonesian
-- Use `intl` package for date/currency formatting with `'id_ID'` locale
-- Initialize date formatting early in `main.dart`: `initializeDateFormatting('id_ID')`
+## Theme & Responsive Design
 
-### Theme & Styling
-- [AppTheme](lib/themes/app_theme.dart) defines global colors, text styles, and Material design settings
-- Use theme colors via `Theme.of(context).primaryColor`, not hardcoded hex values
-- Responsive design via [ResponsiveHelper](lib/utils/responsive_helper.dart)
+- Global colors/styles in [AppTheme](lib/themes/app_theme.dart); use `Theme.of(context).primaryColor`, not hardcoded hex
+- Responsive layouts via [ResponsiveHelper](lib/utils/responsive_helper.dart)
+- System UI overlay configured in `main.dart`: white navigation bar with dark icons
 
-### Image & Asset Handling
-- Product images uploaded to Firebase Storage via [StorageService](lib/services/storage_service.dart)
-- Use `cached_network_image` for remote images to minimize network calls
-- Local assets in `assets/` directory (banners, icons)
+## Adding a New Feature: Step-by-Step
 
-### Local Storage
-- `shared_preferences` for user preferences (e.g., `has_seen_onboarding`)
-- **Do not store sensitive data** (tokens, passwords) in SharedPreferences; use Firebase Auth
+1. **Create Model** → `lib/models/feature_model.dart` with `fromFirebase()` and `toFirebase()` methods
+2. **Create Service** → `lib/services/feature_service.dart` for Firebase operations (static methods or singleton)
+3. **Create Controller** → `lib/controllers/feature_controller.dart` extending `ChangeNotifier`; call service, manage state, dispose streams
+4. **Create Widgets** → `lib/widgets/feature/` with reusable components
+5. **Create Page** → `lib/pages/feature_page.dart` initializing controller via `ChangeNotifierProvider`
+6. **Register Route** → Add to `AppRoutes.getRoutes()` in `lib/routes/app_routes.dart`
 
-## Testing Patterns
+## Testing (Implicit Patterns, No Test Files)
 
-While comprehensive test files don't exist, follow these patterns:
-
-- **Unit tests** for utils and formatting functions
-- **Widget tests** for reusable widget components
-- **Integration tests** for critical flows (login → product → transaction → report)
-
-Test directory structure: `test/` (placeholder exists with `widget_test.dart`)
+Follow these patterns when writing tests:
+- **Unit tests**: Utility functions and formatting (e.g., currency formatting, validation)
+- **Widget tests**: Reusable widget components in isolation
+- **Integration tests**: Critical workflows (login → product listing → transaction → report export)
 
 ## Firebase Rules & Security
 
-### Realtime Database Rules
-See [firebase_database.rules.json](firebase_database.rules.json):
-- User data scoped to `users/{uid}/`
-- Authenticated users can read/write only their own data
-- Audit logs are append-only
+- **Database rules**: `users/{uid}/` scoped data; authenticated users read/write only their own
+- **Audit logging**: `DatabaseService._logAuditEvent(action, payload)` for sensitive operations (sanitizes personally identifiable info)
+- **Storage rules**: Product images under `products/{userId}/`; access restricted to authenticated users
+- Test rule changes in Firebase Console before deployment
 
-### Storage Rules
-See [storage.rules](storage.rules):
-- Product images stored under `products/{userId}/`
-- Access restricted to authenticated users
+## Dependencies & Versions
 
-Always test rule changes before deployment via Firebase Console.
-
-## Environment & Dependencies
-
-**Key dependencies**:
-- `firebase_core`, `firebase_auth`, `firebase_database`, `firebase_storage` - Backend
-- `flutter_blue_plus`, `usb_serial` - Printer connectivity
-- `mobile_scanner` - Barcode scanning
-- `excel`, `pdf`, `printing` - Report generation
-- `connectivity_plus` - Network monitoring
-- `intl` - Localization
-
-See `pubspec.yaml` for complete list and versions.
-
----
+Key packages (see `pubspec.yaml` for complete list):
+- `firebase_core`, `firebase_auth`, `firebase_database`, `firebase_storage` (v11.1.2+)
+- `flutter_blue_plus`, `usb_serial` (printer connectivity)
+- `mobile_scanner` (barcode scanning)
+- `excel`, `pdf`, `printing` (report export)
+- `connectivity_plus` (offline detection)
+- `intl` (localization), `shared_preferences` (user prefs)
+- `flutter_dotenv` (environment variables)
+- `encrypt` (data encryption)
 
 ## Quick Reference
 
 | Task | File(s) |
 |------|---------|
-| Add authentication | `AuthService`, `LoginController`, `login_page.dart` |
-| Add product feature | `ProductService`, `ProductController`, `produk_page.dart` |
+| Add user authentication | `AuthService`, `LoginController`, [login_page.dart](lib/pages/login_page.dart) |
+| Add product feature | `ProductService`, `ProductController`, [product_model.dart](lib/models/product_model.dart) |
 | Add custom widget | `lib/widgets/{feature}/` + reference in page |
 | Format currency/date | `FormatUtils` in `lib/utils/` |
-| Handle Firebase error | `ErrorHelper.toAppException()` |
-| Add audit logging | `DatabaseService._logAuditEvent()` |
-| Configure printer | `PrinterController`, `settings_page.dart` |
+| Handle Firebase error | `error_helper.dart` → `toAppException()` |
+| Log sensitive operations | `DatabaseService._logAuditEvent()` |
+| Configure printer | `PrinterController`, `PrinterCommands`, [settings_page.dart](lib/pages/settings_page.dart) |
 | Export report | `ReportExportService`, `DataExportService` |
-
----
+| Add payment method | `XenditService`, `transaction_model.dart` |
 
 ## When Uncertain
 
-1. **Architecture question?** → Check `lib/{controllers,services,models}/README.md` for layer responsibilities
-2. **Firebase operation?** → Reference [DatabaseService](lib/services/database_service.dart) patterns
+1. **Architecture question?** → Check layer responsibilities above; verify services are stateless and controllers extend ChangeNotifier
+2. **Firebase operation?** → Reference [DatabaseService](lib/services/database_service.dart) for user-scoped patterns
 3. **UI component?** → Look at existing widgets in `lib/widgets/{feature}/`
-4. **Error handling?** → Use `ErrorHelper.toAppException()` with Indonesian messages
+4. **Error handling?** → Use `error_helper.dart` with Indonesian messages; never expose internal Firebase codes
 5. **Printer integration?** → Study [PrinterCommands](lib/services/printer_commands.dart) and [PrinterController](lib/controllers/printer_controller.dart)
+6. **Offline handling?** → Controllers use `Connectivity` plugin to detect network; services handle `SocketException` → `OfflineException`

@@ -14,6 +14,8 @@ class ReportContent extends StatelessWidget {
   final VoidCallback onDateRangePicker;
   final Function(Transaction) onShowTransactionDetail;
   final Function(Transaction) onQuickPrint;
+  final VoidCallback? onExportPDF;
+  final VoidCallback? onExportExcel;
 
   const ReportContent({
     super.key,
@@ -22,6 +24,8 @@ class ReportContent extends StatelessWidget {
     required this.onDateRangePicker,
     required this.onShowTransactionDetail,
     required this.onQuickPrint,
+    this.onExportPDF,
+    this.onExportExcel,
   });
 
   @override
@@ -159,6 +163,8 @@ class ReportContent extends StatelessWidget {
                 onPaymentMethodChanged: controller.setSelectedPaymentMethod,
                 onDateRangePicker: onDateRangePicker,
                 searchController: searchController,
+                onExportPDF: onExportPDF,
+                onExportExcel: onExportExcel,
               ),
             ),
             const SizedBox(height: 16),

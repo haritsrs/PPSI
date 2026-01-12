@@ -245,6 +245,8 @@ class _LaporanPageState extends State<LaporanPage> {
                       onDateRangePicker: _handleOpenDateRangePicker,
                       onShowTransactionDetail: _handleShowTransactionDetail,
                       onQuickPrint: _handleQuickPrint,
+                      onExportPDF: _handleExportPDF,
+                      onExportExcel: _handleExportExcel,
                     ),
         ),
       ),

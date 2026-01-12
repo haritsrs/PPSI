@@ -160,9 +160,16 @@ class ReportExportService {
     required String periodText,
     required double totalRevenue,
     required int totalTransactions,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final excel = Excel.createExcel();
-    excel.delete('Sheet1');
+    
+    // Remove default Sheet1
+    if (excel.sheets.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
+    
     final sheet = excel['Laporan Transaksi'];
     
     final dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
@@ -215,9 +222,17 @@ class ReportExportService {
       return null;
     }
     
+    // Generate filename with date range
+    String fileName = 'Laporan_Transaksi';
+    if (startDate != null && endDate != null) {
+      final startFormatted = DateFormat('ddMMyyyy').format(startDate);
+      final endFormatted = DateFormat('ddMMyyyy').format(endDate);
+      fileName = 'laporan_transaksi_${startFormatted}_${endFormatted}';
+    }
+    
     return await _saveFile(
       bytes: excelBytes,
-      fileName: 'Laporan_Transaksi',
+      fileName: fileName,
       extension: 'xlsx',
     );
   }

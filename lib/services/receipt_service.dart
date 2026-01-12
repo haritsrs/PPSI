@@ -102,8 +102,6 @@ class ReceiptService {
               ),
               
               pw.SizedBox(height: sectionSpacing),
-              pw.Divider(),
-              pw.SizedBox(height: spacing),
               
               // Items - single line format: name x qty = total
               ...items.map((item) {
@@ -135,22 +133,16 @@ class ReceiptService {
               }),
               
               pw.SizedBox(height: sectionSpacing),
-              pw.Divider(),
-              pw.SizedBox(height: spacing),
               
               // Subtotal
               _buildReceiptRow('Subtotal', subtotal, normalFontSize),
               // Tax (only show if > 0)
               if (tax > 0) _buildReceiptRow('Pajak', tax, normalFontSize),
               pw.SizedBox(height: spacing),
-              pw.Divider(thickness: 1.5),
-              pw.SizedBox(height: spacing),
               // Total
               _buildReceiptRow('TOTAL', total, totalFontSize, isBold: true),
               
               pw.SizedBox(height: sectionSpacing),
-              pw.Divider(),
-              pw.SizedBox(height: spacing),
               
               // Payment method
               pw.Text(
@@ -277,11 +269,6 @@ class ReceiptService {
       cashAmount: cashAmount,
       change: change,
     );
-
-    // QR code (if provided)
-    if (qrCodeData != null && qrCodeData.isNotEmpty) {
-      builder.addQRCode(qrCodeData, label: 'ID Transaksi');
-    }
 
     // Footer
     builder.addFooter();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
 import '../utils/home_utils.dart';
 
@@ -49,7 +50,7 @@ class TransactionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.id,
+                    'Transaksi #${transaction.id.substring(0, 8)} ${DateFormat('HH:mm:ss').format(transaction.date)}',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1F2937),
