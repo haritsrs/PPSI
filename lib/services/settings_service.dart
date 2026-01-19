@@ -34,6 +34,9 @@ class SettingsService {
   static const String keyCustomQRCodeUrl = 'custom_qr_code_url';
   // UI scale setting (preset: 'small', 'normal', 'large', 'extra_large')
   static const String keyUIScale = 'ui_scale';
+  // Store info for receipt header
+  static const String keyStoreAddress = 'store_address';
+  static const String keyStorePhone = 'store_phone';
 
   /// Validates and sanitizes setting key to prevent path injection
   /// Only allows alphanumeric characters, underscores, and hyphens

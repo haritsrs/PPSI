@@ -24,28 +24,18 @@ class ReceiptBuilder {
       // For now, just add a placeholder
     }
     
-    // Store name (centered, bold, large)
-    commands.addAll(PrinterCommands.align(TextAlign.center));
-    commands.addAll(PrinterCommands.textSize(width: 2, height: 2));
+    // Dense header (left-aligned, minimal spacing)
+    commands.addAll(PrinterCommands.align(TextAlign.left));
     commands.addAll(PrinterCommands.bold(true));
     commands.addAll(PrinterCommands.textLine(storeName));
     commands.addAll(PrinterCommands.bold(false));
-    commands.addAll(PrinterCommands.textSize(width: 1, height: 1));
-    commands.addAll(PrinterCommands.emptyLines(1));
-    
-    // Address (centered, small)
-    if (address != null && address.isNotEmpty) {
-      commands.addAll(PrinterCommands.textLine(address));
+
+    if (address != null && address.trim().isNotEmpty) {
+      commands.addAll(PrinterCommands.textLine(address.trim()));
     }
-    
-    // Phone (centered, small)
-    if (phone != null && phone.isNotEmpty) {
-      commands.addAll(PrinterCommands.textLine(phone));
+    if (phone != null && phone.trim().isNotEmpty) {
+      commands.addAll(PrinterCommands.textLine(phone.trim()));
     }
-    
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.divider());
-    commands.addAll(PrinterCommands.emptyLines(1));
     
     _sections.add(commands);
     return this;
@@ -69,30 +59,17 @@ class ReceiptBuilder {
     
     commands.addAll(PrinterCommands.align(TextAlign.left));
     
-    // Transaction ID
-    commands.addAll(PrinterCommands.text('ID: '));
-    commands.addAll(PrinterCommands.bold(true));
-    commands.addAll(PrinterCommands.text(transactionId));
-    commands.addAll(PrinterCommands.bold(false));
+    // Dense transaction info
+    commands.addAll(PrinterCommands.text('ID: $transactionId'));
     commands.addAll(PrinterCommands.feed());
-    
-    // Date
-    commands.addAll(PrinterCommands.text('Tanggal: '));
-    commands.addAll(PrinterCommands.text(dateString));
+    commands.addAll(PrinterCommands.text('Tgl: $dateString'));
     commands.addAll(PrinterCommands.feed());
     
     // Customer name (if provided)
     if (customerName != null && customerName.isNotEmpty) {
-      commands.addAll(PrinterCommands.text('Pelanggan: '));
-      commands.addAll(PrinterCommands.bold(true));
-      commands.addAll(PrinterCommands.text(customerName));
-      commands.addAll(PrinterCommands.bold(false));
+      commands.addAll(PrinterCommands.text('Plg: $customerName'));
       commands.addAll(PrinterCommands.feed());
     }
-    
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.divider());
-    commands.addAll(PrinterCommands.emptyLines(1));
     
     _sections.add(commands);
     return this;
@@ -112,25 +89,14 @@ class ReceiptBuilder {
       final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
       final price = (item['price'] as num?)?.toDouble() ?? 0.0;
       final itemTotal = quantity * price;
-      
-      // Item name (bold)
-      commands.addAll(PrinterCommands.bold(true));
-      commands.addAll(PrinterCommands.text(_truncateText(name, maxCharsPerLine - 15)));
-      commands.addAll(PrinterCommands.bold(false));
-      commands.addAll(PrinterCommands.feed());
-      
-      // Quantity and price
-      final qtyPrice = '$quantity x ${_formatCurrency(price)}';
-      final total = _formatCurrency(itemTotal);
-      final line = _formatItemLine(qtyPrice, total);
+
+      // Single line: name x qty | total
+      final left = _truncateText('${name.trim()} x$quantity', maxCharsPerLine - 1 - _formatCurrency(itemTotal).length);
+      final right = _formatCurrency(itemTotal);
+      final line = _formatItemLine('$left|', right);
       commands.addAll(PrinterCommands.text(line));
       commands.addAll(PrinterCommands.feed());
-      commands.addAll(PrinterCommands.emptyLines(1));
     }
-    
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.divider());
-    commands.addAll(PrinterCommands.emptyLines(1));
     
     _sections.add(commands);
     return this;
@@ -163,21 +129,11 @@ class ReceiptBuilder {
       commands.addAll(PrinterCommands.feed());
     }
     
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.doubleDivider());
-    commands.addAll(PrinterCommands.emptyLines(1));
-    
-    // Total (bold, large)
-    commands.addAll(PrinterCommands.textSize(width: 1, height: 2));
+    // Total (bold, compact)
     commands.addAll(PrinterCommands.bold(true));
     commands.addAll(PrinterCommands.text(_formatTotalLine('TOTAL', total)));
     commands.addAll(PrinterCommands.bold(false));
-    commands.addAll(PrinterCommands.textSize(width: 1, height: 1));
     commands.addAll(PrinterCommands.feed());
-    
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.divider());
-    commands.addAll(PrinterCommands.emptyLines(1));
     
     _sections.add(commands);
     return this;
@@ -214,10 +170,6 @@ class ReceiptBuilder {
       commands.addAll(PrinterCommands.feed());
     }
     
-    commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.divider());
-    commands.addAll(PrinterCommands.emptyLines(1));
-    
     _sections.add(commands);
     return this;
   }
@@ -245,17 +197,12 @@ class ReceiptBuilder {
   /// Add footer
   ReceiptBuilder addFooter({String? thankYouMessage}) {
     final commands = <int>[];
-    
-    commands.addAll(PrinterCommands.emptyLines(2));
-    commands.addAll(PrinterCommands.align(TextAlign.center));
-    commands.addAll(PrinterCommands.bold(true));
-    commands.addAll(PrinterCommands.textSize(width: 1, height: 2));
-    commands.addAll(PrinterCommands.textLine(thankYouMessage ?? 'Terima Kasih'));
-    commands.addAll(PrinterCommands.textSize(width: 1, height: 1));
-    commands.addAll(PrinterCommands.bold(false));
+
     commands.addAll(PrinterCommands.emptyLines(1));
-    commands.addAll(PrinterCommands.textLine('Selamat Berbelanja Kembali'));
-    commands.addAll(PrinterCommands.emptyLines(2));
+    commands.addAll(PrinterCommands.align(TextAlign.left));
+    commands.addAll(PrinterCommands.bold(true));
+    commands.addAll(PrinterCommands.textLine(thankYouMessage ?? 'Terima Kasih'));
+    commands.addAll(PrinterCommands.bold(false));
     
     _sections.add(commands);
     return this;

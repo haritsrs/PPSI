@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/receipt_service.dart';
+import '../services/settings_service.dart';
+import '../services/auth_service.dart';
 import '../controllers/printer_controller.dart';
 import '../utils/snackbar_helper.dart';
 
@@ -238,6 +240,18 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
     });
 
     try {
+      final storeAddress = await SettingsService.getSetting<String>(
+        SettingsService.keyStoreAddress,
+        '',
+      );
+      final storePhone = await SettingsService.getSetting<String>(
+        SettingsService.keyStorePhone,
+        '',
+      );
+      final storeName = AuthService.currentUser?.displayName?.trim().isNotEmpty == true
+          ? AuthService.currentUser!.displayName!.trim()
+          : 'Toko Saya';
+
       // Parse transaction data
       final items = widget.transactionData['items'] as List<dynamic>? ?? [];
       final itemsList = items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
@@ -275,6 +289,9 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
           paymentMethod: widget.transactionData['paymentMethod'] as String? ?? 'Cash',
           cashAmount: (widget.transactionData['cashAmount'] as num?)?.toDouble(),
           change: (widget.transactionData['change'] as num?)?.toDouble(),
+          storeName: storeName,
+          storeAddress: storeAddress,
+          storePhone: storePhone,
           qrCodeData: qrCodeData,
           discount: discount,
         );
@@ -304,6 +321,9 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
           paymentMethod: widget.transactionData['paymentMethod'] as String? ?? 'Cash',
           cashAmount: (widget.transactionData['cashAmount'] as num?)?.toDouble(),
           change: (widget.transactionData['change'] as num?)?.toDouble(),
+          storeName: storeName,
+          storeAddress: storeAddress,
+          storePhone: storePhone,
         );
 
         await ReceiptService.printPDFReceipt(pdf);

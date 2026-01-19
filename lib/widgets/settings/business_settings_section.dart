@@ -32,6 +32,22 @@ class BusinessSettingsSection extends StatelessWidget {
           color: const Color(0xFF10B981),
           children: [
             SettingItem(
+              icon: Icons.location_on_rounded,
+              title: "Alamat Toko",
+              subtitle: controller.storeAddress.trim().isEmpty
+                  ? "Belum diatur"
+                  : controller.storeAddress,
+              onTap: () => _showStoreAddressDialog(context, controller),
+            ),
+            SettingItem(
+              icon: Icons.phone_rounded,
+              title: "Nomor Telepon Toko",
+              subtitle: controller.storePhone.trim().isEmpty
+                  ? "Belum diatur"
+                  : controller.storePhone,
+              onTap: () => _showStorePhoneDialog(context, controller),
+            ),
+            SettingItem(
               icon: Icons.qr_code_scanner_rounded,
               title: "Scanner Barcode",
               subtitle: "Aktifkan scanner",
@@ -95,6 +111,79 @@ class BusinessSettingsSection extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  void _showStoreAddressDialog(BuildContext context, SettingsController controller) {
+    final addressController = TextEditingController(text: controller.storeAddress);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Atur Alamat Toko'),
+        content: TextField(
+          controller: addressController,
+          keyboardType: TextInputType.streetAddress,
+          textInputAction: TextInputAction.done,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Alamat',
+            hintText: 'Contoh: Jl. Merdeka No. 10, Jakarta',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final value = addressController.text.trim();
+              await controller.setStoreAddress(value);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStorePhoneDialog(BuildContext context, SettingsController controller) {
+    final phoneController = TextEditingController(text: controller.storePhone);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Atur Nomor Telepon Toko'),
+        content: TextField(
+          controller: phoneController,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Nomor Telepon',
+            hintText: 'Contoh: 0812xxxxxxx',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final value = phoneController.text.trim();
+              await controller.setStorePhone(value);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
     );
   }
 

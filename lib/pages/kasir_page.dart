@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../controllers/kasir_controller.dart';
+import '../models/cart_item_model.dart';
 import '../services/barcode_scanner_service.dart';
 import '../controllers/printer_controller.dart';
 import '../utils/error_helper.dart';
@@ -171,9 +172,24 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
       itemCount: filteredProducts.length,
       itemBuilder: (context, index) {
         final product = filteredProducts[index];
+        final cartItem = _controller.cartItems.firstWhere(
+          (item) => item.product.id == product.id,
+          orElse: () => CartItem(product: product, quantity: 0),
+        );
+        final quantity = cartItem.quantity;
+        
         return ProductListItem(
           product: product,
+          quantity: quantity,
           onAddToCart: () => _controller.addToCart(product),
+          onIncrement: () => _controller.addToCart(product),
+          onDecrement: () {
+            if (quantity > 1) {
+              _controller.updateQuantity(product.id, quantity - 1);
+            } else {
+              _controller.removeFromCart(product.id);
+            }
+          },
           paddingScale: paddingScale,
           iconScale: iconScale,
         );
@@ -294,12 +310,20 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     } catch (error) {
       if (!mounted) return;
       Navigator.pop(context);
-      final errorString = error.toString();
-      final message = getFriendlyErrorMessage(
+      
+      // Extract full error details for display
+      final appException = toAppException(
         error,
-        fallbackMessage: 'Gagal memproses pembayaran. [DIAG: $errorString]',
+        fallbackMessage: 'Gagal memproses pembayaran.',
       );
-      SnackbarHelper.showError(context, message);
+      
+      SnackbarHelper.showError(
+        context,
+        appException.message,
+        details: appException.details,
+        forceDialog: true, // Always show dialog for transaction errors
+      );
+      
       debugPrint('Payment processing error: $error');
     }
   }

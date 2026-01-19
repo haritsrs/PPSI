@@ -474,17 +474,28 @@ class _PaymentModalState extends State<PaymentModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final systemBottomPadding = MediaQuery.of(context).padding.bottom;
+    // Use keyboard height if keyboard is visible, otherwise use system navigation bar height
+    final bottomPadding = keyboardHeight > 0 ? keyboardHeight : systemBottomPadding;
+    
+    return AnimatedPadding(
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      duration: const Duration(milliseconds: 100),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
-      ),
-      child: Column(
-        children: [
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40,
@@ -621,7 +632,7 @@ class _PaymentModalState extends State<PaymentModal> {
             ),
           ),
           const SizedBox(height: 24),
-          Expanded(
+          Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Column(
@@ -713,16 +724,6 @@ class _PaymentModalState extends State<PaymentModal> {
                       keyboardType: TextInputType.number,
                       enabled: !_isProcessingPayment,
                       autofocus: false,
-                      canRequestFocus: true,
-                      onTap: () {
-                        // Ensure this field can get focus when tapped
-                        // Request focus after a small delay to ensure it's not stolen
-                        Future.delayed(const Duration(milliseconds: 50), () {
-                          if (mounted && _cashFocusNode.canRequestFocus) {
-                            _cashFocusNode.requestFocus();
-                          }
-                        });
-                      },
                       decoration: InputDecoration(
                         hintText: 'Masukkan jumlah uang',
                         hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -859,6 +860,7 @@ class _PaymentModalState extends State<PaymentModal> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

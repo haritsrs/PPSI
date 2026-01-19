@@ -662,7 +662,12 @@ class DatabaseService {
         await newTransactionRef.set(transactionData);
         debugPrint('Transaction saved successfully: $transactionId');
       } catch (e) {
-        throw Exception('Gagal menyimpan transaksi ke database: $e [DIAG: save_failed]');
+        // Include specific Firebase error codes for debugging permission issues
+        final errorDetails = e.toString();
+        if (errorDetails.contains('permission-denied')) {
+          throw Exception('Gagal menyimpan transaksi: Akses ke database ditolak. Silakan logout dan login kembali, atau hubungi admin jika masalah berlanjut. [DIAG: firebase_permission_denied | Path: users/$userId/transactions/$transactionId | Error: $e]');
+        }
+        throw Exception('Gagal menyimpan transaksi ke database: $e [DIAG: save_failed | TransactionId: $transactionId]');
       }
       
       // Update stock for each item

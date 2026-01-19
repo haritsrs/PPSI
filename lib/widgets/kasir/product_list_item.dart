@@ -5,6 +5,9 @@ import '../../utils/responsive_helper.dart';
 class ProductListItem extends StatefulWidget {
   final Product product;
   final VoidCallback onAddToCart;
+  final VoidCallback? onIncrement;
+  final VoidCallback? onDecrement;
+  final int quantity;
   final double paddingScale;
   final double iconScale;
 
@@ -12,6 +15,9 @@ class ProductListItem extends StatefulWidget {
     super.key,
     required this.product,
     required this.onAddToCart,
+    this.onIncrement,
+    this.onDecrement,
+    this.quantity = 0,
     required this.paddingScale,
     required this.iconScale,
   });
@@ -162,18 +168,81 @@ class _ProductListItemState extends State<ProductListItem>
                               ),
                             ),
                             if (!isOutOfStock)
-                              Container(
-                                padding: EdgeInsets.all(10 * widget.paddingScale),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF6366F1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.add_rounded,
-                                  color: Colors.white,
-                                  size: 24 * widget.iconScale,
-                                ),
-                              ),
+                              widget.quantity > 0
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: widget.onDecrement,
+                                          child: Container(
+                                            padding: EdgeInsets.all(8 * widget.paddingScale),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.red.withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.remove_rounded,
+                                              color: Colors.red[700],
+                                              size: 20 * widget.iconScale,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          margin: EdgeInsets.symmetric(horizontal: 8 * widget.paddingScale),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 12 * widget.paddingScale,
+                                            vertical: 6 * widget.paddingScale,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF6366F1).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: const Color(0xFF6366F1).withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${widget.quantity}',
+                                            style: TextStyle(
+                                              color: const Color(0xFF6366F1),
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16 * widget.paddingScale,
+                                            ),
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: widget.onIncrement,
+                                          child: Container(
+                                            padding: EdgeInsets.all(8 * widget.paddingScale),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366F1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.add_rounded,
+                                              color: Colors.white,
+                                              size: 20 * widget.iconScale,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Container(
+                                      padding: EdgeInsets.all(10 * widget.paddingScale),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF6366F1),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.add_rounded,
+                                        color: Colors.white,
+                                        size: 24 * widget.iconScale,
+                                      ),
+                                    ),
                           ],
                         ),
                       ],

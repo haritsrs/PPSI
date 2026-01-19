@@ -21,6 +21,10 @@ class SettingsController extends ChangeNotifier {
   
   // Custom QR code
   String? _customQRCodeUrl;
+
+  // Store info (used in receipt header)
+  String _storeAddress = '';
+  String _storePhone = '';
   
   // UI Scale preset (small=0.9, normal=1.0, large=1.15, extra_large=1.3)
   String _uiScalePreset = 'normal';
@@ -50,6 +54,8 @@ class SettingsController extends ChangeNotifier {
   double get taxRate => _taxRate;
   bool get taxInclusive => _taxInclusive;
   String? get customQRCodeUrl => _customQRCodeUrl;
+  String get storeAddress => _storeAddress;
+  String get storePhone => _storePhone;
   String get uiScalePreset => _uiScalePreset;
   double get uiScaleFactor {
     switch (_uiScalePreset) {
@@ -137,6 +143,15 @@ class SettingsController extends ChangeNotifier {
         '',
       );
       _customQRCodeUrl = qrCodeUrl.isEmpty ? null : qrCodeUrl;
+
+      _storeAddress = await SettingsService.getSetting<String>(
+        SettingsService.keyStoreAddress,
+        '',
+      );
+      _storePhone = await SettingsService.getSetting<String>(
+        SettingsService.keyStorePhone,
+        '',
+      );
       
       _uiScalePreset = await SettingsService.getSetting(
         SettingsService.keyUIScale,
@@ -209,6 +224,15 @@ class SettingsController extends ChangeNotifier {
             '',
           );
           _customQRCodeUrl = qrCodeUrlAfterSync.isEmpty ? null : qrCodeUrlAfterSync;
+
+          _storeAddress = await SettingsService.getSetting<String>(
+            SettingsService.keyStoreAddress,
+            '',
+          );
+          _storePhone = await SettingsService.getSetting<String>(
+            SettingsService.keyStorePhone,
+            '',
+          );
         } catch (e) {
           debugPrint('Error syncing from Firebase: $e');
         }
@@ -254,6 +278,18 @@ class SettingsController extends ChangeNotifier {
     _darkModeEnabled = value;
     notifyListeners();
     await updateSetting(SettingsService.keyDarkModeEnabled, value);
+  }
+
+  Future<void> setStoreAddress(String value) async {
+    _storeAddress = value;
+    notifyListeners();
+    await updateSetting(SettingsService.keyStoreAddress, value);
+  }
+
+  Future<void> setStorePhone(String value) async {
+    _storePhone = value;
+    notifyListeners();
+    await updateSetting(SettingsService.keyStorePhone, value);
   }
 
   Future<void> setAutoBackupEnabled(bool value) async {
