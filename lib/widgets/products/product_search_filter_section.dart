@@ -179,3 +179,4 @@ class _ProductSearchFilterSectionState extends State<ProductSearchFilterSection>
   }
 }
 
+

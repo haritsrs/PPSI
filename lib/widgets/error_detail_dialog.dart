@@ -148,3 +148,4 @@ class ErrorDetailDialog extends StatelessWidget {
     );
   }
 }
+

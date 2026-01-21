@@ -91,3 +91,4 @@ class DefaultFirebaseOptions {
         measurementId: dotenv.env['WINDOWS_MEASUREMENT_ID'] ?? '',
       );
 }
+

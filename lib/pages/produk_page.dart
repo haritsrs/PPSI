@@ -238,3 +238,4 @@ class _ProdukPageState extends State<ProdukPage> with TickerProviderStateMixin {
     ProductDeleteDialog.show(context, product, _controller);
   }
 }
+

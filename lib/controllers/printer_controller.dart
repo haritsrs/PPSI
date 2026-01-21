@@ -654,3 +654,4 @@ class PrinterService extends ChangeNotifier {
 
 /// Alias for PrinterService for backwards compatibility
 typedef PrinterController = PrinterService;
+

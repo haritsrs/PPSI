@@ -246,3 +246,4 @@ class ChartPainter extends CustomPainter {
     return oldDelegate.hoveredIndex != hoveredIndex || oldDelegate.data != data;
   }
 }
+

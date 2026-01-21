@@ -283,3 +283,4 @@ class BarcodeScannerInstructionsDialog extends StatelessWidget {
   }
 }
 
+

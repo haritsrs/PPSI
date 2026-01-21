@@ -66,3 +66,4 @@ class CurrencyInputFormatter extends TextInputFormatter {
   }
 }
 
+

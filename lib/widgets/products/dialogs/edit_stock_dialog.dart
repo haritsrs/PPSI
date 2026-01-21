@@ -223,3 +223,4 @@ class _EditStockDialogState extends State<EditStockDialog> {
   }
 }
 
+

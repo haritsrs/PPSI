@@ -65,3 +65,4 @@ String getFriendlyErrorMessage(Object error, {String? fallbackMessage}) {
   return appException.message;
 }
 
+

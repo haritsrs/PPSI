@@ -672,3 +672,4 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   }
 }
 
+

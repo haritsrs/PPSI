@@ -300,3 +300,4 @@ class _BulkStockUpdateDialogState extends State<BulkStockUpdateDialog> {
   }
 }
 
+

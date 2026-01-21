@@ -132,3 +132,4 @@ class NewsDetailModal extends StatelessWidget {
   }
 }
 
+

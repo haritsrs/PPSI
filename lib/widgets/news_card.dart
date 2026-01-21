@@ -117,3 +117,4 @@ class NewsCard extends StatelessWidget {
   }
 }
 
+

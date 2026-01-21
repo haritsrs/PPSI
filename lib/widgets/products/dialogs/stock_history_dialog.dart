@@ -186,3 +186,4 @@ class _StockHistoryDialogState extends State<StockHistoryDialog> {
   }
 }
 
+

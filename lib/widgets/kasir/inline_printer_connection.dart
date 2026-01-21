@@ -125,3 +125,4 @@ class _InlinePrinterConnectionState extends State<InlinePrinterConnection> {
     );
   }
 }
+

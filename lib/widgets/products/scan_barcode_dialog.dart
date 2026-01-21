@@ -33,3 +33,4 @@ class ScanBarcodeDialog extends StatelessWidget {
   }
 }
 
+

@@ -114,3 +114,4 @@ class SearchAndCategorySection extends StatelessWidget {
   }
 }
 
+

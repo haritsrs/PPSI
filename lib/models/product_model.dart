@@ -79,3 +79,4 @@ class Product {
     return 'Tersedia';
   }
 }
+

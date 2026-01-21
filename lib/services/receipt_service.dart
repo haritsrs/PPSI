@@ -7,24 +7,24 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'receipt_builder.dart';
 
 class ReceiptService {
-  // Static flag to track locale initialization
+  // Flag statis untuk melacak inisialisasi lokal
   static bool _localeInitialized = false;
   static Completer<void>? _localeInitCompleter;
 
   /// Ensure locale data is initialized (only once, thread-safe)
   static Future<void> _ensureLocaleInitialized() async {
-    // If already initialized, return immediately
+    // Jika sudah diinisialisasi, kembali segera
     if (_localeInitialized) {
       return;
     }
 
-    // If initialization is in progress, wait for it
+    // Jika inisialisasi sedang berlangsung, tunggu
     if (_localeInitCompleter != null && !_localeInitCompleter!.isCompleted) {
       try {
         await _localeInitCompleter!.future;
         return;
       } catch (e) {
-        // If previous initialization failed, reset and try again
+        // Jika inisialisasi sebelumnya gagal, atur ulang dan coba lagi
         _localeInitCompleter = null;
         _localeInitialized = false;
       }
@@ -327,9 +327,10 @@ class ReceiptService {
     );
   }
 
-  // Print to thermal printer using PrinterService
-  // This method should be called with an instance of PrinterService
-  // Example: await printerService.printBytes(bytes);
-  // The PrinterService handles both USB and Bluetooth connections
+  // Cetak ke printer termal menggunakan PrinterService
+  // Metode ini harus dipanggil dengan instance PrinterService
+  // Contoh: await printerService.printBytes(bytes);
+  // PrinterService menangani koneksi USB dan Bluetooth
 }
+
 
