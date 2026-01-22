@@ -15,6 +15,7 @@ class ReceiptBuilder {
     String? address,
     String? phone,
     Uint8List? logoBytes,
+    DateTime? date,
   }) {
     final commands = <int>[];
     
@@ -24,8 +25,8 @@ class ReceiptBuilder {
       // For now, just add a placeholder
     }
     
-    // Dense header (left-aligned, minimal spacing)
-    commands.addAll(PrinterCommands.align(TextAlign.left));
+    // Dense header (centered)
+    commands.addAll(PrinterCommands.align(TextAlign.center));
     commands.addAll(PrinterCommands.bold(true));
     commands.addAll(PrinterCommands.textLine(storeName));
     commands.addAll(PrinterCommands.bold(false));
@@ -36,6 +37,10 @@ class ReceiptBuilder {
     if (phone != null && phone.trim().isNotEmpty) {
       commands.addAll(PrinterCommands.textLine(phone.trim()));
     }
+    if (date != null) {
+      final formattedDate = _formatDate(date);
+      commands.addAll(PrinterCommands.textLine(formattedDate));
+    }
     
     _sections.add(commands);
     return this;
@@ -45,31 +50,16 @@ class ReceiptBuilder {
   Future<ReceiptBuilder> addTransactionInfo({
     required String transactionId,
     required DateTime date,
-    String? customerName,
   }) async {
     final commands = <int>[];
     
-    // Format date manually to avoid locale initialization issues
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-    final dateString = '$day/$month/$year $hour:$minute';
+    final dateString = _formatDateWithSeconds(date);
     
     commands.addAll(PrinterCommands.align(TextAlign.left));
-    
-    // Dense transaction info
-    commands.addAll(PrinterCommands.text('ID: $transactionId'));
+    commands.addAll(PrinterCommands.text('Nomor Nota: $transactionId'));
     commands.addAll(PrinterCommands.feed());
-    commands.addAll(PrinterCommands.text('Tgl: $dateString'));
+    commands.addAll(PrinterCommands.text('Tanggal: $dateString'));
     commands.addAll(PrinterCommands.feed());
-    
-    // Customer name (if provided)
-    if (customerName != null && customerName.isNotEmpty) {
-      commands.addAll(PrinterCommands.text('Plg: $customerName'));
-      commands.addAll(PrinterCommands.feed());
-    }
     
     _sections.add(commands);
     return this;
@@ -90,10 +80,11 @@ class ReceiptBuilder {
       final price = (item['price'] as num?)?.toDouble() ?? 0.0;
       final itemTotal = quantity * price;
 
-      // Single line: name x qty | total
-      final left = _truncateText('${name.trim()} x$quantity', maxCharsPerLine - 1 - _formatCurrency(itemTotal).length);
+      // Two-line pattern: name on first line, qty x price -> total on next
+      commands.addAll(PrinterCommands.textLine(_truncateText(name.trim(), maxCharsPerLine)));
+      final qtyText = '${quantity} x ${_formatCurrency(price)}';
       final right = _formatCurrency(itemTotal);
-      final line = _formatItemLine('$left|', right);
+      final line = _formatItemLine(qtyText, right);
       commands.addAll(PrinterCommands.text(line));
       commands.addAll(PrinterCommands.feed());
     }
@@ -114,25 +105,7 @@ class ReceiptBuilder {
     commands.addAll(PrinterCommands.align(TextAlign.left));
     
     // Subtotal
-    commands.addAll(PrinterCommands.text(_formatTotalLine('Subtotal', subtotal)));
-    commands.addAll(PrinterCommands.feed());
-    
-    // Tax (only show if > 0)
-    if (tax > 0) {
-      commands.addAll(PrinterCommands.text(_formatTotalLine('Pajak', tax)));
-      commands.addAll(PrinterCommands.feed());
-    }
-    
-    // Discount (if applicable)
-    if (discount > 0) {
-      commands.addAll(PrinterCommands.text(_formatTotalLine('Diskon', discount)));
-      commands.addAll(PrinterCommands.feed());
-    }
-    
-    // Total (bold, compact)
-    commands.addAll(PrinterCommands.bold(true));
-    commands.addAll(PrinterCommands.text(_formatTotalLine('TOTAL', total)));
-    commands.addAll(PrinterCommands.bold(false));
+    commands.addAll(PrinterCommands.text(_formatTotalLine('Total', total)));
     commands.addAll(PrinterCommands.feed());
     
     _sections.add(commands);
@@ -149,26 +122,10 @@ class ReceiptBuilder {
     
     commands.addAll(PrinterCommands.align(TextAlign.left));
     
-    // Payment method
-    commands.addAll(PrinterCommands.text('Pembayaran: '));
-    commands.addAll(PrinterCommands.bold(true));
-    commands.addAll(PrinterCommands.text(_formatPaymentMethod(paymentMethod)));
-    commands.addAll(PrinterCommands.bold(false));
+    commands.addAll(PrinterCommands.text(_formatTotalLine('Bayar ${_formatPaymentMethod(paymentMethod)}', cashAmount ?? total)));
     commands.addAll(PrinterCommands.feed());
-    
-    // Cash amount (if provided)
-    if (cashAmount != null) {
-      commands.addAll(PrinterCommands.text('Tunai: '));
-      commands.addAll(PrinterCommands.text(_formatCurrency(cashAmount)));
-      commands.addAll(PrinterCommands.feed());
-    }
-    
-    // Change (if provided and > 0)
-    if (change != null && change > 0) {
-      commands.addAll(PrinterCommands.text('Kembalian: '));
-      commands.addAll(PrinterCommands.text(_formatCurrency(change)));
-      commands.addAll(PrinterCommands.feed());
-    }
+    commands.addAll(PrinterCommands.text(_formatTotalLine('Kembali', change ?? 0)));
+    commands.addAll(PrinterCommands.feed());
     
     _sections.add(commands);
     return this;
@@ -200,9 +157,7 @@ class ReceiptBuilder {
 
     commands.addAll(PrinterCommands.emptyLines(1));
     commands.addAll(PrinterCommands.align(TextAlign.left));
-    commands.addAll(PrinterCommands.bold(true));
-    commands.addAll(PrinterCommands.textLine(thankYouMessage ?? 'Terima Kasih'));
-    commands.addAll(PrinterCommands.bold(false));
+    commands.addAll(PrinterCommands.textLine(thankYouMessage ?? 'Terima kasih atas kunjungan Anda'));
     
     _sections.add(commands);
     return this;
@@ -227,10 +182,10 @@ class ReceiptBuilder {
   // Helper methods
 
   String _formatCurrency(double value) {
-    return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(
+    return value.toStringAsFixed(0).replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
-    )}';
+    );
   }
 
   String _formatPaymentMethod(String method) {
@@ -255,7 +210,7 @@ class ReceiptBuilder {
   }
 
   String _formatTotalLine(String label, double value) {
-    final labelText = label.padRight(12);
+    final labelText = '$label :'.padRight(18);
     final valueText = _formatCurrency(value);
     return '$labelText$valueText';
   }
@@ -264,6 +219,21 @@ class ReceiptBuilder {
     if (text.length <= maxLength) return text;
     return '${text.substring(0, maxLength - 3)}...';
   }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    const months = [
+      'Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'
+    ];
+    final month = months[date.month - 1];
+    final year = date.year.toString();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    final second = date.second.toString().padLeft(2, '0');
+    return '$day $month $year $hour:$minute:$second';
+  }
+
+  String _formatDateWithSeconds(DateTime date) => _formatDate(date);
 }
 
 

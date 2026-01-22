@@ -65,16 +65,16 @@ class ReceiptService {
     await _ensureLocaleInitialized();
     
     final pdf = pw.Document();
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'id_ID');
+    final dateFormat = DateFormat('dd MMM yyyy HH:mm:ss', 'id_ID');
     
-    // Classic compact 80mm thermal layout
+    // Classic compact 80mm thermal layout for 58/80mm printers
     const double headerFontSize = 12;
-    const double normalFontSize = 8;
-    const double smallFontSize = 7;
-    const double totalFontSize = 10;
-    const double lineHeight = 1.0;
-    const double spacing = 1;
-    const double sectionSpacing = 2;
+    const double normalFontSize = 8.5;
+    const double smallFontSize = 7.5;
+    const double totalFontSize = 10.5;
+    const double lineHeight = 1.05;
+    const double spacing = 2;
+    const double sectionSpacing = 3;
     
     pdf.addPage(
       pw.Page(
@@ -94,14 +94,11 @@ class ReceiptService {
             height: lineHeight,
           );
 
-          pw.Widget separator() {
-            // Single thin text separator (classic thermal look)
-            return pw.Text(
-              '------------------------------------------',
-              style: smallStyle,
-              textAlign: pw.TextAlign.center,
-            );
-          }
+          pw.Widget separator() => pw.Text(
+                '------------------------------------------',
+                style: smallStyle,
+                textAlign: pw.TextAlign.center,
+              );
 
           String truncateLeft(String text, int maxLen) {
             if (text.length <= maxLen) return text;
@@ -139,78 +136,63 @@ class ReceiptService {
               pw.SizedBox(height: spacing),
               separator(),
               pw.SizedBox(height: spacing),
-              
-              // Items (two-column grid): name left, price right
+
+              // Transaction meta
+              pw.Text('Nomor Nota: $transactionId', style: normalStyle),
+              pw.Text('Tanggal: ${dateFormat.format(date)}', style: normalStyle),
+
+              pw.SizedBox(height: spacing),
+              separator(),
+              pw.SizedBox(height: spacing),
+
+              // Items with two-line pattern
               ...items.map((item) {
-                final name = (item['productName'] as String?) ?? 
-                             (item['name'] as String?) ?? 
-                             'Item';
+                final name = (item['productName'] as String?) ??
+                    (item['name'] as String?) ??
+                    'Item';
                 final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
                 final price = (item['price'] as num?)?.toDouble() ?? 0.0;
                 final itemTotal = quantity * price;
-                final leftTextRaw = '${name.trim()} x$quantity';
-                final rightText = _formatCurrency(itemTotal);
-                // Keep row single-line by truncating left based on right length
-                final maxLeft = (32 - rightText.length - 1).clamp(8, 32);
-                final leftText = truncateLeft(leftTextRaw, maxLeft);
-                
+
+                final qtyLine = '${quantity} x ${_formatMoney(price)}';
+                final rightText = _formatMoney(itemTotal);
+                final maxLeft = ((32 - rightText.length - 1).clamp(8, 32)).toInt();
+                final truncatedName = truncateLeft(name.trim(), maxLeft + 6);
+
                 return pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 1),
-                  child: pw.Row(
+                  padding: const pw.EdgeInsets.only(bottom: 2),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Expanded(
-                        child: pw.Text(
-                          leftText,
-                          style: normalStyle,
-                          maxLines: 1,
-                          overflow: pw.TextOverflow.clip,
-                        ),
-                      ),
-                      pw.Text(
-                        rightText,
-                        style: normalStyle,
+                      pw.Text(truncatedName, style: normalStyle),
+                      pw.Row(
+                        children: [
+                          pw.Expanded(
+                            child: pw.Text(
+                              qtyLine,
+                              style: normalStyle,
+                              maxLines: 1,
+                              overflow: pw.TextOverflow.clip,
+                            ),
+                          ),
+                          pw.Text(rightText, style: normalStyle),
+                        ],
                       ),
                     ],
                   ),
                 );
               }),
-              
-              pw.SizedBox(height: spacing),
-              separator(),
-              pw.SizedBox(height: spacing),
-              
-              // Totals (tight grouping)
-              _buildReceiptRow('Subtotal', subtotal, normalStyle),
-              if (tax > 0) _buildReceiptRow('Pajak', tax, normalStyle),
 
               pw.SizedBox(height: spacing),
               separator(),
               pw.SizedBox(height: spacing),
 
-              // TOTAL isolated (bold, compact section)
-              _buildReceiptRow('TOTAL', total, totalStyle, isTight: true),
-
-              pw.SizedBox(height: spacing),
-              separator(),
-              pw.SizedBox(height: spacing),
-              
-              // Payment
-              pw.Text(
-                'Pembayaran: ${_formatPaymentMethod(paymentMethod)}',
-                style: normalStyle,
-              ),
-              
-              // Change (if applicable)
-              if (change != null && change > 0) ...[
-                pw.SizedBox(height: spacing),
-                pw.Text(
-                  'Kembalian: ${_formatCurrency(change)}',
-                  style: normalStyle,
-                ),
-              ],
+              _buildReceiptRow('Total', total, totalStyle, isTight: true),
+              _buildReceiptRow('Bayar ${_formatPaymentMethod(paymentMethod)}', cashAmount ?? total, normalStyle, isTight: true),
+              _buildReceiptRow('Kembali', change ?? 0, normalStyle, isTight: true),
 
               pw.SizedBox(height: sectionSpacing),
-              pw.Text('Terima Kasih', style: totalStyle, textAlign: pw.TextAlign.center),
+              pw.Text('Terima kasih atas kunjungan Anda', style: totalStyle, textAlign: pw.TextAlign.center),
             ],
           );
         },
@@ -232,11 +214,11 @@ class ReceiptService {
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(
-            label,
+            '$label :',
             style: style,
           ),
           pw.Text(
-            _formatCurrency(value),
+            _formatMoney(value),
             style: style,
           ),
         ],
@@ -245,8 +227,10 @@ class ReceiptService {
   }
 
 
-  static String _formatCurrency(double value) {
-    return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+  static String _formatMoney(double value) {
+    return value
+        .toStringAsFixed(0)
+        .replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
   }
 
   static String _formatPaymentMethod(String method) {
@@ -287,13 +271,13 @@ class ReceiptService {
       storeName: storeName ?? 'Toko Saya',
       address: storeAddress,
       phone: storePhone,
+      date: date,
     );
 
     // Transaction info
     await builder.addTransactionInfo(
       transactionId: transactionId,
       date: date,
-      customerName: customerName,
     );
 
     // Items

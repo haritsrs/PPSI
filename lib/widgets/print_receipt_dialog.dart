@@ -252,6 +252,7 @@ class _PrintReceiptDialogState extends State<PrintReceiptDialog> {
           ? AuthService.currentUser!.displayName!.trim()
           : 'Toko Saya';
 
+
       // Parse transaction data
       final items = widget.transactionData['items'] as List<dynamic>? ?? [];
       final itemsList = items.map((item) => Map<String, dynamic>.from(item as Map)).toList();
