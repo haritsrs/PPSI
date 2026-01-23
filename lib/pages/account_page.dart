@@ -148,7 +148,6 @@ class _AccountPageState extends State<AccountPage> with TickerProviderStateMixin
                     formKey: _controller.formKey,
                     nameController: _controller.nameController,
                     emailController: _controller.emailController,
-                    phoneController: _controller.phoneController,
                     currentUser: _controller.currentUser,
                     isEditing: _controller.isEditing,
                     isLoading: _controller.isLoading,

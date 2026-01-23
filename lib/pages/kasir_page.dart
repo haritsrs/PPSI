@@ -371,8 +371,10 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    final useCleanLayout = isLandscape && _useCleanLayout;
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.size.width > mediaQuery.size.height;
+    final isMobileWidth = mediaQuery.size.width < 900;
+    final useCleanLayout = !isMobileWidth && isLandscape && _useCleanLayout;
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -443,7 +445,13 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                   position: _slideAnimation,
                   child: useCleanLayout
                       ? _buildCleanHorizontalLayout(context, paddingScale, iconScale)
-                      : _buildDesktopLayout(context, paddingScale, iconScale),
+                      : _buildDesktopLayout(
+                          context,
+                          paddingScale,
+                          iconScale,
+                          isLandscape,
+                          isMobileWidth,
+                        ),
                 ),
               ),
             )
@@ -468,7 +476,13 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                       position: _slideAnimation,
                       child: useCleanLayout
                           ? _buildCleanHorizontalLayout(context, paddingScale, iconScale)
-                          : _buildDesktopLayout(context, paddingScale, iconScale),
+                          : _buildDesktopLayout(
+                              context,
+                              paddingScale,
+                              iconScale,
+                              isLandscape,
+                              isMobileWidth,
+                            ),
                     ),
                   ),
                 ),
@@ -481,7 +495,13 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildDesktopLayout(BuildContext context, double paddingScale, double iconScale) {
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    double paddingScale,
+    double iconScale,
+    bool isLandscape,
+    bool isMobileWidth,
+  ) {
     return Column(
       children: [
         // Test Barcode Input Field (for debugging)
@@ -572,7 +592,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           paddingScale: paddingScale,
           iconScale: iconScale,
           useCleanLayout: _useCleanLayout,
-          onToggleLayout: _toggleLayout,
+          onToggleLayout: (!isMobileWidth && isLandscape) ? _toggleLayout : null,
         ),
         
         // Products List

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/settings_controller.dart';
 import '../../utils/snackbar_helper.dart';
-import '../../pages/about_page.dart';
 import 'settings_section.dart';
 import 'setting_item.dart';
 import 'settings_dialogs.dart';
@@ -56,12 +55,7 @@ class _SupportSettingsSectionState extends State<SupportSettingsSection> {
           icon: Icons.info_rounded,
           title: "Tentang Aplikasi",
           subtitle: _version,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AboutPage()),
-            );
-          },
+          onTap: () => SettingsAboutDialog.show(context),
         ),
         SettingItem(
           icon: Icons.logout_rounded,

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -11,40 +11,24 @@ import 'pages/onboarding_page.dart';
 import 'routes/app_routes.dart';
 import 'themes/app_theme.dart';
 import 'services/settings_service.dart';
+import 'utils/system_ui_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize locale data for date formatting (do this early)
+  // Initialize locale data for date formatting
   try {
     await initializeDateFormatting('id_ID', null);
   } catch (e) {
     debugPrint('Warning: Failed to initialize locale data: $e');
   }
 
-  await dotenv.load(fileName: ".env"); // must come before using XenditService
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Set system UI overlay style to make navigation bar opaque and visible
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      systemNavigationBarColor: Colors.white, // Opaque white navbar
-      systemNavigationBarIconBrightness: Brightness.dark, // Dark icons on white
-      systemNavigationBarDividerColor: Colors.transparent,
-    ),
-  );
-
-  // Set system UI mode - use manual mode to ensure navigation bar area is always reserved
-  // This ensures the navigation bar area is always visible, even if buttons are hidden by gesture navigation
-  SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.manual,
-    overlays: [
-      SystemUiOverlay.top, // Show status bar
-      SystemUiOverlay.bottom, // Show navigation bar area (buttons may be hidden by gesture navigation)
-    ],
-  );
+  SystemUIManager.initialize();
 
   final prefs = await SharedPreferences.getInstance();
   final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
@@ -80,6 +64,7 @@ class _KiosDarmaAppState extends State<KiosDarmaApp> {
     super.initState();
     _hasSeenOnboarding = widget.hasSeenOnboarding;
     _uiScalePreset = widget.initialUIScale;
+    WidgetsBinding.instance.addObserver(SystemUILifecycleObserver());
   }
 
   void _handleOnboardingFinished() {
@@ -107,10 +92,16 @@ class _KiosDarmaAppState extends State<KiosDarmaApp> {
 
   @override
   Widget build(BuildContext context) {
+    SystemUIManager.enforce();
+    
     return MaterialApp(
       key: KiosDarmaApp.appKey,
       title: 'KiosDarma',
-      theme: AppTheme.theme,
+      theme: AppTheme.theme.copyWith(
+        appBarTheme: AppTheme.theme.appBarTheme.copyWith(
+          systemOverlayStyle: SystemUIManager.style,
+        ),
+      ),
       // Apply global UI scaling via MediaQuery
       builder: (context, child) {
         final mediaQuery = MediaQuery.of(context);
@@ -133,4 +124,3 @@ class _KiosDarmaAppState extends State<KiosDarmaApp> {
     );
   }
 }
-

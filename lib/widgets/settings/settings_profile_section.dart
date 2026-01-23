@@ -84,7 +84,7 @@ class SettingsProfileSection extends StatelessWidget {
           IconButton(
             onPressed: () {
               HapticFeedback.lightImpact();
-              onEditProfile();
+              SnackbarHelper.showInfo(context, 'Fitur edit profil akan segera hadir!');
             },
             icon: const Icon(
               Icons.edit_rounded,

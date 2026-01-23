@@ -5,7 +5,6 @@ class AccountInfoForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController emailController;
-  final TextEditingController phoneController;
   final User? currentUser;
   final bool isEditing;
   final bool isLoading;
@@ -17,7 +16,6 @@ class AccountInfoForm extends StatelessWidget {
     required this.formKey,
     required this.nameController,
     required this.emailController,
-    required this.phoneController,
     required this.currentUser,
     required this.isEditing,
     required this.isLoading,
@@ -112,31 +110,6 @@ class AccountInfoForm extends StatelessWidget {
                 }
                 return null;
               },
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Phone Field
-            TextFormField(
-              controller: phoneController,
-              enabled: isEditing,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                labelText: 'Nomor Telepon',
-                hintText: 'Contoh: 08123456789',
-                prefixIcon: const Icon(Icons.phone_rounded, color: Color(0xFF6366F1)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
-                ),
-                filled: true,
-                fillColor: isEditing ? const Color(0xFFF8FAFC) : Colors.grey[100],
-              ),
             ),
             
             const SizedBox(height: 20),

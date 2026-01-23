@@ -18,11 +18,6 @@ class NotificationModel {
   });
 
   factory NotificationModel.fromFirebase(Map<String, dynamic> data) {
-    Map<String, dynamic>? additionalData;
-    if (data['data'] != null && data['data'] is Map) {
-      additionalData = Map<String, dynamic>.from(data['data'] as Map);
-    }
-    
     return NotificationModel(
       id: data['id'] as String? ?? data['key'] as String? ?? '',
       title: data['title'] as String? ?? '',
@@ -32,7 +27,7 @@ class NotificationModel {
       createdAt: data['createdAt'] != null
           ? DateTime.tryParse(data['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
-      data: additionalData,
+      data: data['data'] as Map<String, dynamic>?,
     );
   }
 

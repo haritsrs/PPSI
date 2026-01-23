@@ -145,8 +145,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final mq = MediaQuery.of(context);
     final isLandscape = mq.orientation == Orientation.landscape;
     final isWidePortraitTablet = mq.orientation == Orientation.portrait && mq.size.width >= 840;
+    final isMobileWidth = mq.size.width < 900;
 
-    if (isLandscape || isWidePortraitTablet) {
+    // Use desktop/tablet layout only when the screen is wide enough
+    if (!isMobileWidth && (isLandscape || isWidePortraitTablet)) {
       return HomeLandscapeLayout(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,

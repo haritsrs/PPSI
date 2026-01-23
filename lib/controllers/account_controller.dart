@@ -3,16 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
-import '../services/database_service.dart';
-import '../services/settings_service.dart';
 
 class AccountController extends ChangeNotifier {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  final DatabaseService _databaseService = DatabaseService();
 
   bool _isEditing = false;
   bool _isLoading = false;
@@ -23,7 +19,6 @@ class AccountController extends ChangeNotifier {
   GlobalKey<FormState> get formKey => _formKey;
   TextEditingController get nameController => _nameController;
   TextEditingController get emailController => _emailController;
-  TextEditingController get phoneController => _phoneController;
   bool get isEditing => _isEditing;
   bool get isLoading => _isLoading;
   bool get isUploadingPhoto => _isUploadingPhoto;
@@ -39,25 +34,6 @@ class AccountController extends ChangeNotifier {
     _currentUser = AuthService.currentUser;
     _nameController.text = _currentUser?.displayName ?? '';
     _emailController.text = _currentUser?.email ?? '';
-    
-    // Load phone from database
-    try {
-      final profile = await _databaseService.getUserProfile();
-      if (profile != null) {
-        _phoneController.text = profile['phoneNumber'] as String? ?? '';
-        // Update name and photo from database if available
-        if (profile['displayName'] != null) {
-          _nameController.text = profile['displayName'] as String;
-        }
-      }
-    } catch (e) {
-      // Fallback to settings
-      _phoneController.text = await SettingsService.getSetting(
-        SettingsService.keyUserPhone,
-        '',
-      );
-    }
-    
     notifyListeners();
   }
 
@@ -100,22 +76,6 @@ class AccountController extends ChangeNotifier {
         photoURL: photoURL,
       );
 
-      // Save phone number to database and settings
-      final phone = _phoneController.text.trim();
-      if (phone.isNotEmpty) {
-        await _databaseService.updateUserProfile({
-          'phoneNumber': phone,
-          'displayName': _nameController.text.trim(),
-        });
-        await SettingsService.setSetting(SettingsService.keyUserPhone, phone);
-      }
-      
-      // Save display name to settings
-      await SettingsService.setSetting(
-        SettingsService.keyUserDisplayName,
-        _nameController.text.trim(),
-      );
-
       // Reload user data
       await _loadUserData();
 
@@ -135,7 +95,6 @@ class AccountController extends ChangeNotifier {
     _selectedImage = null;
     _nameController.text = _currentUser?.displayName ?? '';
     _emailController.text = _currentUser?.email ?? '';
-    _phoneController.text = _phoneController.text; // Keep phone as is
     notifyListeners();
   }
 
@@ -205,7 +164,6 @@ class AccountController extends ChangeNotifier {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 }

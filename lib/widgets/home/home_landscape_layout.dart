@@ -118,6 +118,8 @@ class HomeLandscapeLayout extends StatelessWidget {
     
     final screenWidth = MediaQuery.of(context).size.width;
     final shortestSide = MediaQuery.of(context).size.shortestSide;
+    // Show labels only on sufficiently wide screens; otherwise icons-only
+    final showExtendedRail = screenWidth >= 1100;
     
     final baseIconSize = 24.0 * iconScale;
     final iconSize = baseIconSize * 1.15;
@@ -159,8 +161,8 @@ class HomeLandscapeLayout extends StatelessWidget {
                   return NavigationRail(
                     selectedIndex: selectedIndex,
                     onDestinationSelected: onItemTapped,
-                    extended: isWideScreen || isHorizontal,
-                    minWidth: isWideScreen || isHorizontal ? extendedWidth : minWidth,
+                    extended: showExtendedRail,
+                    minWidth: showExtendedRail ? extendedWidth : minWidth,
                     labelType: NavigationRailLabelType.none,
                     selectedIconTheme: IconThemeData(
                       color: const Color(0xFF6366F1),
