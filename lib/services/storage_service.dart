@@ -217,6 +217,71 @@ class StorageService {
       );
     }
   }
+
+  /// Upload profile picture to Firebase Storage with automatic optimization
+  /// Returns the download URL
+  static Future<String> uploadProfilePicture({
+    required File imageFile,
+    required String userId,
+  }) async {
+    try {
+      // Validate userId to prevent path injection
+      if (userId.isEmpty || !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(userId)) {
+        throw Exception('Invalid user ID format');
+      }
+      
+      // Optimize image (converts to JPEG, resizes to max 800px width, quality 80)
+      final optimizedFile = await optimizeImage(imageFile);
+      
+      // Create filename (always .jpg since we convert to JPEG)
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'profile_pictures/$userId/${timestamp}.jpg';
+      
+      // Upload to Firebase Storage
+      final ref = _storage.ref().child(fileName);
+      final uploadTask = ref.putFile(optimizedFile);
+      
+      // Wait for upload to complete
+      final snapshot = await uploadTask;
+      
+      // Get download URL
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      // Clean up optimized file
+      try {
+        await optimizedFile.delete();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      return downloadUrl;
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal mengunggah foto profil.',
+      );
+    }
+  }
+
+  /// Delete profile picture from Firebase Storage
+  static Future<void> deleteProfilePicture(String userId) async {
+    try {
+      if (userId.isEmpty) {
+        return;
+      }
+      
+      // Delete entire profile pictures folder for user
+      final ref = _storage.ref().child('profile_pictures/$userId');
+      final listResult = await ref.listAll();
+      
+      for (final item in listResult.items) {
+        await item.delete();
+      }
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal menghapus foto profil.',
+      );
+    }
+  }
 }
-
-

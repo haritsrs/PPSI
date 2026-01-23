@@ -5,7 +5,7 @@ import '../services/database_service.dart';
 
 class NotificationController extends ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
-  StreamSubscription<List<Map<String, dynamic>>>? _notificationsSubscription;
+  StreamSubscription? _notificationsSubscription;
 
   List<NotificationModel> _notifications = [];
   bool _isLoading = true;
@@ -33,36 +33,51 @@ class NotificationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> initialize() async {
-    await loadNotifications();
+  void initialize() {
+    loadNotifications();
   }
 
   Future<void> loadNotifications() async {
-    _isLoading = true;
-    notifyListeners();
+  _isLoading = true;
+  notifyListeners();
 
-    try {
-      _notificationsSubscription?.cancel();
-      _notificationsSubscription = _databaseService.getNotificationsStream().listen(
-        (notificationsData) {
-          _notifications = notificationsData.map((data) {
-            return NotificationModel.fromFirebase(data);
-          }).toList();
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (error) {
-          _isLoading = false;
-          notifyListeners();
-          throw error;
-        },
-      );
+  _notificationsSubscription?.cancel();
+
+  try {
+    final stream = _databaseService.getNotificationsStream();
+
+    _notificationsSubscription = stream
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: (sink) => sink.add([]),
+        )
+        .listen(
+          (data) {
+            if (data is! List) {
+              _notifications = [];
+            } else {
+              _notifications = data
+                  .whereType<Map<String, dynamic>>()
+                  .map(NotificationModel.fromFirebase)
+                  .toList();
+            }
+
+            _isLoading = false;
+            notifyListeners();
+          },
+          onError: (error) {
+            _notifications = [];
+            _isLoading = false;
+            notifyListeners();
+          },
+        );
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
+    _notifications = [];
+    _isLoading = false;
+    notifyListeners();
     }
   }
+
 
   Future<void> markAsRead(NotificationModel notification) async {
     try {

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/settings_service.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
 import '../main.dart';
 
 class SettingsController extends ChangeNotifier {
@@ -284,12 +285,34 @@ class SettingsController extends ChangeNotifier {
     _storeAddress = value;
     notifyListeners();
     await updateSetting(SettingsService.keyStoreAddress, value);
+    
+    // Sync to Firebase
+    try {
+      final DatabaseService dbService = DatabaseService();
+      await dbService.updateBusinessSettings({
+        'address': value,
+        'phone': _storePhone,
+      });
+    } catch (e) {
+      debugPrint('Error syncing store address to Firebase: $e');
+    }
   }
 
   Future<void> setStorePhone(String value) async {
     _storePhone = value;
     notifyListeners();
     await updateSetting(SettingsService.keyStorePhone, value);
+    
+    // Sync to Firebase
+    try {
+      final DatabaseService dbService = DatabaseService();
+      await dbService.updateBusinessSettings({
+        'address': _storeAddress,
+        'phone': value,
+      });
+    } catch (e) {
+      debugPrint('Error syncing store phone to Firebase: $e');
+    }
   }
 
   Future<void> setAutoBackupEnabled(bool value) async {

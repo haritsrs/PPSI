@@ -985,6 +985,10 @@ class DatabaseService {
 
   // Get notifications stream for current user
   Stream<List<Map<String, dynamic>>> getNotificationsStream() {
+    if (currentUserId == null) {
+      return Stream.value([]);
+    }
+    
     return notificationsRef.orderByChild('createdAt').onValue.map((event) {
       if (event.snapshot.value == null) {
         return <Map<String, dynamic>>[];
@@ -1566,6 +1570,94 @@ class DatabaseService {
       );
     }
   }
+
+  // User Profile operations
+  DatabaseReference get userProfileRef => _database.child('users').child(currentUserId!).child('profile');
+  
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final snapshot = await userProfileRef.get();
+      if (!snapshot.exists || snapshot.value == null) {
+        return null;
+      }
+      return Map<String, dynamic>.from(snapshot.value as Map);
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat profil pengguna.',
+      );
+    }
+  }
+
+  Future<void> updateUserProfile(Map<String, dynamic> profileData) async {
+    try {
+      final sanitizedData = SecurityUtils.sanitizeMap(profileData);
+      sanitizedData['updatedAt'] = DateTime.now().toIso8601String();
+      
+      await userProfileRef.update(sanitizedData);
+      
+      await _logAuditEvent('update_profile', {
+        'fields': sanitizedData.keys.toList(),
+      });
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui profil pengguna.',
+      );
+    }
+  }
+
+  Future<void> updateProfilePicture(String imageUrl) async {
+    try {
+      await userProfileRef.update({
+        'photoURL': imageUrl,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      
+      await _logAuditEvent('update_profile_picture', {
+        'imageUrl': imageUrl,
+      });
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui foto profil.',
+      );
+    }
+  }
+
+  // Business settings operations
+  DatabaseReference get businessSettingsRef => _getUserRef('settings/business');
+  
+  Future<Map<String, dynamic>?> getBusinessSettings() async {
+    try {
+      final snapshot = await businessSettingsRef.get();
+      if (!snapshot.exists || snapshot.value == null) {
+        return null;
+      }
+      return Map<String, dynamic>.from(snapshot.value as Map);
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memuat pengaturan bisnis.',
+      );
+    }
+  }
+
+  Future<void> updateBusinessSettings(Map<String, dynamic> settings) async {
+    try {
+      final sanitizedData = SecurityUtils.sanitizeMap(settings);
+      sanitizedData['updatedAt'] = DateTime.now().toIso8601String();
+      
+      await businessSettingsRef.update(sanitizedData);
+      
+      await _logAuditEvent('update_business_settings', {
+        'fields': sanitizedData.keys.toList(),
+      });
+    } catch (error) {
+      throw toAppException(
+        error,
+        fallbackMessage: 'Gagal memperbarui pengaturan bisnis.',
+      );
+    }
+  }
 }
-
-

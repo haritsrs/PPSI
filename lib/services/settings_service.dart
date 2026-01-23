@@ -37,6 +37,12 @@ class SettingsService {
   // Store info for receipt header
   static const String keyStoreAddress = 'store_address';
   static const String keyStorePhone = 'store_phone';
+  static const String keyStoreName = 'store_name';
+  static const String keyStoreLogo = 'store_logo';
+  // Profile settings
+  static const String keyUserDisplayName = 'user_display_name';
+  static const String keyUserPhotoURL = 'user_photo_url';
+  static const String keyUserPhone = 'user_phone';
 
   /// Validates and sanitizes setting key to prevent path injection
   /// Only allows alphanumeric characters, underscores, and hyphens

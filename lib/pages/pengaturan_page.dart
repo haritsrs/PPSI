@@ -10,6 +10,7 @@ import '../widgets/settings/business_settings_section.dart';
 import '../widgets/settings/data_security_settings_section.dart';
 import '../widgets/settings/support_settings_section.dart';
 import '../widgets/settings/settings_dialogs.dart';
+import 'account_page.dart';
 
 class PengaturanPage extends StatefulWidget {
   const PengaturanPage({super.key});
@@ -91,7 +92,12 @@ class _PengaturanPageState extends State<PengaturanPage> with TickerProviderStat
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SettingsProfileSection(
-                    onEditProfile: () => EditProfileDialog.show(context),
+                    onEditProfile: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AccountPage()),
+                      );
+                    },
                   ),
                   const SizedBox(height: 24),
                   GeneralSettingsSection(controller: _controller),
