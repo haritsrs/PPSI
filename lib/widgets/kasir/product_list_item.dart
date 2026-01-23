@@ -68,102 +68,96 @@ class _ProductListItemState extends State<ProductListItem>
         child: Opacity(
           opacity: isOutOfStock ? 0.6 : 1.0,
           child: Container(
-            margin: EdgeInsets.only(bottom: 12 * widget.paddingScale),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
               border: Border.all(
-                color: isOutOfStock 
-                    ? Colors.red.withOpacity(0.2)
-                    : Colors.grey.withOpacity(0.1),
+                color: isOutOfStock
+                    ? Colors.red.withOpacity(0.18)
+                    : const Color(0xFFE5E7EB),
                 width: 1,
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  width: 120,
-                  height: 120,
+                  height: 140,
+                  margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                    ),
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
-                      widget.product.image.isNotEmpty 
-                          ? widget.product.image 
+                      widget.product.image.isNotEmpty
+                          ? widget.product.image
                           : '📦',
-                      style: const TextStyle(fontSize: 64),
+                      style: const TextStyle(fontSize: 56),
                     ),
                   ),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.all(16 * widget.paddingScale),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                         Text(
                           widget.product.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1F2937),
-                            fontSize: 16 * fontSize,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                            fontSize: 15,
                             height: 1.3,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 8 * widget.paddingScale),
+                        const SizedBox(height: 8),
                         Text(
                           'Rp ${widget.product.price.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF6366F1),
-                            fontSize: 20 * fontSize,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF545BFF),
+                            fontSize: 20,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        SizedBox(height: 8 * widget.paddingScale),
+                        const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10 * widget.paddingScale,
-                                vertical: 6 * widget.paddingScale,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: isOutOfStock
-                                    ? Colors.red.withOpacity(0.1)
-                                    : widget.product.stock > 10 
-                                        ? Colors.green.withOpacity(0.1)
-                                        : Colors.orange.withOpacity(0.1),
+                                    ? Colors.red.withOpacity(0.12)
+                                    : widget.product.stock > 10
+                                        ? Colors.green.withOpacity(0.12)
+                                        : Colors.orange.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                isOutOfStock 
+                                isOutOfStock
                                     ? 'Habis'
-                                    : 'Stok: ${widget.product.stock}',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    : widget.product.stock > 10
+                                        ? 'Stok: ${widget.product.stock}'
+                                        : '${widget.product.stock}',
+                                style: TextStyle(
                                   color: isOutOfStock
                                       ? Colors.red[700]
-                                      : widget.product.stock > 10 
+                                      : widget.product.stock > 10
                                           ? Colors.green[700]
                                           : Colors.orange[700],
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13 * fontSize,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
                                 ),
                               ),
                             ),
@@ -175,78 +169,62 @@ class _ProductListItemState extends State<ProductListItem>
                                         GestureDetector(
                                           onTap: widget.onDecrement,
                                           child: Container(
-                                            padding: EdgeInsets.all(8 * widget.paddingScale),
+                                            padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
-                                              color: Colors.red.withOpacity(0.1),
+                                              color: Colors.white,
                                               borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: Colors.red.withOpacity(0.3),
-                                                width: 1,
-                                              ),
+                                              border: Border.all(color: Colors.red.withOpacity(0.3)),
                                             ),
-                                            child: Icon(
-                                              Icons.remove_rounded,
-                                              color: Colors.red[700],
-                                              size: 20 * widget.iconScale,
-                                            ),
+                                            child: Icon(Icons.remove_rounded, color: Colors.red[700], size: 16),
                                           ),
                                         ),
                                         Container(
-                                          margin: EdgeInsets.symmetric(horizontal: 8 * widget.paddingScale),
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 12 * widget.paddingScale,
-                                            vertical: 6 * widget.paddingScale,
-                                          ),
+                                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF6366F1).withOpacity(0.1),
+                                            color: const Color(0xFFEEF2FF),
                                             borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: const Color(0xFF6366F1).withOpacity(0.3),
-                                              width: 1,
-                                            ),
                                           ),
                                           child: Text(
                                             '${widget.quantity}',
-                                            style: TextStyle(
-                                              color: const Color(0xFF6366F1),
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16 * widget.paddingScale,
+                                            style: const TextStyle(
+                                              color: Color(0xFF3B42F6),
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 15,
                                             ),
                                           ),
                                         ),
                                         GestureDetector(
                                           onTap: widget.onIncrement,
                                           child: Container(
-                                            padding: EdgeInsets.all(8 * widget.paddingScale),
+                                            padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF6366F1),
+                                              color: const Color(0xFF545BFF),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
-                                            child: Icon(
-                                              Icons.add_rounded,
-                                              color: Colors.white,
-                                              size: 20 * widget.iconScale,
-                                            ),
+                                            child: const Icon(Icons.add_rounded, color: Colors.white, size: 16),
                                           ),
                                         ),
                                       ],
                                     )
                                   : Container(
-                                      padding: EdgeInsets.all(10 * widget.paddingScale),
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF6366F1),
+                                        color: const Color(0xFF545BFF),
                                         borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF545BFF).withOpacity(0.28),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
                                       ),
-                                      child: Icon(
-                                        Icons.add_rounded,
-                                        color: Colors.white,
-                                        size: 24 * widget.iconScale,
-                                      ),
+                                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                                     ),
                           ],
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ],

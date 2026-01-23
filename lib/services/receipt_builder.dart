@@ -8,6 +8,8 @@ class ReceiptBuilder {
   static const int maxCharsPerLine = 32; // Approximate for 58mm
 
   final List<List<int>> _sections = [];
+  
+  get total => null;
 
   /// Add business header
   ReceiptBuilder addHeader({

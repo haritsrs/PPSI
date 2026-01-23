@@ -8,6 +8,8 @@ class SearchAndCategorySection extends StatelessWidget {
   final FocusNode searchFocusNode;
   final double paddingScale;
   final double iconScale;
+  final bool? useCleanLayout;
+  final VoidCallback? onToggleLayout;
 
   const SearchAndCategorySection({
     super.key,
@@ -16,6 +18,8 @@ class SearchAndCategorySection extends StatelessWidget {
     required this.searchFocusNode,
     required this.paddingScale,
     required this.iconScale,
+    this.useCleanLayout,
+    this.onToggleLayout,
   });
 
   @override
@@ -27,43 +31,91 @@ class SearchAndCategorySection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Search Bar
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller: searchController,
-              focusNode: searchFocusNode,
-              onChanged: (value) {
-                controller.setSearchQuery(value);
-              },
-              decoration: InputDecoration(
-                hintText: 'Cari produk...',
-                hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
-                  fontSize: 14,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: const Color(0xFF6366F1),
-                  size: 20 * iconScale,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16 * paddingScale,
-                  vertical: 12 * paddingScale,
+          // Search Bar with toggle
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: searchController,
+                    focusNode: searchFocusNode,
+                    onChanged: (value) {
+                      controller.setSearchQuery(value);
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Cari produk...',
+                      hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: const Color(0xFF545BFF),
+                        size: 20 * iconScale,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0x00FFFFFF)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF545BFF), width: 1.4),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16 * paddingScale,
+                        vertical: 12 * paddingScale,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (onToggleLayout != null) ...[
+                SizedBox(width: 8 * paddingScale),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      onToggleLayout!();
+                    },
+                    icon: Icon(
+                      useCleanLayout == true ? Icons.view_list_rounded : Icons.view_module_rounded,
+                      color: const Color(0xFF545BFF),
+                      size: 22 * iconScale,
+                    ),
+                    tooltip: useCleanLayout == true
+                        ? 'Tampilan Vertikal'
+                        : 'Tampilan Horizontal',
+                    padding: EdgeInsets.all(10 * paddingScale),
+                    constraints: const BoxConstraints(),
+                  ),
+                ),
+              ],
+            ],
           ),
           SizedBox(height: 12 * paddingScale),
           

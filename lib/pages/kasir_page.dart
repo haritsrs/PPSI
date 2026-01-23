@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../controllers/kasir_controller.dart';
 import '../models/cart_item_model.dart';
 import '../services/barcode_scanner_service.dart';
@@ -45,6 +46,7 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   late BarcodeScannerService _barcodeScanner;
   bool _testModeEnabled = false;
   bool _barcodeScannerEnabled = true;
+  bool _useCleanLayout = false;
 
   @override
   void initState() {
@@ -102,6 +104,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
 
     _animationController.forward();
     _barcodeScanner.initializeFocus();
+    
+    // Load layout preference
+    _loadLayoutPreference();
     
     // Attempt to auto-reconnect to printer when entering kasir page
     _attemptPrinterAutoReconnect();
@@ -229,6 +234,40 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     });
   }
 
+  void _toggleLayout() {
+    setState(() {
+      _useCleanLayout = !_useCleanLayout;
+    });
+    _saveLayoutPreference();
+  }
+
+  Future<void> _loadLayoutPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedLayout = prefs.getBool('kasir_use_clean_layout') ?? false;
+      if (mounted) {
+        setState(() {
+          _useCleanLayout = savedLayout;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to load layout preference: $e');
+      }
+    }
+  }
+
+  Future<void> _saveLayoutPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('kasir_use_clean_layout', _useCleanLayout);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to save layout preference: $e');
+      }
+    }
+  }
+
   void _showPaymentModal() {
     if (_controller.cartItems.isEmpty) {
       SnackbarHelper.showInfo(
@@ -332,6 +371,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    final useCleanLayout = isLandscape && _useCleanLayout;
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -400,7 +441,9 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: _buildDesktopLayout(context, paddingScale, iconScale),
+                  child: useCleanLayout
+                      ? _buildCleanHorizontalLayout(context, paddingScale, iconScale)
+                      : _buildDesktopLayout(context, paddingScale, iconScale),
                 ),
               ),
             )
@@ -423,13 +466,15 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
                     opacity: _fadeAnimation,
                     child: SlideTransition(
                       position: _slideAnimation,
-                      child: _buildDesktopLayout(context, paddingScale, iconScale),
+                      child: useCleanLayout
+                          ? _buildCleanHorizontalLayout(context, paddingScale, iconScale)
+                          : _buildDesktopLayout(context, paddingScale, iconScale),
                     ),
                   ),
                 ),
               ),
             ),
-      floatingActionButton: CartFAB(
+      floatingActionButton: useCleanLayout ? null : CartFAB(
         controller: _controller,
         onPressed: _showCartBottomSheet,
       ),
@@ -526,6 +571,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
           searchFocusNode: _searchFocusNode,
           paddingScale: paddingScale,
           iconScale: iconScale,
+          useCleanLayout: _useCleanLayout,
+          onToggleLayout: _toggleLayout,
         ),
         
         // Products List
@@ -607,6 +654,195 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductGridContent({
+    required double paddingScale,
+    required double iconScale,
+  }) {
+    final filteredProducts = _controller.filteredProducts;
+    if (filteredProducts.isEmpty) {
+      return EmptyProductState(
+        controller: _controller,
+        onAddProduct: _showAddProductDialog,
+        paddingScale: paddingScale,
+        iconScale: iconScale,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const cardWidth = 240.0;
+        int crossAxisCount = (constraints.maxWidth / cardWidth).floor().clamp(2, 5);
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.82,
+          ),
+          itemCount: filteredProducts.length,
+          itemBuilder: (context, index) {
+            final product = filteredProducts[index];
+            final cartItem = _controller.cartItems.firstWhere(
+              (item) => item.product.id == product.id,
+              orElse: () => CartItem(product: product, quantity: 0),
+            );
+            final quantity = cartItem.quantity;
+
+            return ProductListItem(
+              product: product,
+              quantity: quantity,
+              onAddToCart: () => _controller.addToCart(product),
+              onIncrement: () => _controller.addToCart(product),
+              onDecrement: () {
+                if (quantity > 1) {
+                  _controller.updateQuantity(product.id, quantity - 1);
+                } else {
+                  _controller.removeFromCart(product.id);
+                }
+              },
+              paddingScale: 1.0,
+              iconScale: 1.0,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCleanHorizontalLayout(BuildContext context, double paddingScale, double iconScale) {
+    const cartWidth = 380.0;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            children: [
+              SearchAndCategorySection(
+                controller: _controller,
+                searchController: _searchController,
+                searchFocusNode: _searchFocusNode,
+                paddingScale: paddingScale,
+                iconScale: iconScale,
+                useCleanLayout: _useCleanLayout,
+                onToggleLayout: _toggleLayout,
+              ),
+              if (_controller.isOffline)
+                Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+                      child: StatusBanner(
+                        color: Colors.orange,
+                        icon: Icons.wifi_off_rounded,
+                        message: 'Anda sedang offline. Data produk mungkin tidak terbaru.',
+                        trailing: TextButton(
+                          onPressed: _controller.isRetrying ? null : _controller.retryLoadProducts,
+                          child: Text(
+                            'Segarkan',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: Colors.orange[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ),
+              if (_controller.showInlineErrorBanner)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+                      child: StatusBanner(
+                        color: Colors.red,
+                        icon: Icons.error_outline_rounded,
+                        message: _controller.errorMessage ?? 'Terjadi kesalahan.',
+                        trailing: TextButton(
+                          onPressed: _controller.isRetrying ? null : _controller.retryLoadProducts,
+                          child: Text(
+                            'Coba Lagi',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: Colors.red[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ),
+              if (_controller.isRetrying && _controller.hasLoadedOnce)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16 * paddingScale),
+                      child: StatusBanner(
+                        color: Colors.blue,
+                        icon: Icons.sync_rounded,
+                        message: 'Menyegarkan data produk...',
+                        trailing: const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                          ),
+                        ),
+                      ),
+                    ),
+              const SizedBox(height: 8),
+              Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _controller.showInitialLoader
+                          ? const Center(
+                              key: ValueKey('kasir-products-loader-clean'),
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                              ),
+                            )
+                          : _controller.showFullErrorState
+                              ? ErrorStateWidget(controller: _controller)
+                              : _buildProductGridContent(
+                                  paddingScale: paddingScale,
+                                  iconScale: iconScale,
+                                ),
+                    ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          width: cartWidth,
+          height: double.infinity,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 24,
+                  offset: const Offset(-4, 0),
+                ),
+              ],
+            ),
+            child: CartPanel(
+            cartItems: _controller.cartItems,
+            customItems: _controller.customItems,
+            subtotal: _controller.subtotal,
+            tax: _controller.tax,
+            total: _controller.total,
+            onRemoveItem: _controller.removeFromCart,
+            onUpdateQuantity: _controller.updateQuantity,
+            onRemoveCustomItem: _controller.removeCustomItem,
+            onUpdateCustomItemQuantity: _controller.updateCustomItemQuantity,
+            onAddCustomItem: _controller.addCustomItem,
+            onClearCart: () {
+              _controller.clearCart();
+              HapticHelper.lightImpact();
+            },
+            onCheckout: _showPaymentModal,
+            hideCheckout: false,
+          ),
+        ),
         ),
       ],
     );
