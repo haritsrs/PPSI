@@ -1,6 +1,33 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 class ResponsiveHelper {
+  // CANONICAL METHODS - Use with LayoutBuilder
+  
+  /// Check if layout is horizontal (landscape-like)
+  /// Must be called from LayoutBuilder with BoxConstraints
+  static bool isHorizontal(BoxConstraints constraints) {
+    return constraints.maxWidth / constraints.maxHeight > 1.1;
+  }
+
+  /// Check if layout is vertical (portrait-like)
+  static bool isVertical(BoxConstraints constraints) {
+    return !isHorizontal(constraints);
+  }
+
+  /// Check if device is tablet-sized (7"+ screens)
+  static bool isTablet(BoxConstraints constraints) {
+    return math.min(constraints.maxWidth, constraints.maxHeight) >= 600;
+  }
+
+  /// Check if screen is wide enough for desktop-like layouts
+  static bool isWideScreen(BoxConstraints constraints) {
+    return constraints.maxWidth >= constraints.maxHeight * 1.3;
+  }
+
+  // DEPRECATED CONTEXT-BASED METHODS - For backward compatibility only
+  // New code should use LayoutBuilder + BoxConstraints versions above
+  
   // Get screen dimensions
   static Size getScreenSize(BuildContext context) {
     try {
@@ -8,10 +35,8 @@ class ResponsiveHelper {
       if (mediaQuery != null) {
         return mediaQuery.size;
       }
-      // Fallback to a default size if MediaQuery is not available
       return const Size(360, 640);
     } catch (e) {
-      // Fallback to a default size if there's an error
       return const Size(360, 640);
     }
   }
@@ -23,49 +48,33 @@ class ResponsiveHelper {
       if (size.height > 0) {
         return size.width / size.height;
       }
-      return 1.0; // Default aspect ratio
+      return 1.0;
     } catch (e) {
-      return 1.0; // Default aspect ratio
+      return 1.0;
     }
   }
 
-  // Check if screen is wide (16:9 or 16:10)
-  static bool isWideScreen(BuildContext context) {
+  @Deprecated('Use LayoutBuilder with isWideScreen(constraints)')
+  static bool isWideScreenContext(BuildContext context) {
     final aspectRatio = getAspectRatio(context);
     final shortestSide = getScreenSize(context).shortestSide;
-    // Consider displays that are clearly wide or in desktop-like modes.
     return aspectRatio >= 1.5 && shortestSide >= 500;
   }
 
-  // Check if screen is very wide (16:9)
-  static bool isVeryWideScreen(BuildContext context) {
+  @Deprecated('Use LayoutBuilder with isHorizontal(constraints)')
+  static bool isHorizontalContext(BuildContext context) {
     final aspectRatio = getAspectRatio(context);
-    return aspectRatio >= 1.7;
-  }
-
-  // Check if screen is vertical (portrait mode)
-  static bool isVertical(BuildContext context) {
-    final aspectRatio = getAspectRatio(context);
-    // Portrait mode: aspect ratio < 1 (width < height)
-    return aspectRatio < 1.0;
-  }
-
-  // Check if screen is tall/narrow (like Samsung S22 Ultra in portrait: 19.3:9 = ~0.466)
-  static bool isTallScreen(BuildContext context) {
-    final aspectRatio = getAspectRatio(context);
-    // Very tall screens have aspect ratio < 0.5
-    return aspectRatio < 0.5;
-  }
-
-  // Check if screen is horizontal/landscape
-  static bool isHorizontal(BuildContext context) {
-    final aspectRatio = getAspectRatio(context);
-    // Landscape mode: aspect ratio > 1 (width > height)
     return aspectRatio > 1.0;
   }
 
-  // Check if screen is a tablet (typical tablet aspect ratios: 4:3, 16:10, etc.)
-  static bool isTablet(BuildContext context) {
+  @Deprecated('Use LayoutBuilder with isVertical(constraints)')
+  static bool isVerticalContext(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    return aspectRatio < 1.0;
+  }
+
+  @Deprecated('Use LayoutBuilder with isTablet(constraints)')
+  static bool isTabletContext(BuildContext context) {
     try {
       final aspectRatio = getAspectRatio(context);
       final size = getScreenSize(context);
@@ -73,23 +82,29 @@ class ResponsiveHelper {
       
       if (mediaQuery != null) {
         final shortestSide = size.width < size.height ? size.width : size.height;
-        // Tablets typically have:
-        // - Shortest side >= 600dp (physical size check)
-        // - Aspect ratio between 0.7 and 1.7 (covers 4:3, 16:10, 3:4, 10:16)
         return shortestSide >= 600 && aspectRatio >= 0.7 && aspectRatio <= 1.7;
       }
-      return false; // Default to not a tablet if MediaQuery is not available
+      return false;
     } catch (e) {
-      return false; // Default to not a tablet on error
+      return false;
     }
   }
 
-  // Check if it's a tall phone in landscape mode (like 19.3:9 rotated = aspect ratio > 2.0)
+  static bool isVeryWideScreen(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    return aspectRatio >= 1.7;
+  }
+
+  static bool isTallScreen(BuildContext context) {
+    final aspectRatio = getAspectRatio(context);
+    return aspectRatio < 0.5;
+  }
+
   static bool isTallPhoneInLandscape(BuildContext context) {
     final aspectRatio = getAspectRatio(context);
-    // Tall phones in landscape have aspect ratio > 2.0 (like 19.3:9 = 2.14)
-    // But exclude tablets
-    return isHorizontal(context) && aspectRatio > 2.0 && !isTablet(context);
+    final size = getScreenSize(context);
+    final shortestSide = size.width < size.height ? size.width : size.height;
+    return aspectRatio > 2.0 && shortestSide < 600;
   }
 
   // Get responsive AppBar height based on aspect ratio

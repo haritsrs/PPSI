@@ -372,9 +372,11 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
     final paddingScale = ResponsiveHelper.getPaddingScale(context);
     final iconScale = ResponsiveHelper.getIconScale(context);
     final mediaQuery = MediaQuery.of(context);
-    final isLandscape = mediaQuery.size.width > mediaQuery.size.height;
-    final isMobileWidth = mediaQuery.size.width < 900;
-    final useCleanLayout = !isMobileWidth && isLandscape && _useCleanLayout;
+    final isLandscape = ResponsiveHelper.isHorizontal(context);
+    // Use aspect ratio instead of hardcoded pixel width
+    // Wide screens (tablets/desktops) have aspect ratio >= 1.3 in landscape
+    final isWideScreen = ResponsiveHelper.isWideScreen(context) || ResponsiveHelper.isTablet(context);
+    final useCleanLayout = isWideScreen && isLandscape && _useCleanLayout;
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -737,10 +739,17 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
   }
 
   Widget _buildCleanHorizontalLayout(BuildContext context, double paddingScale, double iconScale) {
-    const cartWidth = 380.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate responsive cart width:
+        // - Max 380px on very wide screens
+        // - 35% of screen width on medium screens
+        // - Min 280px to ensure usability
+        final dynamicCartWidth = constraints.maxWidth * 0.35;
+        final cartWidth = dynamicCartWidth.clamp(280.0, 380.0);
 
-    return Row(
-      children: [
+        return Row(
+          children: [
         Expanded(
           child: Column(
             children: [
@@ -865,6 +874,8 @@ class _KasirPageState extends State<KasirPage> with TickerProviderStateMixin {
         ),
         ),
       ],
+    );
+      },
     );
   }
 

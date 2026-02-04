@@ -49,12 +49,12 @@ service firebase.storage {
     
     // Custom QR codes: Users can only read/write their own QR code
     // Path structure: custom_qr_codes/{userId}.jpg
-    match /custom_qr_codes/{fileName} {
-      // Extract userId from filename (filename is userId.jpg)
+    match /custom_qr_codes/{userId}.jpg {
+      // The userId is extracted from the path segment, not filename
       // Users can only access their own QR code
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
-      allow delete: if isAuthenticated() && fileName == request.auth.uid + '.jpg';
+      allow write: if isAuthenticated() && userId == request.auth.uid;
+      allow delete: if isAuthenticated() && userId == request.auth.uid;
     }
   }
 }

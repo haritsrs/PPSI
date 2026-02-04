@@ -143,12 +143,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final showHomeChrome = _selectedIndex == 0;
     final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
-    final isWidePortraitTablet = mq.orientation == Orientation.portrait && mq.size.width >= 840;
-    final isMobileWidth = mq.size.width < 900;
+    final isLandscape = ResponsiveHelper.isHorizontal(context);
+    final isWidePortraitTablet = ResponsiveHelper.isVertical(context) && ResponsiveHelper.isTablet(context);
+    // Use aspect ratio instead of hardcoded pixel width
+    final isWideScreen = ResponsiveHelper.isWideScreen(context) || ResponsiveHelper.isTablet(context);
 
     // Use desktop/tablet layout only when the screen is wide enough
-    if (!isMobileWidth && (isLandscape || isWidePortraitTablet)) {
+    if (isWideScreen && (isLandscape || isWidePortraitTablet)) {
       return HomeLandscapeLayout(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,

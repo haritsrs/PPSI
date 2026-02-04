@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../../models/cart_item_model.dart';
 import '../../models/custom_item_model.dart';
 import '../../utils/responsive_helper.dart';
@@ -166,38 +167,47 @@ class CartPanel extends StatelessWidget {
                 ),
         ),
         if (cartItems.isNotEmpty || customItems.isNotEmpty) ...[
-          Container(
-            padding: EdgeInsets.all(16 * paddingScale),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              border: const Border(
-                top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(
+              bottom: math.max(
+                MediaQuery.of(context).padding.bottom,
+                MediaQuery.of(context).viewInsets.bottom,
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildBillRow(context, "Subtotal", subtotal, paddingScale),
-                SizedBox(height: 8 * paddingScale),
-                _buildTaxRow(context, tax, paddingScale),
-                SizedBox(height: 16 * paddingScale),
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 12 * paddingScale),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+            child: Container(
+              padding: EdgeInsets.all(16 * paddingScale),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                border: const Border(
+                  top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildBillRow(context, "Subtotal", subtotal, paddingScale),
+                  SizedBox(height: 8 * paddingScale),
+                  _buildTaxRow(context, tax, paddingScale),
+                  SizedBox(height: 16 * paddingScale),
+                  Container(
+                    padding: EdgeInsets.symmetric(vertical: 12 * paddingScale),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: const Color(0xFFE5E7EB),
+                        width: 1,
                       ),
-                    ],
-                    border: Border.all(
-                      color: const Color(0xFFE5E7EB),
-                      width: 1,
                     ),
-                  ),
                   child: _buildBillRow(context, "Total", total, paddingScale, isTotal: true),
                 ),
                 SizedBox(height: 16 * paddingScale),
@@ -257,6 +267,7 @@ class CartPanel extends StatelessWidget {
                 ],
               ],
             ),
+          ),
           ),
         ],
       ],

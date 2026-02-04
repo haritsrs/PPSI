@@ -474,17 +474,34 @@ class _PaymentModalState extends State<PaymentModal> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    final systemBottomPadding = MediaQuery.of(context).padding.bottom;
-    // Use keyboard height if keyboard is visible, otherwise use system navigation bar height
-    final bottomPadding = keyboardHeight > 0 ? keyboardHeight : systemBottomPadding;
+    final mediaQuery = MediaQuery.of(context);
+    final systemTopPadding = mediaQuery.padding.top;
+    final screenHeight = mediaQuery.size.height;
+    final screenWidth = mediaQuery.size.width;
+    final aspectRatio = screenWidth / screenHeight;
+    
+    // Calculate safe area bottom padding (navbar or keyboard, whichever is larger)
+    final bottomInset = math.max(
+      mediaQuery.padding.bottom,
+      mediaQuery.viewInsets.bottom,
+    );
+    
+    // Calculate max height intelligently:
+    // - In landscape (aspect >= 1.5), use 90% of height since screen is short
+    // - In portrait, use 80% to leave room for context
+    // - Account for keyboard by using available screen height minus safe areas
+    final availableHeight = screenHeight - systemTopPadding;
+    final isLandscape = aspectRatio >= 1.5;
+    final maxHeightPercentage = isLandscape ? 0.95 : 0.85;
+    final calculatedMaxHeight = availableHeight * maxHeightPercentage;
     
     return AnimatedPadding(
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      duration: const Duration(milliseconds: 100),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
+          maxHeight: calculatedMaxHeight,
         ),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -494,7 +511,7 @@ class _PaymentModalState extends State<PaymentModal> {
           ),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
           Container(
             margin: const EdgeInsets.only(top: 12),
@@ -632,7 +649,7 @@ class _PaymentModalState extends State<PaymentModal> {
             ),
           ),
           const SizedBox(height: 24),
-          Flexible(
+          Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Column(
